@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fibrobot - Assistant Intelligent pour la Fibromyalgie</title>
+    <style>
+        /* ===== FIBROBOT v3.1 STYLES ===== */
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #166088;
+            --accent-color: #4fc3f7;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--light-color);
+            color: var(--dark-color);
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--dark-color);
+        }
+
+        .header h1 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #6c757d;
+            font-size: 1.1rem;
+        }
+
+        .chat-container {
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            height: 50vh; /* Hauteur fixe pour le scroll */
+            overflow-y: auto;
+            border-left: 4px solid var(--primary-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            max-width: 85%;
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #e9f7fe;
+            align-self: flex-end; /* Aligner à droite */
+            border-top-right-radius: 0;
+            color: var(--dark-color);
+        }
+
+        .bot-message {
+            background-color: #f8f9fa;
+            align-self: flex-start; /* Aligner à gauche */
+            border-top-left-radius: 0;
+            color: var(--dark-color);
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+        }
+
+        #send-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        #send-button:hover {
+            background-color: var(--secondary-color);
+        }
+
+        #voice-button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.8rem 1rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        #voice-button:hover {
+            background-color: #3ab7e5;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        .symptom-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .symptom-item:last-child {
+            border-bottom: none;
+        }
+
+        .symptom-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .symptom-edit, .symptom-delete {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            color: var(--dark-color);
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .symptom-edit:hover, .symptom-delete:hover {
+            background-color: #e9ecef;
+        }
+
+        .symptom-delete {
+            color: var(--danger-color);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            max-width: 500px;
+            width: 90%;
+            box-shadow: var(--box-shadow);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+        }
+
+        .close-modal {
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-weight: 600;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+        }
+
+        .btn-secondary {
+            background-color: #f8f9fa;
+            color: var(--dark-color);
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background-color: #e9ecef;
+        }
+
+        .toast {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: var(--success-color);
+            color: white;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            z-index: 1001;
+        }
+
+        .toast.error { background-color: var(--danger-color); }
+        .toast.warning { background-color: var(--warning-color); }
+        .toast-info { background-color: var(--primary-color); }
+
+        .toast-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .toast-message { font-size: 1rem; }
+        .toast-close {
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-left: 1rem;
+        }
+
+        .suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .suggestion-item {
+            background-color: #f8f9fa;
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            border: 1px solid #eee;
+        }
+
+        .suggestion-item:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .recommendations { margin-top: 1rem; }
+
+        .recommendation-item {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 0.8rem;
+            cursor: pointer;
+            transition: var(--transition);
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .recommendation-item:hover {
+            background-color: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Fibrobot</h1>
+        <p>Votre assistant intelligent pour la gestion de la fibromyalgie</p>
+    </div>
+
+    <div class="chat-container" id="chat-container">
+        </div>
+
+    <div class="input-container">
+        <input type="text" id="user-input" placeholder="Posez votre question ici..." autocomplete="off">
+        <button id="send-button">Envoyer</button>
+        <button id="voice-button">🎤</button>
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">📊 Analyse Complète</h2>
+        <div class="chart-container">
+            <canvas id="painChart"></canvas>
+        </div>
+        <p style="text-align: center; font-size: 0.8rem; color: #888; margin-top: 5px;">Comparatif Douleur vs Énergie</p>
+        <button class="btn btn-primary" style="margin-top: 1rem;" onclick="generatePDF()">📄 Télécharger Rapport PDF</button>
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">📝 Suivi des Symptômes</h2>
+        <div id="symptoms-list">
+            </div>
+        <button class="btn btn-primary" onclick="openAddSymptomModal()">🆕 Ajouter un symptôme</button>
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">💡 Suggestions</h2>
+        <div class="suggestions" id="suggestions-container">
+            </div>
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">📚 Recommandations</h2>
+        <div class="recommendations" id="recommendations-container">
+            </div>
+    </div>
+
+    <div class="modal" id="symptom-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Ajouter un symptôme</h3>
+                <span class="close-modal" id="close-modal">&times;</span>
+            </div>
+            <form id="symptom-form">
+                <div class="modal-form">
+                    <div class="form-group">
+                        <label for="symptom-name">Nom du symptôme</label>
+                        <input type="text" id="symptom-name" required placeholder="Ex: Douleur épaule">
+                    </div>
+                    <div class="form-group">
+                        <label for="symptom-date">Date</label>
+                        <input type="date" id="symptom-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="symptom-intensity">Intensité (1-10)</label>
+                        <input type="number" id="symptom-intensity" min="1" max="10" value="5" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="symptom-notes">Notes</label>
+                        <textarea id="symptom-notes" rows="3" placeholder="Détails supplémentaires..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancel-modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary" id="save-modal">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">
+        <div class="toast-content">
+            <p class="toast-message" id="toast-message">Message</p>
+            <span class="toast-close" id="toast-close">&times;</span>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // 🗃️ Gestion de la base de données (IndexedDB)
+        // ============================================================================
+
+        class DatabaseManager {
+            constructor() {
+                this.dbName = 'FibrobotDB';
+                this.dbVersion = 1;
+                this.db = null;
+                // Cache mémoire pour la base de connaissances
+                this.knowledgeBaseCache = [];
+            }
+
+            async initDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.dbVersion);
+
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains('symptoms')) {
+                            db.createObjectStore('symptoms', { keyPath: 'id', autoIncrement: true });
+                        }
+                        if (!db.objectStoreNames.contains('conversations')) {
+                            db.createObjectStore('conversations', { keyPath: 'id', autoIncrement: true });
+                        }
+                        if (!db.objectStoreNames.contains('knowledgeBase')) {
+                            db.createObjectStore('knowledgeBase', { keyPath: 'question' });
+                        }
+                    };
+
+                    request.onsuccess = () => {
+                        this.db = request.result;
+                        resolve();
+                    };
+
+                    request.onerror = (event) => {
+                        console.error('Erreur DB:', event.target.error);
+                        reject(event.target.error);
+                    };
+                });
+            }
+
+            async addSymptom(symptom) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction(['symptoms'], 'readwrite');
+                    const store = transaction.objectStore('symptoms');
+                    const request = store.add(symptom);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = (event) => reject(event.target.error);
+                });
+            }
+
+            async getAllSymptoms() {
+                return new Promise((resolve, reject) => {
+                    if (!this.db) return resolve([]);
+                    const transaction = this.db.transaction(['symptoms'], 'readonly');
+                    const store = transaction.objectStore('symptoms');
+                    const request = store.getAll();
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = (event) => reject(event.target.error);
+                });
+            }
+
+            async updateSymptom(id, updatedSymptom) {
+                return new Promise((resolve, reject) => {
+                    // On s'assure de garder l'ID lors de l'update
+                    updatedSymptom.id = id;
+                    const transaction = this.db.transaction(['symptoms'], 'readwrite');
+                    const store = transaction.objectStore('symptoms');
+                    const request = store.put(updatedSymptom);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = (event) => reject(event.target.error);
+                });
+            }
+
+            async deleteSymptom(id) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction(['symptoms'], 'readwrite');
+                    const store = transaction.objectStore('symptoms');
+                    const request = store.delete(id);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = (event) => reject(event.target.error);
+                });
+            }
+
+            async addConversation(message) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction(['conversations'], 'readwrite');
+                    const store = transaction.objectStore('conversations');
+                    const request = store.add(message);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = (event) => reject(event.target.error);
+                });
+            }
+
+            async saveToKnowledgeBase(question, answer) {
+                // Mise à jour cache et DB
+                this.knowledgeBaseCache.push({ question, answer });
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction(['knowledgeBase'], 'readwrite');
+                    const store = transaction.objectStore('knowledgeBase');
+                    const request = store.put({ question, answer });
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = (event) => reject(event.target.error);
+                });
+            }
+
+            async getFromKnowledgeBase(question) {
+                return new Promise((resolve, reject) => {
+                    // 1. Chercher dans le cache
+                    const found = this.knowledgeBaseCache.find(entry =>
+                        entry.question.toLowerCase() === question.toLowerCase() ||
+                        entry.question.toLowerCase().includes(question.toLowerCase())
+                    );
+                    if (found) {
+                        resolve(found.answer);
+                        return;
+                    }
+
+                    // 2. Chercher dans la DB
+                    const transaction = this.db.transaction(['knowledgeBase'], 'readonly');
+                    const store = transaction.objectStore('knowledgeBase');
+                    const request = store.openCursor();
+                    
+                    let result = null;
+                    request.onsuccess = (event) => {
+                        const cursor = event.target.result;
+                        if (cursor) {
+                            if (cursor.value.question.toLowerCase().includes(question.toLowerCase())) {
+                                result = cursor.value.answer;
+                                // Mettre en cache pour la prochaine fois
+                                this.knowledgeBaseCache.push(cursor.value);
+                            } else {
+                                cursor.continue();
+                                return;
+                            }
+                        }
+                        resolve(result);
+                    };
+                    request.onerror = (event) => reject(event.target.error);
+                });
+            }
+        }
+
+        // ============================================================================
+        // 📊 Fonctionnalités de graphiques
+        // ============================================================================
+
+        let painChart = null;
+
+        function initChart() {
+            const ctx = document.getElementById('painChart').getContext('2d');
+            painChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Intensité de la douleur',
+                        data: [],
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }, {
+                        label: 'Niveau d\'énergie',
+                        data: [],
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 10,
+                            title: { display: true, text: 'Niveau (1-10)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(symptoms) {
+            if(!painChart) return;
+            
+            const dates = [];
+            const painData = [];
+            const energyData = [];
+
+            // Trier les symptômes par date
+            const sortedSymptoms = [...symptoms].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            sortedSymptoms.forEach(symptom => {
+                const date = new Date(symptom.date);
+                dates.push(date.toLocaleDateString('fr-FR', { month: 'short', day: 'numeric' }));
+                painData.push(symptom.intensity);
+                // Estimation énergie : 10 - douleur (simplifié)
+                energyData.push(Math.max(0, 10 - symptom.intensity));
+            });
+
+            painChart.data.labels = dates;
+            painChart.data.datasets[0].data = painData;
+            painChart.data.datasets[1].data = energyData;
+            painChart.update();
+        }
+
+        // ============================================================================
+        // 📄 Fonctionnalités de génération de PDF
+        // ============================================================================
+
+        function generatePDF() {
+            if (!window.jspdf) {
+                showToast("Erreur: Librairie PDF non chargée", "error");
+                return;
+            }
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFontSize(20);
+            doc.setTextColor(74, 111, 165); // Primary color
+            doc.text('Rapport Fibrobot', 105, 20, { align: 'center' });
+
+            const today = new Date();
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Généré le ${today.toLocaleDateString('fr-FR')} à ${today.toLocaleTimeString('fr-FR')}`, 105, 30, { align: 'center' });
+
+            doc.setFontSize(14);
+            doc.setTextColor(0);
+            doc.text('Historique des symptômes', 20, 50);
+            doc.setLineWidth(0.5);
+            doc.line(20, 52, 190, 52);
+
+            dbManager.getAllSymptoms().then(symptoms => {
+                if(symptoms.length === 0) {
+                    doc.setFontSize(12);
+                    doc.text("Aucun symptôme enregistré.", 20, 65);
+                } else {
+                    let yOffset = 65;
+                    // Trier du plus récent au plus ancien pour le PDF
+                    const sorted = symptoms.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                    sorted.forEach(symptom => {
+                        if (yOffset > 270) {
+                            doc.addPage();
+                            yOffset = 20;
+                        }
+
+                        const date = new Date(symptom.date);
+                        const formattedDate = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+                        doc.setFontSize(12);
+                        doc.setFont(undefined, 'bold');
+                        doc.text(`• ${symptom.name}`, 20, yOffset);
+                        
+                        doc.setFont(undefined, 'normal');
+                        doc.setFontSize(10);
+                        doc.text(`${formattedDate} | Intensité: ${symptom.intensity}/10`, 30, yOffset + 5);
+                        
+                        if (symptom.notes) {
+                            doc.setTextColor(80);
+                            doc.text(`Note: ${symptom.notes}`, 30, yOffset + 10);
+                            doc.setTextColor(0);
+                            yOffset += 20;
+                        } else {
+                            yOffset += 15;
+                        }
+                    });
+                }
+                
+                doc.save('Rapport_Fibrobot.pdf');
+                showToast("PDF généré avec succès", "success");
+            }).catch(error => {
+                console.error('Erreur PDF:', error);
+                showToast('Erreur lors de la génération du PDF', 'error');
+            });
+        }
+
+        // ============================================================================
+        // 🎤 Reconnaissance vocale
+        // ============================================================================
+
+        let recognition = null;
+        let isListening = false;
+
+        function initSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                document.getElementById('voice-button').style.display = 'none';
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'fr-FR';
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('user-input').value = transcript;
+                processUserInput(transcript);
+                stopListening();
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Erreur vocale:', event.error);
+                stopListening();
+                if(event.error !== 'no-speech') {
+                    showToast('Erreur vocale: ' + event.error, 'error');
+                }
+            };
+
+            recognition.onend = () => {
+                stopListening();
+            };
+        }
+
+        function stopListening() {
+            isListening = false;
+            document.getElementById('voice-button').textContent = '🎤';
+            document.getElementById('voice-button').style.backgroundColor = 'var(--accent-color)';
+        }
+
+        function toggleSpeechRecognition() {
+            if (!recognition) return;
+
+            if (isListening) {
+                recognition.stop();
+                stopListening();
+            } else {
+                try {
+                    recognition.start();
+                    isListening = true;
+                    document.getElementById('voice-button').textContent = '🛑';
+                    document.getElementById('voice-button').style.backgroundColor = 'var(--danger-color)';
+                    showToast('Je vous écoute...', 'info');
+                } catch (error) {
+                    console.error('Start error:', error);
+                }
+            }
+        }
+
+        function speak(text) {
+            if (!('speechSynthesis' in window)) return;
+            // Annuler la parole précédente
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'fr-FR';
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // ============================================================================
+        // 📝 UI Gestion Symptômes
+        // ============================================================================
+
+        function openAddSymptomModal() {
+            document.getElementById('modal-title').textContent = 'Ajouter un symptôme';
+            document.getElementById('symptom-name').value = '';
+            document.getElementById('symptom-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('symptom-intensity').value = '5';
+            document.getElementById('symptom-notes').value = '';
+            document.getElementById('symptom-form').dataset.id = ''; // Clear ID
+            document.getElementById('symptom-modal').style.display = 'flex';
+        }
+
+        function openEditSymptomModal(id) {
+            dbManager.getAllSymptoms().then(symptoms => {
+                const symptom = symptoms.find(s => s.id === id);
+                if (symptom) {
+                    document.getElementById('modal-title').textContent = 'Modifier un symptôme';
+                    document.getElementById('symptom-name').value = symptom.name;
+                    document.getElementById('symptom-date').value = symptom.date.split('T')[0];
+                    document.getElementById('symptom-intensity').value = symptom.intensity;
+                    document.getElementById('symptom-notes').value = symptom.notes || '';
+                    document.getElementById('symptom-form').dataset.id = id;
+                    document.getElementById('symptom-modal').style.display = 'flex';
+                }
+            });
+        }
+
+        function closeModal() {
+            document.getElementById('symptom-modal').style.display = 'none';
+        }
+
+        function saveSymptom(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('symptom-name').value;
+            const date = document.getElementById('symptom-date').value;
+            const intensity = parseInt(document.getElementById('symptom-intensity').value);
+            const notes = document.getElementById('symptom-notes').value;
+            const id = document.getElementById('symptom-form').dataset.id;
+
+            if (!name || !date || isNaN(intensity)) {
+                showToast('Champs obligatoires manquants', 'warning');
+                return;
+            }
+
+            const symptom = {
+                name,
+                date: `${date}T12:00:00`, // Midi pour éviter problèmes de fuseau horaire
+                intensity,
+                notes: notes || ''
+            };
+
+            const action = id ? dbManager.updateSymptom(parseInt(id), symptom) : dbManager.addSymptom(symptom);
+
+            action.then(() => {
+                showToast(id ? 'Modifié avec succès' : 'Ajouté avec succès', 'success');
+                updateSymptomsList();
+                closeModal();
+            }).catch(error => {
+                console.error('Erreur sauvegarde:', error);
+                showToast('Erreur lors de la sauvegarde', 'error');
+            });
+        }
+
+        function deleteSymptom(id) {
+            if (confirm('Supprimer ce symptôme ?')) {
+                dbManager.deleteSymptom(id).then(() => {
+                    showToast('Symptôme supprimé', 'success');
+                    updateSymptomsList();
+                });
+            }
+        }
+
+        function updateSymptomsList() {
+            dbManager.getAllSymptoms().then(symptoms => {
+                const symptomsList = document.getElementById('symptoms-list');
+                symptomsList.innerHTML = '';
+
+                if (symptoms.length === 0) {
+                    symptomsList.innerHTML = '<p style="text-align:center; color:#888;">Aucun symptôme enregistré.</p>';
+                    // Reset chart
+                    updateChart([]);
+                    return;
+                }
+
+                const sortedSymptoms = [...symptoms].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                sortedSymptoms.forEach(symptom => {
+                    const item = document.createElement('div');
+                    item.className = 'symptom-item';
+                    const dateStr = new Date(symptom.date).toLocaleDateString('fr-FR');
+
+                    item.innerHTML = `
+                        <div>
+                            <strong>${symptom.name}</strong> <small>(${dateStr})</small><br>
+                            <span style="color:${getColorForIntensity(symptom.intensity)}">Intensité: ${symptom.intensity}/10</span>
+                            ${symptom.notes ? `<br><small style="color:#666">"${symptom.notes}"</small>` : ''}
+                        </div>
+                        <div class="symptom-actions">
+                            <span class="symptom-edit" onclick="openEditSymptomModal(${symptom.id})">✏️</span>
+                            <span class="symptom-delete" onclick="deleteSymptom(${symptom.id})">🗑️</span>
+                        </div>
+                    `;
+                    symptomsList.appendChild(item);
+                });
+
+                updateChart(symptoms);
+            });
+        }
+
+        function getColorForIntensity(val) {
+            if(val <= 3) return '#28a745';
+            if(val <= 6) return '#ffc107';
+            return '#dc3545';
+        }
+
+        // ============================================================================
+        // 📢 Chat & NLP
+        // ============================================================================
+
+        const knowledgeBaseStatic = [
+            {
+                question: "Qu'est-ce que la fibromyalgie ?",
+                answer: "La fibromyalgie est un syndrome chronique caractérisé par des douleurs diffuses dans tout le corps, associées à une grande fatigue et des troubles du sommeil."
+            },
+            {
+                question: "Symptômes",
+                answer: "Les principaux symptômes sont : douleurs musculaires/articulaires, fatigue intense, troubles du sommeil, brouillard mental (fibro fog) et raideurs matinales."
+            },
+            {
+                question: "Traitement",
+                answer: "Il n'y a pas de remède unique. La prise en charge est pluridisciplinaire : activité physique adaptée, médicaments (antalgiques, antidépresseurs), relaxation, et soutien psychologique."
+            },
+            {
+                question: "Sport",
+                answer: "L'activité physique est essentielle mais doit être douce et progressive : marche, balnéothérapie, vélo d'appartement, yoga ou Tai-chi."
+            }
+        ];
+
+        async function processUserInput(input) {
+            if (!input.trim()) return;
+
+            addMessageToChat(input, 'user');
+            
+            // Indicateur de chargement
+            const loadingId = 'loading-' + Date.now();
+            const chatContainer = document.getElementById('chat-container');
+            const loadingHTML = `
+                <div class="message bot-message" id="${loadingId}">
+                    <div class="message-content">
+                        <div class="loading-container">
+                            <span>Fibrobot réfléchit...</span>
+                            <span class="loading"></span>
+                        </div>
+                    </div>
+                </div>`;
+            chatContainer.insertAdjacentHTML('beforeend', loadingHTML);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // Simulation délai réseau pour réalisme
+            setTimeout(async () => {
+                try {
+                    const response = await generateSmartResponse(input);
+                    
+                    // Retirer le loading
+                    const loadingEl = document.getElementById(loadingId);
+                    if(loadingEl) loadingEl.remove();
+
+                    addMessageToChat(response, 'bot');
+                    
+                    // Apprentissage simple (sauvegarde question/réponse)
+                    dbManager.saveToKnowledgeBase(input, response);
+
+                } catch (error) {
+                    console.error("Erreur chat:", error);
+                    const loadingEl = document.getElementById(loadingId);
+                    if(loadingEl) loadingEl.remove();
+                    addMessageToChat("Désolé, j'ai eu un petit problème technique.", 'bot');
+                }
+            }, 800);
+        }
+
+        async function generateSmartResponse(input) {
+            const lowerInput = input.toLowerCase();
+
+            // 1. Chercher dans la base statique (priorité haute)
+            for (const item of knowledgeBaseStatic) {
+                if (lowerInput.includes(item.question.toLowerCase()) || (item.question.length < 15 && lowerInput.includes(item.question.toLowerCase()))) {
+                   return item.answer; 
+                }
+            }
+
+            // 2. Chercher dans la base de données apprise
+            const learnedAnswer = await dbManager.getFromKnowledgeBase(lowerInput);
+            if (learnedAnswer) return learnedAnswer;
+
+            // 3. Logique par mots-clés
+            if (lowerInput.includes('bonjour') || lowerInput.includes('salut')) return "Bonjour ! Comment vous sentez-vous aujourd'hui ?";
+            if (lowerInput.includes('merci')) return "Je vous en prie. Prenez soin de vous.";
+            if (lowerInput.includes('fatigue') || lowerInput.includes('épuis')) return "La fatigue est courante. Essayez de fractionner vos activités et accordez-vous des micro-siestes de 15-20 minutes.";
+            if (lowerInput.includes('douleur') || lowerInput.includes('mal')) return "Je suis désolé. Avez-vous pensé à appliquer de la chaleur, ou à faire quelques étirements doux ? N'oubliez pas de noter cette douleur dans votre suivi.";
+            if (lowerInput.includes('alimentation') || lowerInput.includes('manger')) return "Une alimentation anti-inflammatoire (type méditerranéen) riche en oméga-3, fruits et légumes aide souvent à réduire les symptômes.";
+
+            // 4. Fallback
+            return "Je ne suis pas sûr de comprendre. Pouvez-vous reformuler ? Vous pouvez me demander des conseils sur le sommeil, le sport ou l'alimentation.";
+        }
+
+        function addMessageToChat(message, sender) {
+            const chatContainer = document.getElementById('chat-container');
+            const div = document.createElement('div');
+            div.className = `message ${sender}-message`;
+            div.innerHTML = `<div class="message-content">${message}</div>`;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            if (sender === 'bot') speak(message);
+        }
+
+        // ============================================================================
+        // 🚀 Initialisation
+        // ============================================================================
+
+        const dbManager = new DatabaseManager();
+
+        async function initApp() {
+            try {
+                await dbManager.initDB();
+                updateSymptomsList();
+                initChart();
+                initSpeechRecognition();
+                
+                // Remplir les suggestions
+                const suggestionsDiv = document.getElementById('suggestions-container');
+                suggestionsDiv.innerHTML = '';
+                ["Symptômes", "Traitements", "Fatigue", "Alimentation", "Sport"].forEach(topic => {
+                    const tag = document.createElement('div');
+                    tag.className = 'suggestion-item';
+                    tag.textContent = topic;
+                    tag.onclick = () => {
+                        document.getElementById('user-input').value = topic;
+                        processUserInput(topic);
+                    };
+                    suggestionsDiv.appendChild(tag);
+                });
+
+                // Remplir recommandations
+                const recDiv = document.getElementById('recommendations-container');
+                recDiv.innerHTML = `
+                    <div class="recommendation-item" onclick="processUserInput('sommeil')">
+                        <h4>💤 Hygiène du sommeil</h4>
+                        <p>Astuces pour mieux dormir malgré les douleurs.</p>
+                    </div>
+                    <div class="recommendation-item" onclick="processUserInput('stress')">
+                        <h4>🧘 Gestion du stress</h4>
+                        <p>Techniques de respiration et relaxation.</p>
+                    </div>
+                `;
+
+                // Message d'accueil différé
+                setTimeout(() => {
+                    addMessageToChat("Bonjour ! Je suis Fibrobot. Je suis là pour vous écouter et vous aider à suivre votre santé. Comment allez-vous ?", 'bot');
+                }, 500);
+
+            } catch (e) {
+                console.error("Init Error:", e);
+                showToast("Erreur d'initialisation de l'application", "error");
+            }
+        }
+
+        // Event Listeners globaux
+        document.addEventListener('DOMContentLoaded', initApp);
+        
+        document.getElementById('send-button').addEventListener('click', () => {
+            const input = document.getElementById('user-input');
+            processUserInput(input.value);
+            input.value = '';
+        });
+
+        document.getElementById('user-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('send-button').click();
+            }
+        });
+
+        document.getElementById('voice-button').addEventListener('click', toggleSpeechRecognition);
+        
+        // Modal events
+        document.getElementById('close-modal').onclick = closeModal;
+        document.getElementById('cancel-modal').onclick = closeModal;
+        document.getElementById('symptom-form').onsubmit = saveSymptom;
+        
+        document.getElementById('toast-close').onclick = () => {
+            document.getElementById('toast').style.display = 'none';
+        };
+
+        function showToast(msg, type='info') {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            t.className = 'toast ' + type;
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 4000);
+        }
+
+    </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+</html>
