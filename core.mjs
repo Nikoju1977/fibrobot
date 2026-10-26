@@ -1,7 +1,7 @@
 /* FibroBot — moteur local vérifiable (MIT). Aucune IA distante. */
 export const DB_NAME="FibrobotDB";
-export const DB_VERSION=2;
-export const STORES=["symptoms","tasks","conditions","appointments","settings","conversations","knowledgeBase"];
+export const DB_VERSION=3;
+export const STORES=["symptoms","tasks","conditions","appointments","medications","settings","conversations","knowledgeBase"];
 export function today(date=new Date()){return [date.getFullYear(),String(date.getMonth()+1).padStart(2,"0"),String(date.getDate()).padStart(2,"0")].join("-");}
 export function text(v,max=800){return String(v??"").trim().slice(0,max);}
 export function dateOK(v){return /^\d{4}-\d\d-\d\d$/.test(String(v))&&today(new Date(v+"T12:00:00"))===v;}
@@ -33,3 +33,5 @@ export function all(db,name){return new Promise((resolve,reject)=>{const req=db.
 export function put(db,name,record){return new Promise((resolve,reject)=>{const req=db.transaction(name,"readwrite").objectStore(name).put(record);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 export function del(db,name,id){return new Promise((resolve,reject)=>{const req=db.transaction(name,"readwrite").objectStore(name).delete(id);req.onsuccess=()=>resolve();req.onerror=()=>reject(req.error);});}
 export function wipeDB(){return new Promise((resolve,reject)=>{const r=indexedDB.deleteDatabase(DB_NAME);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error("Fermez les autres onglets FibroBot."));});}
+
+export function makeMedication(v){const name=text(v.name,160),dose=text(v.dose,160),schedule=text(v.schedule,200),prescriber=text(v.prescriber,160),notes=text(v.notes,1000);if(!name)throw Error("Indiquez le nom tel qu'inscrit sur votre ordonnance.");return{name,dose,schedule,prescriber,notes,created:Date.now()};}
