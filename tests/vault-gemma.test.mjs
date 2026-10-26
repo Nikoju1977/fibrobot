@@ -50,3 +50,21 @@ test("gemma output is a closed selection of existing tasks only",()=>{
   assert.equal(parseTaskOrder(s,3),null,s);
  }
 });
+
+test("aucun texte libre ni nom de tâche ne peut pénétrer dans le worker Gemma",()=>{
+ const privatePhrase="CONFIDENTIEL-DIAGNOSTIC-MEDICAMENT-98765";
+ const tasks=[
+  {title:"Mes traitements "+privatePhrase,effort:1,priority:"important",done:false,notes:"Secret"},
+  {title:"Adresse privée "+privatePhrase,effort:2,priority:"normal",done:false}
+ ];
+ const messages=safePlanInput("Organise-moi "+privatePhrase,{energy:3,tasks,medications:[{name:privatePhrase}],symptoms:[{name:privatePhrase}]});
+ const prompt=JSON.stringify(messages);
+ assert.ok(!prompt.includes(privatePhrase));
+ assert.ok(!prompt.includes("Adresse privée"));
+ assert.ok(!prompt.includes("traitements"));
+ assert.deepEqual(parseTaskOrder('{"ordre":[1,0]}',2),[1,0]);
+});
+test("les suggestions Gemma sont uniquement des indices déjà déclarés",()=>{
+ const bad=['{"ordre":[-1]}','{"ordre":[8]}','{"ordre":[0,0]}','{"ordre":[0,1,2,3]}','{"ordre":[0],"texte":"conseil"}','{"ordre":["0"]}'];
+ for(const output of bad)assert.equal(parseTaskOrder(output,3),null,output);
+});
