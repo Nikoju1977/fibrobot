@@ -1,40 +1,61 @@
-# 🤖 FibroBot
+# FibroBot — assistant de vie local
 
-## Ce que fait l'application, en pratique
+FibroBot est un assistant de vie pour les personnes vivant avec la fibromyalgie et d'autres maladies chroniques. Il conserve un profil multi-maladies, un journal de santé, des tâches quotidiennes, un inventaire de traitements déclarés et des rendez-vous.
 
-**FibroBot** combine un **chat d'information sur la fibromyalgie**, un espace de **suivi des symptômes**, des suggestions de lecture et de bien-être, ainsi qu'une commande d'**export de rapport PDF**. L'objectif est d'organiser des questions et observations pour une conversation avec un professionnel.
+**Statut : prototype expérimental non validé cliniquement.** Il ne remplace ni médecin, ni pharmacien, ni service d'urgence.
 
-**Statut :** outil pédagogique expérimental ; les études citées et les recommandations générées doivent être vérifiées dans leurs sources d'origine.
+## Fonctionnalités
 
-**Studio Niko Design** — Agent IA spécialisé fibromyalgie.
+- Organiser les tâches selon une énergie que la personne renseigne, sans déduire l'énergie de la douleur.
+- Tenir un journal avec douleur, énergie, fatigue, sommeil, symptômes et maladies associées.
+- Enregistrer les autres maladies chroniques, les traitements réels (tels que déclarés), les horaires et questions à poser.
+- Rappels de médicaments pour un horaire quotidien par traitement : confirmer « pris » ou « ignoré ». Les notifications ne sont pas garanties quand le navigateur est fermé.
+- Enregistrer les rendez-vous, les questions médicales et produire un rapport imprimable.
+- Mode Crise : sécurité, relaxation et respiration facultatives, aide aux tâches et liens institutionnels.
+- Afficher la date et l'heure de l'appareil. Ne pas inventer la météo réelle.
+- Fiches médicales embarquées avec sources et indications sur la qualité des preuves.
+- Exporter en JSON ou supprimer toutes les données de ce navigateur.
+- Application PWA adaptée aux smartphones et tablettes iOS/Android, hors ligne après mise en cache initiale.
 
-> Chatbot médical basé sur GWAS fibromyalgie Kerrebijn 2025 (2.56M individus, 26 loci identifiés).
+## Moteur de réponse
 
-## ✨ Fonctionnalités
-- Agent IA spécialisé fibromyalgie
-- Base scientifique GWAS 2025
-- Recommandations personnalisées
+Le moteur actuel est **déterministe et vérifiable**. Ce n'est PAS un grand modèle d'IA générative open source, ni une encyclopédie exhaustive des traitements. Les réponses de santé sont sélectionnées parmi des fiches pré-rédigées et liées à des sources. Une question sans réponse autorisée déclenche un refus explicite. Les autres maladies sont enregistrées mais ne donnent pas lieu à des traitements déduits automatiquement.
 
-## ⚠️ Disclaimer
-Outil d'information — ne remplace pas un médecin.
+Un modèle génératif sur l'appareil nécessiterait un téléchargement initial, une mémoire et une puissance variables et une validation de sécurité ; il n'est pas implémenté dans cette version. Aucun modèle ne peut garantir zéro hallucination.
 
-## 🛠 Stack
-`HTML` · `Mistral AI`
+## Voix et météo : limitations
 
-## 👤 Auteur
-**Nicolas Julienne** — [Studio Niko Design](https://github.com/Nikoju1977)
-📧 nicolasjulienne.nj@gmail.com
+La lecture vocale n'est proposée que lorsque le navigateur expose une voix française marquée comme locale. La dictée intégrée est refusée si le navigateur n'expose pas explicitement un mode de reconnaissance local. La dictée proposée par le clavier du système relève des réglages de confidentialité de ce dernier.
 
----
+La météo nécessite des données extérieures actualisées. Elle est volontairement indisponible en mode strictement local. L'heure et la date proviennent de l'appareil.
 
-## Utilisation et statut du projet
+## Rappels : limitations impératives
 
-**Thème :** Santé — information sur la fibromyalgie.
+Un seul horaire de rappel quotidien est disponible par traitement déclaré. FibroBot vérifie les rappels pendant qu'il est ouvert et affiche les rappels passés à sa réouverture. **Il ne garantit aucune notification quand l'application est fermée**, notamment sur iOS. Utilisez une alarme système pour toute prise importante.
 
-Le point d'entrée est `index.html`. Le projet peut être exploré via un serveur local (`python3 -m http.server 8000`), sous réserve des ressources externes éventuellement utilisées.
+## Traitements et soins complémentaires
 
-**Précaution :** information scientifique et pédagogique uniquement. Les études citées et leurs effectifs doivent être contrôlés dans leurs publications originales avant réutilisation. Les recommandations d'un assistant conversationnel ne remplacent pas une consultation, un diagnostic ou un traitement. Ne pas publier de données personnelles de santé dans les issues.
+Les doses et les fréquences sont recopiées par la personne et jamais vérifiées par FibroBot. Aucune vérification automatisée des interactions, contre-indications, allergies ou ajustements de prescription. Faites réviser la liste par votre médecin ou pharmacien. Méditation et hypnose : pratiques facultatives, preuves souvent limitées, jamais une substitution aux soins.
 
-**Validation :** documentation basée sur les fichiers présents ; tests fonctionnels non exécutés lors de cette mise à jour.
+## Confidentialité
 
-[Catalogue des projets Studio Niko Design](https://github.com/Nikoju1977).
+Données stockées dans IndexedDB, non chiffrées par FibroBot. Aucun script ni service d'IA tiers utilisé. Les fichiers JSON exportés et les rapports imprimables contiennent des informations de santé en clair. Protégez-les. Le navigateur contacte l'hébergeur au premier chargement et lors des mises à jour. Les liens médicaux externes ne sont ouverts que par action volontaire.
+
+Les anciens objets IndexedDB restent présents après migration ; la sauvegarde et l'effacement incluent aussi les données historiques de la version antérieure.
+
+## Utilisation et validation
+
+Servir les fichiers par un serveur statique HTTP(S), par exemple avec python3 -m http.server 8000. Les tests automatisés utilisent node --test tests/*.test.mjs. Les modules ne sont pas garantis en ouvrant directement index.html en mode fichier.
+
+Avant un usage patient en production : revue clinique externe, audit de sécurité et d'accessibilité, tests sur iOS/Android/tablettes, validation des données scientifiques, analyse RGPD et éventuel statut de dispositif médical.
+
+## Sources
+
+- HAS : https://www.has-sante.fr/jcms/p_3634512/fr/fibromyalgie-de-l-adulte-conduite-diagnostique-et-strategie-therapeutique
+- HAS pour le public : https://www.has-sante.fr/jcms/p_3686005/fr/fibromyalgie-comprendre-la-maladie-pour-mieux-vivre-avec-ses-symptomes
+- NCCIH : https://www.nccih.nih.gov/health/fibromyalgia-in-depth
+- Médicaments : https://base-donnees-publique.medicaments.gouv.fr/
+
+Urgences en France : 15 ou 112 ; crise suicidaire : 3114.
+
+Studio Niko Design.
