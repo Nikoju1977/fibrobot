@@ -1,4 +1,11 @@
 # 🤖 FibroBot
+
+## Ce que fait l'application, en pratique
+
+**FibroBot** combine un **chat d'information sur la fibromyalgie**, un espace de **suivi des symptômes**, des suggestions de lecture et de bien-être, ainsi qu'une commande d'**export de rapport PDF**. L'objectif est d'organiser des questions et observations pour une conversation avec un professionnel.
+
+**Statut :** outil pédagogique expérimental ; les études citées et les recommandations générées doivent être vérifiées dans leurs sources d'origine.
+
 **Studio Niko Design** — Agent IA spécialisé fibromyalgie.
 
 > Chatbot médical basé sur GWAS fibromyalgie Kerrebijn 2025 (2.56M individus, 26 loci identifiés).
