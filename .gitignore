@@ -1,0 +1,20 @@
+# Secrets et fichiers de santé locaux
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+fibrobot-coffre-chiffre-*.json
+Rapport_Fibrobot*.pdf
+# Poids des modèles de plusieurs gigaoctets
+*.litertlm
+*.safetensors
+*.gguf
+*.bin
+# Build local / dépendances
+node_modules/
+dist/
+.cache/
+*.log
