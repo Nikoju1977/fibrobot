@@ -1,0 +1,55 @@
+name: FibroBot - tests de fiabilite
+on:
+  push:
+    paths:
+      - "index.html"
+      - "app.mjs"
+      - "core.mjs"
+      - "medical-library.mjs"
+      - "styles.css"
+      - "sw.js"
+      - "manifest.json"
+      - "tests/**"
+      - ".github/workflows/test-app.yml"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  local-first:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Vérification syntaxe JavaScript
+        run: |
+          node --check core.mjs
+          node --check medical-library.mjs
+          node --check app.mjs
+          node --check sw.js
+      - name: Tests métier et garde-fous médicaux
+        run: node --test tests/*.test.mjs
+      - name: Contrôles de sécurité et fichiers PWA
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+          html = Path('index.html').read_text(encoding='utf-8')
+          app = Path('app.mjs').read_text(encoding='utf-8')
+          manifest = json.loads(Path('manifest.json').read_text(encoding='utf-8'))
+          assert "connect-src 'none'" in html, "Network blocked by app CSP"
+          assert '<script type="module" src="./app.mjs"></script>' in html
+          assert not re.search(r'on(?:click|load|error)\s*=',html,re.I), "Inline event handler forbidden"
+          assert not re.search(r'innerHTML\s*=|insertAdjacentHTML\s*\(|\beval\s*\(',app), "Unsafe DOM sink"
+          for f in ('index.html','app.mjs','core.mjs','medical-library.mjs','styles.css','sw.js','manifest.json','icon.svg'):
+              assert Path(f).is_file(),f'File missing: {f}'
+          for name in ('src','href'):
+              for value in re.findall(rf'{name}="([^"]+)"',html):
+                  if value.startswith('./') and not value.startswith('./#'):
+                      assert Path(value[2:]).exists(),f'Missing linked asset: {value}'
+          assert manifest['display']=='standalone'
+          print('HTML, CSP, static assets, PWA: OK')
+          PY
