@@ -44,5 +44,49 @@ try{
  await page.locator("#prompt").fill("Quelle dose de médicament dois-je prendre ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/je ne peux pas déterminer/i).waitFor({timeout:10000});
- console.log("Chromium local vault + medical refusal smoke test OK");
+ // Restore the encrypted backup in an independent browsing context.
+ const restored=await browser.newPage();
+ try{
+  await restored.goto(URL,{waitUntil:"networkidle"});
+  const buffer=Buffer.from(JSON.stringify({format:"FibroBotVaultEncrypted",version:1,envelope}),"utf8");
+  await restored.locator("#vault-import").setInputFiles({name:"coffre-chiffre.json",mimeType:"application/json",buffer});
+  await restored.locator("#vault-password").fill(secret);
+  await restored.locator("#vault-ack").check();
+  await restored.locator("#vault-submit").click();
+  await restored.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
+  await restored.locator('[data-tab="health"]').first().click();
+  await restored.locator("#health-list").getByText(value).waitFor();
+ }finally{await restored.close();}
+ // Migration: create a legacy database in a separate context, then opt in.
+ const legacy=await browser.newPage();
+ try{
+  await legacy.goto(URL,{waitUntil:"networkidle"});
+  await legacy.evaluate(async()=>{
+   await new Promise((resolve,reject)=>{
+    const request=indexedDB.open("FibrobotDB",1);
+    request.onupgradeneeded=()=>{request.result.createObjectStore("symptoms",{keyPath:"id",autoIncrement:true});};
+    request.onsuccess=()=>{
+      const db=request.result;
+      const tx=db.transaction("symptoms","readwrite");
+      tx.objectStore("symptoms").put({id:7,name:"Ancienne note",date:"2026-10-26T12:00:00",intensity:5});
+      tx.oncomplete=()=>{db.close();resolve();};
+      tx.onerror=()=>reject(tx.error);
+    };
+    request.onerror=()=>reject(request.error);
+   });
+  });
+  await legacy.reload({waitUntil:"networkidle"});
+  await legacy.locator("#vault-migrate-wrap").waitFor({state:"visible",timeout:10000});
+  await legacy.locator("#vault-migrate").check();
+  await legacy.locator("#vault-password").fill(secret);
+  await legacy.locator("#vault-confirm-password").fill(secret);
+  await legacy.locator("#vault-ack").check();
+  await legacy.locator("#vault-submit").click();
+  await legacy.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
+  await legacy.locator('[data-tab="health"]').first().click();
+  await legacy.locator("#health-list").getByText("Ancienne note").waitFor();
+  const dbs=await legacy.evaluate(async()=>typeof indexedDB.databases==="function"?await indexedDB.databases():[]);
+  if(dbs.length)assert.equal(dbs.some(x=>x.name==="FibrobotDB"),false,"legacy plaintext database must be deleted");
+ }finally{await legacy.close();}
+ console.log("Chromium vault, encrypted backup restore, legacy migration and medical refusal: OK");
 }finally{await browser.close();}
