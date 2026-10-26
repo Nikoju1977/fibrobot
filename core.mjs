@@ -54,12 +54,7 @@ export function reply(input,library,context={}) {
  if(doc)return{kind:"documented",message:doc.answer+" "+reportedContext(ctx),sources:[doc],followup:"Souhaitez-vous enregistrer une question pour votre prochain rendez-vous ?"};
  return{kind:"refusal",message:MEDICAL_REFUSAL,sources:[]};
 }
-export async function openDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=()=>{for(const name of STORES){if(!req.result.objectStoreNames.contains(name))req.result.createObjectStore(name,{keyPath:"id",autoIncrement:true});}};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
-export function all(db,name){return new Promise((resolve,reject)=>{const req=db.transaction(name,"readonly").objectStore(name).getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
-export function put(db,name,record){return new Promise((resolve,reject)=>{const req=db.transaction(name,"readwrite").objectStore(name).put(record);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
-export function del(db,name,id){return new Promise((resolve,reject)=>{const req=db.transaction(name,"readwrite").objectStore(name).delete(id);req.onsuccess=()=>resolve();req.onerror=()=>reject(req.error);});}
-export function wipeDB(){return new Promise((resolve,reject)=>{const r=indexedDB.deleteDatabase(DB_NAME);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error("Fermez les autres onglets FibroBot."));});}
-
+// Legacy plaintext write APIs removed in favor of vault.mjs.
 export function makeMedication(v){const name=text(v.name,160),dose=text(v.dose,160),schedule=text(v.schedule,200),prescriber=text(v.prescriber,160),notes=text(v.notes,1000),reminderTime=text(v.reminderTime,5);if(!name)throw Error("Indiquez le nom tel qu'inscrit sur votre ordonnance.");if(reminderTime&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(reminderTime))throw Error("Heure de rappel invalide.");return{name,dose,schedule,prescriber,notes,reminderTime,created:Date.now()};}
 export function dueReminders(medications,logs,now=new Date()){
  const day=today(now),clock=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
