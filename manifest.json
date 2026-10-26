@@ -1,16 +1,21 @@
 {
- "name": "FibroBot — assistant conversationnel d'inform",
- "short_name": "fibrobot",
- "start_url": ".",
- "display": "standalone",
- "background_color": "#050a0d",
- "theme_color": "#050a0d",
- "icons": [
-  {
-   "src": "icon.svg",
-   "sizes": "any",
-   "type": "image/svg+xml",
-   "purpose": "any"
-  }
- ]
+  "id": "./",
+  "name": "FibroBot — Assistant de vie et de suivi",
+  "short_name": "FibroBot",
+  "description": "Assistant de vie local, fibromyalgie et maladies chroniques.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "fr",
+  "background_color": "#f4f8fa",
+  "theme_color": "#132a38",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }

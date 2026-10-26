@@ -1,0 +1,42 @@
+name: FibroBot - coffre et navigateur
+on:
+  push:
+    branches:
+      - feat/gemma4-local-vault-20261026
+    paths:
+      - "index.html"
+      - "styles.css"
+      - "app.mjs"
+      - "core.mjs"
+      - "vault.mjs"
+      - "vault-ui.mjs"
+      - "gemma-local.mjs"
+      - "gemma-worker.mjs"
+      - "sw.js"
+      - "tests/browser-e2e.mjs"
+      - ".github/workflows/browser-e2e.yml"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Install Chromium test dependencies
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Exercise real IndexedDB and Web Crypto in Chromium
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/fibrobot-server.log 2>&1 &
+          sleep 2
+          node tests/browser-e2e.mjs
