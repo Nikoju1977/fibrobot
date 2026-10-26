@@ -83,6 +83,18 @@ try{
   }));
   assert.ok(names.length>100);
  }finally{await sibling.close();}
+ // L'application statique et le coffre doivent aussi se déverrouiller hors ligne une fois le shell mis en cache.
+ await page.evaluate(async()=>{if("serviceWorker" in navigator)await navigator.serviceWorker.ready;});
+ await context.setOffline(true);
+ try{
+  await page.reload({waitUntil:"domcontentloaded"});
+  await page.locator("#vault-gate").waitFor({state:"visible",timeout:15000});
+  await page.locator("#vault-password").fill(secret);
+  await page.locator("#vault-submit").click();
+  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
+  await page.locator('[data-tab="health"]').first().click();
+  await page.locator("#health-list").getByText(value).waitFor({timeout:10000});
+ }finally{await context.setOffline(false);}
  // Restore the encrypted backup in an independent browsing context.
  const restored=await browser.newPage();
  try{
