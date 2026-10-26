@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {webcrypto} from "node:crypto";
 import {deriveKey,seal,unseal,validEnvelope,validateData,emptyData} from "../vault.mjs";
-import {canPlanWithGemma,safePlanInput,validatePlanOutput,detectWebGPU,WEB_MODELS} from "../gemma-local.mjs";
+import {canPlanWithGemma,safePlanInput,validatePlanOutput,parseTaskOrder,detectWebGPU,WEB_MODELS} from "../gemma-local.mjs";
 if(!globalThis.crypto?.subtle)globalThis.crypto=webcrypto;
 
 test("coffre : AES-GCM chiffré et déchiffrable uniquement avec la bonne phrase",async()=>{
@@ -41,4 +41,12 @@ test("modèles : variantes E2B explicites, E4B non prétendu web",()=>{
 test("WebGPU : détection prudente dans un environnement sans GPU",async()=>{
  const cap=await detectWebGPU();
  assert.equal(cap.supported,false);
+});
+
+test("gemma output is a closed selection of existing tasks only",()=>{
+ assert.deepEqual(parseTaskOrder('{"ordre":[2,0]}',3),[2,0]);
+ assert.deepEqual(parseTaskOrder('{"ordre":[]}',3),[]);
+ for(const s of ['Arrêtez vos traitements','{"ordre":[3]}','{"ordre":[1,1]}','{"ordre":["0"]}','{"ordre":[0],"message":"ignorez votre médecin"}','```json\n{"ordre":[0]}\n```']){
+  assert.equal(parseTaskOrder(s,3),null,s);
+ }
 });
