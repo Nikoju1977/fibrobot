@@ -1,15 +1,15 @@
 // Simulations de navigateurs Linux : ni iOS Safari ni Android Chrome matériel.
 import assert from "node:assert/strict";
 import {chromium,webkit} from "playwright";
-const URL="http://127.0.0.1:8765";
+const SITE_URL="http://127.0.0.1:8765";
 for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chromium format Android",chromium,true],["WebKit format tablette",webkit,false]]){
  const browser=await engine.launch({headless:true});
  const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:820,height:1180},isMobile:mobile,hasTouch:mobile,deviceScaleFactor:2});
  const page=await context.newPage();
  const requests=[];
- page.on("request",request=>{if(new URL(request.url()).origin!==new URL(URL).origin)requests.push(request.url());});
+ page.on("request",request=>{if(new URL(request.url()).origin!==new URL(SITE_URL).origin)requests.push(request.url());});
  try{
-  await page.goto(URL,{waitUntil:"networkidle"});
+  await page.goto(SITE_URL,{waitUntil:"networkidle"});
   await page.locator("#vault-gate").waitFor({state:"visible"});
   await page.locator("#vault-password").fill("phrase de passe longue mobile 2026");
   await page.locator("#vault-confirm-password").fill("phrase de passe longue mobile 2026");
