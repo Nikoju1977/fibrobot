@@ -29,7 +29,20 @@ try{
  });
  assert.equal(envelope?.algorithm,"AES-GCM-256");
  assert.ok(!JSON.stringify(envelope).includes(value),"No plaintext in vault IndexedDB");
- await page.locator("#lock-vault").click();
  page.once("dialog",dialog=>dialog.accept());
- // Le dialogue est parfois plus rapide que le gestionnaire si on l'installe tard : gérer ci-dessous.
+ await page.locator("#lock-vault").click();
+ await page.locator("#vault-gate").waitFor({state:"visible",timeout:15000});
+ await page.locator("#vault-password").fill("phrase volontairement incorrecte");
+ await page.locator("#vault-submit").click();
+ await page.waitForFunction(()=>/incorrect|endommagé/.test(document.getElementById("vault-error").textContent),{timeout:15000});
+ await page.locator("#vault-password").fill(secret);
+ await page.locator("#vault-submit").click();
+ await page.locator("#vault-gate").waitFor({state:"hidden",timeout:15000});
+ await page.locator('[data-tab="health"]').first().click();
+ await page.locator("#health-list").getByText(value).waitFor();
+ await page.locator('[data-tab="chat"]').first().click();
+ await page.locator("#prompt").fill("Quelle dose de médicament dois-je prendre ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/je ne peux pas déterminer/i).waitFor({timeout:10000});
+ console.log("Chromium local vault + medical refusal smoke test OK");
 }finally{await browser.close();}
