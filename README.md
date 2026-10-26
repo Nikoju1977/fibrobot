@@ -65,7 +65,7 @@ Studio Niko Design.
 - Toutes les tables applicatives désormais persistées dans une unique enveloppe AES-256-GCM dans `FibroBotVault-v1` (IndexedDB). La clé est dérivée côté navigateur par PBKDF2-SHA256 (600 000 itérations) et n'est pas sauvegardée. Une phrase secrète de 12 caractères minimum est requise.
 - Sans la phrase secrète, FibroBot ne peut pas ouvrir le dossier. En cas de perte de cette phrase, aucune récupération n'est possible. Le coffre ne protège pas les données d'un navigateur ou appareil déjà compromis ni les copies d'écran, les rapports imprimés, l'historique du clavier ou la mémoire d'une session déverrouillée.
 - Après consentement explicite, l'ancienne base non chiffrée `FibrobotDB` est lue une fois, réécrite chiffrée et relue pour validation des effectifs avant tentative de suppression. Si la suppression échoue ou si la personne ne choisit pas la migration, l'ancienne base reste non chiffrée ; un bouton de suppression manuelle est prévu.
-- L'export JSON exporte **l'enveloppe chiffrée**, pas le contenu en clair. Un import du fichier de sauvegarde sur un autre appareil reste à implémenter et tester. Les rapports imprimables, eux, sont en clair.
+- L'export JSON exporte **l'enveloppe chiffrée**, pas le contenu en clair. La restauration de cette enveloppe depuis le formulaire du coffre est implémentée, mais n'a pas encore été validée sur iOS/Android. Les rapports imprimables, eux, sont en clair.
 - Les données de santé ne passent pas par un serveur de traitement, et le modèle ne reçoit pas les posologies pour faire des décisions thérapeutiques.
 
 ## Gemma 4 locale : périmètre effectivement implémenté
@@ -78,11 +78,11 @@ Le chargement est facultatif et déclenché par un clic explicite dans le chat. 
 
 **Compatibilité mobile :** WebGPU a été ajouté par Safari 26 sur iOS/iPadOS, et Chrome Android peut l'exposer sur des appareils compatibles. La présence de WebGPU ne garantit pas la mémoire nécessaire aux modèles. L'application teste les capacités et retombe sur le mode local documentaire si le téléchargement, le cache ou l'inférence échoue. Ni la RAM ni le poids du modèle ne sont chiffrés avec le dossier de santé.
 
-**Mode hors ligne :** le shell PWA et la bibliothèque sont mis en cache ; le chargement initial du runtime et du modèle exige le réseau. Leur disponibilité hors ligne après rechargement dépend des caches et n'est pas garantie par cette PR. Toute mise à jour du runtime demande un nouvel audit de provenance. Le code du runtime est chargé depuis un CDN épinglé à une version et n'est pas encore audité/vendored : une revue de la chaîne d'approvisionnement reste nécessaire.
+**Mode hors ligne :** le shell PWA et la bibliothèque sont mis en cache ; le chargement initial du runtime et du modèle exige le réseau. Leur disponibilité hors ligne après rechargement dépend des caches et n'est pas garantie par cette PR. Toute mise à jour du runtime demande un nouvel audit de provenance. Le code du runtime est chargé depuis un CDN épinglé à une version, dans un Web Worker séparé. Ce Worker ne reçoit jamais la clé du coffre ni les posologies. Le code tiers reste non audité/vendored : une revue de la chaîne d'approvisionnement reste nécessaire.
 
 ### Vérifications
 
-`node --test tests/*.test.mjs` et les vérifications de syntaxe de GitHub Actions couvrent le round-trip chiffrement/déchiffrement, la détection d'altération, les phrases secrètes, la prévention de réponses médicales génératives et les fonctions métier déjà présentes. Les téléchargements multi-Go, l'exécution réelle WebGPU, la migration IndexedDB dans Safari et Android et les notifications ne sont **pas validés** tant qu'ils n'ont pas été testés sur des appareils réels.
+`node --test tests/*.test.mjs` et les vérifications de syntaxe de GitHub Actions couvrent le round-trip chiffrement/déchiffrement, la détection d'altération, les phrases secrètes, la prévention de réponses médicales génératives et les fonctions métier déjà présentes. Les téléchargements multi-Go, l'exécution réelle WebGPU, la migration IndexedDB dans Safari et Android et les notifications ne sont **pas validés** tant qu'ils n'ont pas été testés sur des appareils réels. Un test d'intégration Chromium du coffre et du filtrage médical est également disponible, avec son propre workflow GitHub Actions.
 
 ### Documentation des moteurs
 
@@ -91,3 +91,5 @@ Le chargement est facultatif et déclenché par un clic explicite dans le chat. 
 - Gemma 4 E2B variante FP32 : https://huggingface.co/mlc-ai/gemma-4-E2B-it-q4f32_1-MLC
 - LiteRT-LM E2B et E4B pour mobiles : https://gemma.ai/deployment/litert/
 - WebGPU Safari : https://webkit.org/blog/17333/webkit-features-in-safari-26-0/
+
+Les fichiers `native/ios` et `native/android` ne sont que des **prototypes de runners** documentés pour Gemma 4 E4B ; ils ne constituent pas des applications iOS/Android livrables et n'ont pas été compilés.
