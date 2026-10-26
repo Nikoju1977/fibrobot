@@ -49,6 +49,7 @@ export function reply(input,library,context={}) {
  if(/(acupuncture|massage|tai.chi|yoga|balneotherapie|medecine alternative|medecine complementaire|therapie complementaire)/.test(q))topic="complementary";
  if(/(complement alimentaire|vitamine|regime|gluten|lactose|nutrition|alimentation)/.test(q))topic="nutrition";
  if(/(plusieurs maladies|comorbidit|maladies chroniques|autres maladies)/.test(q))topic="multi";
+ if(/(gwas|genetique|genomique|kerrebijn|26 loci|patrimoine genetique)/.test(q))topic="gwas2026";
  const doc=topic?library.find(x=>x.id===topic):null;
  if(doc)return{kind:"documented",message:doc.answer+" "+reportedContext(ctx),sources:[doc],followup:"Souhaitez-vous enregistrer une question pour votre prochain rendez-vous ?"};
  return{kind:"refusal",message:MEDICAL_REFUSAL,sources:[]};
