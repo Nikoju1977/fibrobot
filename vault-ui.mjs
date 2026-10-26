@@ -10,6 +10,9 @@ export async function openSecureDB(){
  const form=$("vault-form"),gate=$("vault-gate"),button=$("vault-submit"),instructions=$("vault-instructions"),confirm=$("vault-confirm"),legacy=$("vault-legacy");
  if(!form||!gate)throw Error("Interface de coffre introuvable.");
  gate.hidden=false;
+ const appShell=document.querySelector(".shell");
+ if(appShell)appShell.inert=true;
+ $("vault-password").focus();
  let old=null, hasLegacy=false;
  if(!existing){try{old=await readLegacy();hasLegacy=Object.values(old).some(rows=>rows.length>0);}catch(err){status("Ancienne base illisible : "+err.message);}}
  instructions.textContent=existing?"Coffre existant : saisissez votre phrase secrète pour accéder à vos données. Aucun service ne peut la récupérer.":"Créez une phrase secrète d'au moins 12 caractères. Si vous la perdez, il sera impossible de récupérer les données chiffrées.";
@@ -53,6 +56,8 @@ export async function openSecureDB(){
     }else active=await unlockVault(vaultDb,password);
     $("vault-password").value="";$("vault-confirm-password").value="";
     gate.hidden=true;
+    if(appShell)appShell.inert=false;
+    $("main")?.focus({preventScroll:true});
     if(!$("vault-post-warning").hidden){const toast=$("toast");if(toast){toast.hidden=false;toast.textContent="Attention : une ancienne base non chiffrée est peut-être présente. Vérifiez « Mes données ».";}}
     resolve(active);
    }catch(error){status(error.message);button.disabled=false;}
