@@ -1,5 +1,5 @@
 /* Contrôleur du coffre : ne transmet jamais la clé ou les données à un serveur. */
-import {openVaultDB,readEnvelope,createVault,unlockVault,unseal,readLegacy,clearLegacy,clearVault,emptyData,storeEnvelope,validEnvelope,VaultSession} from "./vault.mjs";
+import {openVaultDB,readEnvelope,createVault,unlockVault,unseal,readLegacy,clearLegacy,clearVault,emptyData,storeEnvelopeIfAbsent,validEnvelope,VaultSession} from "./vault.mjs";
 const $=id=>document.getElementById(id);
 let active=null, vaultDb=null;
 const status=message=>{const el=$("vault-error");if(el)el.textContent=message;};
@@ -38,12 +38,13 @@ export async function openSecureDB(){
       let payload;try{payload=JSON.parse(await file.text());}catch(e){throw Error("Fichier JSON illisible.");}
       if(payload?.format!=="FibroBotVaultEncrypted"||!validEnvelope(payload?.envelope))throw Error("Ce fichier n'est pas une sauvegarde FibroBot chiffrée valide.");
       const opened=await unseal(payload.envelope,password);
-      await storeEnvelope(vaultDb,payload.envelope);
+      await storeEnvelopeIfAbsent(vaultDb,payload.envelope);
       active=new VaultSession(vaultDb,opened);
       if(hasLegacy)$("vault-post-warning").hidden=false;
      }else{
       if(password!==$("vault-confirm-password").value)throw Error("Les phrases secrètes ne correspondent pas.");
       active=await createVault(vaultDb,password,migrate?old:emptyData());
+      if(hasLegacy&&!migrate)$("vault-post-warning").hidden=false;
       // Contrôler l'intégrité de TOUTES les données migrées avant tout effacement.
       const verified=await unseal(await readEnvelope(vaultDb),password);
       if(migrate&&JSON.stringify(verified.data)!==JSON.stringify(old))throw Error("Migration non conforme : les anciennes données n'ont pas été supprimées.");
