@@ -1,0 +1,60 @@
+# FibroBot — Dossier de validation technique (27 octobre 2026)
+
+**Statut : prototype public / candidat de livraison technique, NON VALIDÉ CLINIQUEMENT.**
+La réussite d'une CI ou d'une démonstration web ne constitue pas une certification d'utilisation par des patients.
+
+## Environnement et périmètre
+
+- Application web statique/PWA hébergée par GitHub Pages.
+- Assistant documentaire local et bibliothèque HAS/NCCIH/Nature Medicine, avec refus pour les questions non documentées.
+- Option Gemma 4 E2B dans le navigateur via WebLLM 0.2.86 et WebGPU, non requise.
+- Gemma 4 E4B : uniquement des **prototypes non compilés** Swift/Kotlin ; pas d'application native livrable.
+- Toutes les informations de santé saisies dans l'application sont enregistrées localement dans une enveloppe AES-GCM du navigateur déverrouillé. Le coffre est une protection au repos, pas une garantie contre un appareil, un site web ou un fournisseur de ressources compromis.
+- Les alertes de médicaments ne sont pas garanties lorsque la PWA est fermée. L'application n'est pas un outil de prescription ni de vérification des interactions.
+
+## Matrice de validation
+
+| Élément | Contrôle disponible | Résultat / limite |
+| --- | --- | --- |
+| Syntaxe JavaScript, manifest, fichier CSP et assets | GitHub Actions `test-app.yml` | Contrôle automatique ; consulter la CI du commit concerné |
+| Chiffrement AES-GCM et phrase secrète erronée | `tests/vault-gemma.test.mjs` | Tests unitaires (WebCrypto Node) |
+| Protection contre un coffre corrompu | `tests/vault-gemma.test.mjs` | Validation d'authenticité GCM |
+| Écrasement par un onglet concurrent | `vault.mjs`, `tests/browser-e2e.mjs` | Transaction IndexedDB avec comparaison atomique |
+| Création, verrouillage, récupération locale du coffre | `tests/browser-e2e.mjs` | Test navigateur Chromium automatisé |
+| Ancien stockage en clair | `tests/browser-e2e.mjs` | Migration soumise au consentement, vérification avant suppression |
+| Sauvegarde / restauration chiffrées | `tests/browser-e2e.mjs` | Test de restauration avec données fictives |
+| Mode hors connexion | `tests/browser-e2e.mjs` | Test de chargement du shell et déverrouillage Chromium après première mise en cache |
+| XSS et responsive | `tests/mobile-smoke.mjs` | Tests avec Chromium et WebKit sur Linux, avec tailles mobiles/tablettes |
+| Protection des données à destination de Gemma | `tests/vault-gemma.test.mjs` | Noms de tâches, questions libres, médicaments et notes exclus du prompt |
+| Réponses dangereuses et absence de preuves | `tests/core.test.mjs` | Jeu de tests représentatif, **pas** couverture exhaustive |
+| Gemma 4 E2B WebGPU + téléchargements du modèle | Installation et benchmark matériel | **NON TESTÉ sur appareils réels** |
+| Gemma 4 E4B natif | Xcode / Android Studio / matériel | **NON COMPILÉ, NON TESTÉ** |
+| Voix strictement locale | Web Speech selon navigateur | **NON TESTÉ sur vrais iOS/Android** |
+| Rappels de médicaments en arrière-plan | Limitations PWA | **PAS GARANTIS si application fermée** |
+| Validité scientifique et recommandations individualisées | Revue médicale externe | **NON RÉALISÉE** |
+| Conformité RGPD et statut de dispositif médical | Analyse réglementaire indépendante | **NON RÉALISÉE** |
+
+## Confidentialité : éléments vérifiables
+
+Les fichiers `core.mjs`, `medical-library.mjs`, `vault.mjs` et `vault-ui.mjs` exécutent le stockage et les réponses médicales sans appel à une API distante. La seule importation de code IA tiers est dans `gemma-worker.mjs`, après clic de téléchargement du modèle. Le Worker ne reçoit plus que des **indices temporaires de tâches, effort, priorité et énergie déclarée**. Les textes libres ne lui sont plus communiqués.
+
+La **première visite** à GitHub Pages et le téléchargement du modèle contactent des hébergeurs Internet. Aucune promesse d'anonymat réseau total ne peut être faite. Les pages des sources sont également externes et s'ouvrent volontairement.
+
+### Menaces hors périmètre du coffre
+
+- Phrase secrète faible, appareil compromis, navigateur infecté ou extension malveillante.
+- Session déverrouillée et données visibles à l'écran ou dans la mémoire.
+- Sauvegardes imprimées ou fichiers exportés en clair (le rapport imprimable est non chiffré).
+- Base historique `FibrobotDB` conservée si l'utilisateur refuse la migration ou si sa suppression est bloquée.
+- Chaîne d'approvisionnement WebLLM/CDN, non auditée pour cette livraison.
+
+## Conditions bloquantes avant un usage patient réel
+
+1. Auditer la sécurité de l'application déployée, la chaîne d'approvisionnement des scripts externes, l'accessibilité et les permissions.
+2. Tester au moins un iPhone compatible, un iPad, un smartphone Android et une tablette Android réels : coffre, récupération de sauvegarde, multitâche, stockage, voix et hors ligne.
+3. Tester le téléchargement et l'inférence Gemma E2B sur plusieurs configurations représentatives, ainsi que la mémoire et les erreurs sans perte de données.
+4. Construire, signer et tester les véritables applications natives si E4B doit être proposé.
+5. Faire valider les fiches médicales et les scénarios d'alerte par des professionnels de santé ; prévoir la maintenance scientifique continue.
+6. Réaliser les analyses RGPD et réglementaires nécessaires selon les fonctionnalités et les données collectées, et informer les utilisateurs.
+
+**Ne pas demander aux patients de s'appuyer sur FibroBot pour décider d'une dose, d'une interaction ou d'une urgence.** En France, signes de danger immédiat : 15 ou 112 ; crise suicidaire : 3114.
