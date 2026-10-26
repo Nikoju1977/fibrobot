@@ -18,6 +18,22 @@ const request=req=>new Promise((ok,no)=>{req.onsuccess=()=>ok(req.result);req.on
 export function openVaultDB(){return new Promise((ok,no)=>{const r=indexedDB.open(VAULT_DB,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(VAULT_STORE))r.result.createObjectStore(VAULT_STORE,{keyPath:"id"});};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}
 export async function readEnvelope(db){return request(db.transaction(VAULT_STORE,"readonly").objectStore(VAULT_STORE).get(VAULT_ID));}
 export function storeEnvelope(db,envelope){return new Promise((ok,no)=>{const tx=db.transaction(VAULT_STORE,"readwrite");tx.objectStore(VAULT_STORE).put(envelope);tx.oncomplete=()=>ok();tx.onerror=()=>no(tx.error||Error("Échec de l'enregistrement chiffré."));tx.onabort=()=>no(tx.error||Error("Transaction annulée."));});}
+export function storeEnvelopeIfAbsent(db,envelope){
+ return new Promise((resolve,reject)=>{
+  let reason=null;
+  const tx=db.transaction(VAULT_STORE,"readwrite");
+  const store=tx.objectStore(VAULT_STORE);
+  const req=store.get(VAULT_ID);
+  req.onsuccess=()=>{
+   if(req.result){reason=Error("Un coffre existe déjà dans cet autre onglet. Rechargez la page pour l'ouvrir.");tx.abort();return;}
+   store.put(envelope);
+  };
+  req.onerror=()=>{reason=req.error;tx.abort();};
+  tx.oncomplete=()=>resolve();
+  tx.onabort=()=>reject(reason||tx.error||Error("Création du coffre interrompue."));
+  tx.onerror=()=>{reason=tx.error||reason;};
+ });
+}
 export function storeEnvelopeIfUnchanged(db,envelope,expectedCiphertext){return new Promise((resolve,reject)=>{let problem=null;const tx=db.transaction(VAULT_STORE,"readwrite");const store=tx.objectStore(VAULT_STORE);const req=store.get(VAULT_ID);req.onsuccess=()=>{if(!req.result||req.result.ciphertext!==expectedCiphertext){problem=Error("Une autre session a modifié le coffre. Rechargez FibroBot avant d'enregistrer : les données existantes ont été préservées.");tx.abort();return;}store.put(envelope);};req.onerror=()=>{problem=req.error;tx.abort();};tx.oncomplete=()=>resolve();tx.onabort=()=>reject(problem||tx.error||Error("Écriture annulée."));tx.onerror=()=>{problem=tx.error||problem;};});}
 export async function makeVault(password,data=emptyData()){const salt=c().getRandomValues(new Uint8Array(16));const key=await deriveKey(password,salt);return{key,salt,iterations:ITERATIONS,data:validateData(data)};}
 export class VaultSession{
@@ -30,7 +46,7 @@ export class VaultSession{
  async encryptedBackup(){await this.queue;return readEnvelope(this.db);}
  close(){this.closed=true;this.data=emptyData();this.key=null;this.salt=null;this.db.close();}
 }
-export async function createVault(db,password,data){if(await readEnvelope(db))throw Error("Ce coffre existe déjà.");const opened=await makeVault(password,data);const envelope=await seal(opened.data,opened.key,opened.salt);await storeEnvelope(db,envelope);return new VaultSession(db,{...opened,revision:envelope.ciphertext});}
+export async function createVault(db,password,data){if(await readEnvelope(db))throw Error("Ce coffre existe déjà.");const opened=await makeVault(password,data);const envelope=await seal(opened.data,opened.key,opened.salt);await storeEnvelopeIfAbsent(db,envelope);return new VaultSession(db,{...opened,revision:envelope.ciphertext});}
 export async function unlockVault(db,password){const envelope=await readEnvelope(db);if(!envelope)throw Error("Aucun coffre créé.");return new VaultSession(db,await unseal(envelope,password));}
 // Lecture seule de la base historique ; ne supprime jamais les données sans consentement.
 export async function readLegacy(){return new Promise((resolve,reject)=>{const probe=indexedDB.open("FibrobotDB");let fresh=false;probe.onupgradeneeded=()=>{fresh=true;probe.transaction.abort();};probe.onerror=()=>{if(fresh)resolve(emptyData());else reject(probe.error);};probe.onsuccess=async()=>{const db=probe.result,ret=emptyData();try{for(const name of STORES){if(db.objectStoreNames.contains(name))ret[name]=await request(db.transaction(name,"readonly").objectStore(name).getAll());}db.close();resolve(ret);}catch(err){db.close();reject(err);}};});}
