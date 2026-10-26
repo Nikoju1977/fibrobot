@@ -1,5 +1,5 @@
 /* Contrôleur du coffre : ne transmet jamais la clé ou les données à un serveur. */
-import {openVaultDB,readEnvelope,createVault,unlockVault,readLegacy,clearLegacy,clearVault,emptyData} from "./vault.mjs";
+import {openVaultDB,readEnvelope,createVault,unlockVault,unseal,readLegacy,clearLegacy,clearVault,emptyData} from "./vault.mjs";
 const $=id=>document.getElementById(id);
 let active=null, vaultDb=null;
 const status=message=>{const el=$("vault-error");if(el)el.textContent=message;};
@@ -29,18 +29,14 @@ export async function openSecureDB(){
      const migrate=hasLegacy&&$("vault-migrate").checked;
      active=await createVault(vaultDb,password,migrate?old:emptyData());
      // Vérification indépendante avant suppression irréversible de la base historique.
-     const verified=await unlockVault(vaultDb,password);
-     const verifiedRows=await verified.all("symptoms");
-     if(migrate&&verifiedRows.length!==(old.symptoms||[]).length)throw Error("Échec de vérification des données migrées.");
-     verified.close();
-     // unlockVault.close ferme la connexion partagée ; réouvrir pour la session active.
-     vaultDb=await openVaultDB();active=await unlockVault(vaultDb,password);
+     const verified=await unseal(await readEnvelope(vaultDb),password);
+     for(const name of Object.keys(verified.data))if(migrate&&verified.data[name].length!==(old[name]||[]).length)throw Error("Échec de vérification : "+name);
      if(migrate){try{await clearLegacy();}catch(error){status("Migration chiffrée réussie. ATTENTION : ancienne base non chiffrée non supprimée : "+error.message);$("vault-post-warning").hidden=false;}}
     }else active=await unlockVault(vaultDb,password);
     $("vault-password").value="";$("vault-confirm-password").value="";
     gate.hidden=true;
     resolve(active);
-   }catch(error){status(error.message);active=null;button.disabled=false;}
+   }catch(error){status(error.message);button.disabled=false;}
   });
  });
 }
