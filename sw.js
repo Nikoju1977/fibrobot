@@ -11,7 +11,7 @@ self.addEventListener("fetch",event=>{
  if(event.request.method!=="GET")return;
  const url=new URL(event.request.url);
  if(url.origin!==self.location.origin)return;
- const allowed=ASSETS.some(path=>url.pathname.endsWith(path.slice(2)))||event.request.mode==="navigate";
+ const allowed=ASSETS.filter(path=>path!=="./").some(path=>url.pathname.endsWith(path.slice(2)))||event.request.mode==="navigate";
  if(!allowed)return;
  event.respondWith((async()=>{
   const cache=await caches.open(VERSION);
