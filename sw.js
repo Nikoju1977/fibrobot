@@ -1,24 +1,28 @@
-/* FibroBot PWA — les données de santé restent dans IndexedDB, jamais dans ce cache. */
-const CACHE="fibrobot-shell-v4";
-const SHELL=["./","./index.html","./styles.css","./app.mjs","./core.mjs","./medical-library.mjs","./manifest.json","./icon.svg"];
+/* FibroBot local-first : seulement les fichiers statiques, jamais IndexedDB. */
+const VERSION="fibrobot-shell-v5";
+const ASSETS=["./","./index.html","./styles.css","./app.mjs","./core.mjs","./medical-library.mjs","./manifest.json","./icon.svg"];
 self.addEventListener("install",event=>{
- event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
+ event.waitUntil(caches.open(VERSION).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });
 self.addEventListener("activate",event=>{
- event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(x=>x.startsWith("fibrobot-shell-")&&x!==CACHE).map(x=>caches.delete(x)))),self.clients.claim()]));
+ event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith("fibrobot-shell-")&&k!==VERSION).map(k=>caches.delete(k)))),self.clients.claim()]));
 });
 self.addEventListener("fetch",event=>{
- const u=new URL(event.request.url);
- if(event.request.method!=="GET"||u.origin!==self.location.origin)return;
- if(event.request.mode==="navigate"){
-  event.respondWith(fetch(event.request).then(response=>{
-   if(response.ok){const copy=response.clone();caches.open(CACHE).then(c=>c.put("./index.html",copy)).catch(()=>{});}
+ if(event.request.method!=="GET")return;
+ const url=new URL(event.request.url);
+ if(url.origin!==self.location.origin)return;
+ const allowed=ASSETS.some(path=>url.pathname.endsWith(path.slice(2)))||event.request.mode==="navigate";
+ if(!allowed)return;
+ event.respondWith((async()=>{
+  const cache=await caches.open(VERSION);
+  try{
+   const response=await fetch(event.request);
+   if(response.ok){await cache.put(event.request.mode==="navigate"?"./index.html":event.request,response.clone());}
    return response;
-  }).catch(()=>caches.match("./index.html")));
-  return;
- }
- event.respondWith(caches.match(event.request).then(hit=>hit||fetch(event.request).then(response=>{
-  if(response.ok&&SHELL.some(p=>u.pathname.endsWith(p.slice(2)))){const copy=response.clone();caches.open(CACHE).then(c=>c.put(event.request,copy)).catch(()=>{});}
-  return response;
- })));
+  }catch(error){
+   const saved=await cache.match(event.request.mode==="navigate"?"./index.html":event.request);
+   if(saved)return saved;
+   throw error;
+  }
+ })());
 });
