@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import {chromium} from "playwright";
 
 const browser=await chromium.launch({headless:true});
-const page=await browser.newPage({acceptDownloads:true});
+const context=await browser.newContext({acceptDownloads:true});
+const page=await context.newPage();
 const URL="http://127.0.0.1:8765";
 const secret="phrase de controle longue et unique 2026";
 const value="Observation test chiffrée";
