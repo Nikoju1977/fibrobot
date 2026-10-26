@@ -19,6 +19,10 @@ on:
       - ".github/workflows/browser-e2e.yml"
   pull_request:
 
+concurrency:
+  group: fibrobot-browser-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
