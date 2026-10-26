@@ -19,9 +19,9 @@ FibroBot est un assistant de vie pour les personnes vivant avec la fibromyalgie 
 
 ## Moteur de réponse
 
-Le moteur actuel est **déterministe et vérifiable**. Ce n'est PAS un grand modèle d'IA générative open source, ni une encyclopédie exhaustive des traitements. Les réponses de santé sont sélectionnées parmi des fiches pré-rédigées et liées à des sources. Une question sans réponse autorisée déclenche un refus explicite. Les autres maladies sont enregistrées mais ne donnent pas lieu à des traitements déduits automatiquement.
+Le volet médical utilise un moteur **déterministe et sourcé** : fiche pré-rédigée ou refus explicite. Aucune prescription ni vérification d'interactions médicamenteuses n'est générée.
 
-Un modèle génératif sur l'appareil nécessiterait un téléchargement initial, une mémoire et une puissance variables et une validation de sécurité ; il n'est pas implémenté dans cette version. Aucun modèle ne peut garantir zéro hallucination.
+Gemma 4 E2B est facultatif et réservé au **classement de tâches**, après téléchargement volontaire. Seuls des indices temporaires, niveaux d'effort, priorités et énergie déclarée lui sont présentés ; aucun texte libre de tâche ou question, aucun traitement ni symptôme. L'exécution réelle sur appareils mobiles n'est pas encore validée. Les modèles génératifs peuvent halluciner, d'où la sortie limitée à des indices existants.
 
 ## Voix et météo : limitations
 
@@ -39,11 +39,13 @@ Les doses et les fréquences sont recopiées par la personne et jamais vérifié
 
 ## Confidentialité
 
-Données stockées dans IndexedDB, non chiffrées par FibroBot. Aucun script ni service d'IA tiers utilisé. Les fichiers JSON exportés et les rapports imprimables contiennent des informations de santé en clair. Protégez-les. Le navigateur contacte l'hébergeur au premier chargement et lors des mises à jour. Les liens médicaux externes ne sont ouverts que par action volontaire.
+Le **coffre chiffré AES-256-GCM** conserve les données dans IndexedDB. Les exports JSON du coffre sont chiffrés, mais les rapports imprimables sont en clair. La clé n'est pas sauvegardée. Une ancienne base non chiffrée peut rester si la migration n'est pas autorisée ou échoue ; vérifiez son effacement.
 
-Les anciens objets IndexedDB restent présents après migration ; la sauvegarde et l'effacement incluent aussi les données historiques de la version antérieure.
+Le téléchargement volontaire de Gemma charge un runtime WebLLM tiers dans un Worker isolé. Aucun texte clinique n'est transmis à ce Worker, mais la chaîne d'approvisionnement du CDN n'a pas été auditée. Le navigateur contacte l'hébergeur au premier chargement, et les liens externes s'ouvrent à la demande.
 
 ## Utilisation et validation
+
+Voir le [dossier de validation technique](VALIDATION.md) et la liste des essais et vérifications manquants.
 
 Servir les fichiers par un serveur statique HTTP(S), par exemple avec python3 -m http.server 8000. Les tests automatisés utilisent node --test tests/*.test.mjs. Les modules ne sont pas garantis en ouvrant directement index.html en mode fichier.
 
@@ -60,7 +62,7 @@ Urgences en France : 15 ou 112 ; crise suicidaire : 3114.
 
 Studio Niko Design.
 
-## Coffre-fort local chiffré (nouvelle branche Gemma)
+## Coffre-fort local chiffré
 
 - Toutes les tables applicatives désormais persistées dans une unique enveloppe AES-256-GCM dans `FibroBotVault-v1` (IndexedDB). La clé est dérivée côté navigateur par PBKDF2-SHA256 (600 000 itérations) et n'est pas sauvegardée. Une phrase secrète de 12 caractères minimum est requise.
 - Sans la phrase secrète, FibroBot ne peut pas ouvrir le dossier. En cas de perte de cette phrase, aucune récupération n'est possible. Le coffre ne protège pas les données d'un navigateur ou appareil déjà compromis ni les copies d'écran, les rapports imprimés, l'historique du clavier ou la mémoire d'une session déverrouillée.
@@ -72,7 +74,7 @@ Studio Niko Design.
 
 Le chargement est facultatif et déclenché par un clic explicite dans le chat. `gemma-local.mjs` détecte WebGPU et charge dynamiquement WebLLM **0.2.86** et Gemma 4 **E2B** quantifié `q4f16_1` (si FP16 est disponible) ou `q4f32_1` (sans cette capacité). Le runtime et les poids sont téléchargés depuis les domaines indiqués par l'écosystème WebLLM/Hugging Face. Aucune clé API Mistral n'est utilisée.
 
-**Inférence locale :** les demandes de planification quotidienne autorisées sont envoyées au runtime WebGPU **dans le navigateur**, pas à une API d'inférence. Le modèle reçoit un petit contexte de tâches et d'énergie, pas le dossier clinique complet. Le routage médical déterministe reste prioritaire ; les réponses non documentées sont refusées. **Un modèle génératif peut toujours halluciner** : ses réponses de planification ne sont pas des recommandations médicales.
+**Inférence locale :** les demandes de planification quotidienne autorisées sont envoyées au runtime WebGPU **dans le navigateur**, pas à une API d'inférence. Le modèle reçoit uniquement des indices anonymes de tâches (effort/priorité) et l'énergie déclarée, sans leurs intitulés ni question libre. Le routage médical déterministe reste prioritaire ; les réponses non documentées sont refusées. **Un modèle génératif peut toujours halluciner** : ses réponses de planification ne sont pas des recommandations médicales.
 
 **E4B : non implémenté dans la PWA.** Google publie E2B et E4B pour LiteRT-LM natif (Swift iOS et Kotlin Android) mais une application native et sa compilation, des dizaines de tests de performance et des contrôles de sécurité clinique seraient nécessaires. La présente PR ne prétend pas exécuter E4B sur iPhone ou tablette.
 
