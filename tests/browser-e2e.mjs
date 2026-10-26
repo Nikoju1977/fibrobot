@@ -88,5 +88,12 @@ try{
   const dbs=await legacy.evaluate(async()=>typeof indexedDB.databases==="function"?await indexedDB.databases():[]);
   if(dbs.length)assert.equal(dbs.some(x=>x.name==="FibrobotDB"),false,"legacy plaintext database must be deleted");
  }finally{await legacy.close();}
- console.log("Chromium vault, encrypted backup restore, legacy migration and medical refusal: OK");
+ // Responsive layout smoke checks; these emulate viewport sizes, not real iOS/Android.
+ for(const width of [390,834,1024]){
+   await page.setViewportSize({width,height:850});
+   await page.locator('[data-tab="tasks"]').first().click();
+   const dimensions=await page.evaluate(()=>({viewport:innerWidth,document:document.documentElement.scrollWidth}));
+   assert.ok(dimensions.document<=dimensions.viewport+2,"Unexpected page horizontal overflow at "+width+": "+JSON.stringify(dimensions));
+ }
+ console.log("Chromium vault, restore, migration, medical refusal and mobile/tablet viewport: OK");
 }finally{await browser.close();}
