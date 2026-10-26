@@ -44,6 +44,33 @@ try{
  await page.locator("#prompt").fill("Quelle dose de médicament dois-je prendre ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/je ne peux pas déterminer/i).waitFor({timeout:10000});
+ // Two open tabs must not silently overwrite the medical record.
+ const sibling=await page.context().newPage();
+ try{
+  await sibling.goto(URL,{waitUntil:"networkidle"});
+  await sibling.locator("#vault-password").fill(secret);
+  await sibling.locator("#vault-submit").click();
+  await sibling.locator("#vault-gate").waitFor({state:"hidden",timeout:15000});
+  await page.locator('[data-tab="health"]').first().click();
+  await page.locator("#health-name").fill("Note récente du premier onglet");
+  await page.locator("#health-form button[type=submit]").click();
+  await page.locator("#health-list").getByText("Note récente du premier onglet").waitFor();
+  await sibling.locator('[data-tab="health"]').first().click();
+  await sibling.locator("#health-name").fill("Note périmée du second onglet");
+  await sibling.locator("#health-form button[type=submit]").click();
+  await sibling.locator("#toast").getByText(/autre session|autre onglet|modifié le coffre/i).waitFor({timeout:15000});
+  const names=await page.evaluate(async()=>new Promise((resolve,reject)=>{
+    const open=indexedDB.open("FibroBotVault-v1");
+    open.onsuccess=()=>{
+      const db=open.result;
+      const req=db.transaction("envelopes","readonly").objectStore("envelopes").get("data");
+      req.onsuccess=()=>{resolve(req.result.ciphertext);db.close();};
+      req.onerror=()=>reject(req.error);
+    };
+    open.onerror=()=>reject(open.error);
+  }));
+  assert.ok(names.length>100);
+ }finally{await sibling.close();}
  // Restore the encrypted backup in an independent browsing context.
  const restored=await browser.newPage();
  try{
