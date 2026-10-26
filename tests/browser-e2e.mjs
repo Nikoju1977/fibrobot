@@ -84,7 +84,7 @@ try{
   assert.ok(names.length>100);
  }finally{await sibling.close();}
  // L'application statique et le coffre doivent aussi se déverrouiller hors ligne une fois le shell mis en cache.
- await page.evaluate(async()=>{if("serviceWorker" in navigator)await navigator.serviceWorker.ready;});
+ await page.evaluate(async()=>{if(!("serviceWorker" in navigator))throw Error("ServiceWorker indisponible");await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>setTimeout(()=>reject(Error("ServiceWorker non prêt après 15 secondes")),15000))]);});
  await context.setOffline(true);
  try{
   await page.reload({waitUntil:"domcontentloaded"});
