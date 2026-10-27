@@ -1,15 +1,15 @@
 {
   "id": "./",
-  "name": "FibroBot — Assistant de vie et de suivi",
+  "name": "FibroBot — Mon espace personnel",
   "short_name": "FibroBot",
-  "description": "Assistant de vie local, fibromyalgie et maladies chroniques.",
+  "description": "Espace personnel pour un patient, conçu par Studio Niko Design. Organisation, suivi et informations sourcées, avec coffre local chiffré.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "lang": "fr",
-  "background_color": "#f4f8fa",
-  "theme_color": "#132a38",
+  "background_color": "#f6f9f7",
+  "theme_color": "#f6f9f7",
   "icons": [
     {
       "src": "icon.svg",
