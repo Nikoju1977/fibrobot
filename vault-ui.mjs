@@ -11,14 +11,17 @@ export async function openSecureDB(){
  if(!form||!gate)throw Error("Interface de coffre introuvable.");
  gate.hidden=false;
  const appShell=document.querySelector(".shell");
+ const mobileDock=document.querySelector(".mobile-dock");
  if(appShell)appShell.inert=true;
+ if(mobileDock)mobileDock.inert=true;
  $("vault-password").focus();
  let old=null, hasLegacy=false;
  if(!existing){try{old=await readLegacy();hasLegacy=Object.values(old).some(rows=>rows.length>0);}catch(err){status("Ancienne base illisible : "+err.message);}}
- instructions.textContent=existing?"Coffre existant : saisissez votre phrase secrète pour accéder à vos données. Aucun service ne peut la récupérer.":"Créez une phrase secrète d'au moins 12 caractères. Si vous la perdez, il sera impossible de récupérer les données chiffrées.";
+ instructions.textContent=existing?"Bienvenue. Saisissez votre phrase secrète pour retrouver votre dossier personnel.":"Première utilisation ? Choisissez une phrase secrète de 12 caractères minimum. Retenez-la : personne ne peut la retrouver pour vous.";
  button.textContent=existing?"Déverrouiller":"Créer le coffre";
  confirm.hidden=Boolean(existing);
  $("vault-confirm-ack").hidden=Boolean(existing);
+ $("vault-patient-wrap").hidden=Boolean(existing);
  $("vault-import").disabled=Boolean(existing);
  legacy.hidden=!hasLegacy;
  if(hasLegacy)legacy.textContent="Anciennes données non chiffrées détectées. Vous pouvez les importer en sélectionnant l'option ci-dessous. Après vérification du chiffrement, leur suppression sera tentée ; si elle échoue, vous en serez averti.";
@@ -33,6 +36,7 @@ export async function openSecureDB(){
     if(!existing){
      if(password.length<12)throw Error("La phrase secrète doit comporter au moins 12 caractères.");
      if(!$("vault-ack").checked)throw Error("Vous devez confirmer avoir compris le risque de perte des données.");
+     if(!$("vault-single-patient").checked)throw Error("Confirmez que ce coffre appartient à un seul patient.");
      const migrate=hasLegacy&&$("vault-migrate").checked;
      const file=$("vault-import").files?.[0];
      if(file){
@@ -58,6 +62,7 @@ export async function openSecureDB(){
     $("vault-password").value="";$("vault-confirm-password").value="";
     gate.hidden=true;
     if(appShell)appShell.inert=false;
+    if(mobileDock)mobileDock.inert=false;
     $("main")?.focus({preventScroll:true});
     if(!$("vault-post-warning").hidden){const toast=$("toast");if(toast){toast.hidden=false;toast.textContent="Attention : une ancienne base non chiffrée est peut-être présente. Vérifiez « Mes données ».";}}
     resolve(active);

@@ -19,15 +19,22 @@ try{
  await page.locator("#vault-password").fill(secret);
  await page.locator("#vault-confirm-password").fill(secret);
  await page.locator("#vault-ack").check();
+ await page.locator("#vault-single-patient").check();
  await page.locator("#vault-submit").click();
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
  await rival.locator("#vault-password").fill("une autre phrase secrète longue");
  await rival.locator("#vault-confirm-password").fill("une autre phrase secrète longue");
  await rival.locator("#vault-ack").check();
+ await rival.locator("#vault-single-patient").check();
  await rival.locator("#vault-submit").click();
  await rival.locator("#vault-error").getByText(/coffre existe déjà|autre onglet/i).waitFor({timeout:20000});
  await rival.close();
- await page.locator('[data-tab="health"]').first().click();
+ await page.locator("#first-steps").waitFor({state:"visible",timeout:10000});
+ assert.equal(await page.locator("#first-steps .step-card").count(),3,"Three simple patient onboarding steps must be visible");
+ assert.equal(await page.getByText("Studio Niko Design").first().count(),1,"Designer credit must be visible");
+ await page.locator("#dismiss-guide").click();
+ await page.locator("#first-steps").waitFor({state:"hidden",timeout:10000});
+ await page.locator('#nav [data-tab="health"]').click();
  await page.locator("#health-name").fill(value);
  await page.locator("#pain").fill("6");
  await page.locator("#health-form button[type=submit]").click();
@@ -44,15 +51,17 @@ try{
  page.once("dialog",dialog=>dialog.accept());
  await page.locator("#lock-vault").click();
  await page.locator("#vault-gate").waitFor({state:"visible",timeout:15000});
+ assert.equal(await page.locator("#vault-patient-wrap").isVisible(),false,"Returning patient must not be asked to create another account");
  await page.locator("#vault-password").fill("phrase volontairement incorrecte");
  await page.locator("#vault-submit").click();
  await page.waitForFunction(()=>/incorrect|endommagé/.test(document.getElementById("vault-error").textContent),{timeout:15000});
  await page.locator("#vault-password").fill(secret);
  await page.locator("#vault-submit").click();
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:15000});
- await page.locator('[data-tab="health"]').first().click();
+ await page.locator("#first-steps").waitFor({state:"hidden",timeout:10000});
+ await page.locator('#nav [data-tab="health"]').click();
  await page.locator("#health-list").getByText(value).waitFor();
- await page.locator('[data-tab="chat"]').first().click();
+ await page.locator('#nav [data-tab="chat"]').click();
  await page.locator("#prompt").fill("Quelle dose de médicament dois-je prendre ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/je ne peux pas déterminer/i).waitFor({timeout:10000});
@@ -63,11 +72,11 @@ try{
   await sibling.locator("#vault-password").fill(secret);
   await sibling.locator("#vault-submit").click();
   await sibling.locator("#vault-gate").waitFor({state:"hidden",timeout:15000});
-  await page.locator('[data-tab="health"]').first().click();
+  await page.locator('#nav [data-tab="health"]').click();
   await page.locator("#health-name").fill("Note récente du premier onglet");
   await page.locator("#health-form button[type=submit]").click();
   await page.locator("#health-list").getByText("Note récente du premier onglet").waitFor();
-  await sibling.locator('[data-tab="health"]').first().click();
+  await sibling.locator('#nav [data-tab="health"]').click();
   await sibling.locator("#health-name").fill("Note périmée du second onglet");
   await sibling.locator("#health-form button[type=submit]").click();
   await sibling.locator("#toast").getByText(/autre session|autre onglet|modifié le coffre/i).waitFor({timeout:15000});
@@ -92,7 +101,7 @@ try{
   await page.locator("#vault-password").fill(secret);
   await page.locator("#vault-submit").click();
   await page.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
-  await page.locator('[data-tab="health"]').first().click();
+  await page.locator('#nav [data-tab="health"]').click();
   await page.locator("#health-list").getByText(value).waitFor({timeout:10000});
  }finally{await context.setOffline(false);}
  // Restore the encrypted backup in an independent browsing context.
@@ -103,9 +112,10 @@ try{
   await restored.locator("#vault-import").setInputFiles({name:"coffre-chiffre.json",mimeType:"application/json",buffer});
   await restored.locator("#vault-password").fill(secret);
   await restored.locator("#vault-ack").check();
+ await restored.locator("#vault-single-patient").check();
   await restored.locator("#vault-submit").click();
   await restored.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
-  await restored.locator('[data-tab="health"]').first().click();
+  await restored.locator('#nav [data-tab="health"]').click();
   await restored.locator("#health-list").getByText(value).waitFor();
  }finally{await restored.close();}
  // Migration: create a legacy database in a separate context, then opt in.
@@ -132,9 +142,10 @@ try{
   await legacy.locator("#vault-password").fill(secret);
   await legacy.locator("#vault-confirm-password").fill(secret);
   await legacy.locator("#vault-ack").check();
+ await legacy.locator("#vault-single-patient").check();
   await legacy.locator("#vault-submit").click();
   await legacy.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
-  await legacy.locator('[data-tab="health"]').first().click();
+  await legacy.locator('#nav [data-tab="health"]').click();
   await legacy.locator("#health-list").getByText("Ancienne note").waitFor();
   const dbs=await legacy.evaluate(async()=>typeof indexedDB.databases==="function"?await indexedDB.databases():[]);
   if(dbs.length)assert.equal(dbs.some(x=>x.name==="FibrobotDB"),false,"legacy plaintext database must be deleted");
@@ -142,7 +153,7 @@ try{
  // Responsive layout smoke checks; these emulate viewport sizes, not real iOS/Android.
  for(const width of [390,834,1024]){
    await page.setViewportSize({width,height:850});
-   await page.locator('[data-tab="tasks"]').first().click();
+   await (width<=930?page.locator('.mobile-dock [data-tab="tasks"]'):page.locator('#nav [data-tab="tasks"]')).click();
    const dimensions=await page.evaluate(()=>({viewport:innerWidth,document:document.documentElement.scrollWidth}));
    assert.ok(dimensions.document<=dimensions.viewport+2,"Unexpected page horizontal overflow at "+width+": "+JSON.stringify(dimensions));
  }

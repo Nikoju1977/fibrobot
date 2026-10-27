@@ -1,5 +1,18 @@
 # FibroBot — assistant de vie local
 
+## Première prise en main · Studio Niko Design
+
+**FibroBot est conçu pour un seul patient par navigateur / profil d'appareil.** Il ne propose aucun compte multi-utilisateur, aucune liste de patients, et ne demande pas de nom civil. Un seul coffre peut être créé sur cette installation. Pour utiliser un dossier différent, il faut effacer complètement le coffre existant (après sauvegarde si nécessaire). Une sauvegarde doit uniquement être restaurée par le patient auquel elle appartient.
+
+1. Ouvrez FibroBot, créez une phrase secrète personnelle d'au moins 12 caractères et confirmez qu'il s'agit de **votre propre dossier**. La phrase secrète ne peut être récupérée si elle est perdue.
+2. À la première ouverture du coffre, un guide **« 3 gestes simples »** explique comment noter son état, organiser sa journée et demander de l'aide. Le guide peut être masqué et rouvert depuis **« Mode d'emploi »**. L'état du guide est mémorisé **dans le coffre chiffré**, jamais dans un traceur externe.
+3. Sur téléphone et tablette, la barre inférieure donne accès à Accueil, Tâches, Assistant et Santé ; **Plus** ouvre toutes les autres rubriques, notamment les traitements, rendez-vous, bibliothèque et mode crise.
+4. Les réglages **Gemma 4** sont facultatifs et repliés par défaut : le patient n'a pas besoin de télécharger un modèle pour utiliser l'application. Les données médicales restent soumises aux refus prudents et aux sources documentaires.
+5. Pour mettre l'application en sécurité, utilisez **Verrouiller** ; l'export du coffre chiffré se trouve dans **Mes données**.
+
+**Conception interface et expérience utilisateur : Studio Niko Design.** Ce logiciel est expérimental, non évalué cliniquement. Les tests de navigation sur navigateurs émulés ne prouvent pas la compatibilité sur tous les appareils réels.
+
+
 FibroBot est un assistant de vie pour les personnes vivant avec la fibromyalgie et d'autres maladies chroniques. Il conserve un profil multi-maladies, un journal de santé, des tâches quotidiennes, un inventaire de traitements déclarés et des rendez-vous.
 
 **Statut : prototype expérimental non validé cliniquement.** Il ne remplace ni médecin, ni pharmacien, ni service d'urgence.
