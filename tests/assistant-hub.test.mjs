@@ -17,7 +17,7 @@ test("moteur descriptif : synthèse exacte sans données inventées",()=>{
   {date:"2026-10-25",name:"Observation déclarée",intensity:4,energy:3},
   {date:"2026-10-26",name:"Deuxième note",intensity:6,fatigue:8}
  ]});
- assert.match(s,/5\/10 \(2 notes\)/);
+ assert.match(s,/5,0\/10 \(2 notes\)/);
  assert.match(s,/énergie 3,0\/10/);
  assert.match(s,/sans inférence médicale/);
 });
