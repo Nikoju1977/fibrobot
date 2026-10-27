@@ -78,6 +78,7 @@ try{
  await page.locator("#gemma-options").evaluate(x=>x.open=true);
  assert.equal(await page.locator("#llm-check").isVisible(),true);
  assert.equal(await page.locator("#local-model-select").inputValue(),"auto");
+ assert.equal(await page.locator("#gemma-cancel").isVisible(),false,"Cancel appears only during an active model load");
  await page.locator("#llm-check").click();
  await page.locator("#llm-device").getByText(/WebGPU|GPU|catalogue/i).waitFor({timeout:10000});
  await page.locator('#nav [data-tab="library"]').click();

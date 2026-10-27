@@ -97,10 +97,12 @@
   <select id="gemma-variant"><option value="auto">Automatique selon le GPU</option><option value="f32">Sans shader-f16, si compatible</option><option value="f16">Avec shader-f16</option></select>
   <div class="button-row">
    <button type="button" id="gemma-load" class="btn primary">2. Télécharger et charger le modèle choisi</button>
+   <button type="button" id="gemma-cancel" class="btn light" hidden disabled>Annuler le chargement</button>
    <button type="button" id="gemma-unload" class="btn light" disabled>Décharger le modèle</button>
   </div>
   <p id="llm-device" class="tiny" role="status">Aucune vérification de compatibilité effectuée.</p>
   <p id="gemma-status" class="tiny" role="status">Modèle non chargé : toutes les fonctions documentaires restent utilisables.</p>
+  <p class="tiny">Le téléchargement est facultatif et peut être annulé. Les réponses générées par une IA peuvent être incorrectes ; les informations médicales proviennent des fiches distinctes.</p>
   <progress id="gemma-progress" max="1" value="0" hidden aria-label="Progression du modèle"></progress>
   <label class="consent"><input type="checkbox" id="gemma-use" disabled>Activer le modèle local pour le dialogue général et l'organisation (jamais pour la prescription)</label>
  </div>

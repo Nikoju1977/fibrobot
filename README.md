@@ -116,3 +116,9 @@ Les fichiers `native/ios` et `native/android` ne sont que des **prototypes de ru
 - Le dialogue libre passe au modèle local **uniquement** si l'intention est non médicale ; aucun dossier médical, note de santé ou question médicale n'est transmis à son Worker. Les requêtes de santé gardent le refus prudent ou les fiches de sources.
 - Une recherche bibliographique Europe PMC s'effectue seulement sur clic et avec des thèmes fixes (aucune recherche textuelle libre ou donnée de santé transmise). Un article trouvé n'est pas une preuve de sécurité ou d'efficacité clinique.
 - Les rappels de traitement ne sont toujours pas garantis après fermeture du navigateur. Le modèle génératif ne conseille ni prescription, ni dosage, ni changements de traitement.
+
+## Renforcement final — assistant et PWA
+
+- Le dialogue génératif général rejette les questions contenant une demande pharmaceutique identifiée ou des informations personnelles reconnaissables ; les réponses génératives contenant un thème médical, une posologie, une référence à un traitement ou un lien non vérifié sont refusées avant affichage.
+- Un bouton « Annuler le chargement » apparaît pendant l’installation d’un modèle optionnel. Les notes chiffrées et l’assistant documentaire restent utilisables si le modèle échoue.
+- La PWA cache les fichiers statiques (service worker `fibrobot-shell-v10`), pas la clé du coffre ou les observations en clair. La compatibilité WebGPU réelle doit être validée sur les appareils concernés.

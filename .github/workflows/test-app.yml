@@ -13,6 +13,8 @@ on:
       - "vault.mjs"
       - "vault-ui.mjs"
       - "gemma-local.mjs"
+      - "assistant-engine.mjs"
+      - "research-library.mjs"
       - "gemma-worker.mjs"
       - "manifest.json"
       - "tests/**"

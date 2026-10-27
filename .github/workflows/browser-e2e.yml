@@ -14,6 +14,8 @@ on:
       - "vault.mjs"
       - "vault-ui.mjs"
       - "gemma-local.mjs"
+      - "assistant-engine.mjs"
+      - "research-library.mjs"
       - "gemma-worker.mjs"
       - "sw.js"
       - "tests/browser-e2e.mjs"

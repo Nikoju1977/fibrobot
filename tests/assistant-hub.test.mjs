@@ -69,3 +69,25 @@ test("recherche Europe PMC : uniquement des thèmes fixes et liens construits de
  assert.equal(list[0].url,"https://europepmc.org/article/MED/123456");
  assert.throws(()=>parseResearchResults({resultList:{}}),/invalide/);
 });
+
+test("sécurité des hallucinations : aucune proposition clinique issue d'une conversation générale",()=>{
+ const bad=["Prenez deux comprimés le soir.","Arrêtez votre traitement.","Cela ressemble à un diagnostic.",
+  "La morphine peut vous aider.","Vous souffrez de fibromyalgie.","Voir https://site-non-verifie.example"];
+ for(const answer of bad)assert.throws(()=>cleanGeneratedReply(answer),undefined,answer);
+ assert.equal(cleanGeneratedReply("Je peux aider à écrire un poème."),"Je peux aider à écrire un poème.");
+});
+test("dialogue général : médicaments courants, identité et données privées exclus",()=>{
+ for(const s of ["Peux-tu parler du Doliprane ?","Dois-je utiliser l'ibuprofène ?",
+  "Je prends du tramadol.","Parle-moi de la metformine."]){
+  assert.equal(classifyIntent(s),"medical",s);
+  assert.throws(()=>nonMedicalMessages(s),/non admissible/,s);
+ }
+ for(const s of ["Voici mon email : nom@example.org","Mon adresse est 12 rue de la Paix",
+  "Mon numéro de carte est confidentiel"]){
+  assert.throws(()=>nonMedicalMessages(s),/privées/,s);
+ }
+ const history=[{role:"user",purpose:"general-local",body:"mon adresse est 12 rue de la Paix"},
+   {role:"bot",purpose:"general-local",body:"Voici mon poème."}];
+ const m=nonMedicalMessages("Écris un poème original",history);
+ assert.ok(!JSON.stringify(m).includes("rue de la Paix"));
+});

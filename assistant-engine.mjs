@@ -7,6 +7,9 @@ import {rankTasks,energyGuide,today,text} from "./core.mjs";
 const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const RE_MEDICAL=/(fibro|maladi|medic|traitement|douleur|sympt|diagnos|ordonnance|allerg|dose|posolog|crise|suicid|sante|soin|therap|depress|migraine|diabet|asthme|cancer|rhumat|handicap|fatigue|sommeil|insomni|pression|fievre|infection|chirurg|effet secondaire|interact|enceint|prescri|hopital|pharmac|consultation|j.ai mal|mal a la tete|je me sens mal|je souffre|vertige|vomiss|nausee|anxiet|angoiss|paniques|stress|suicide|deprimer|mal etre|blessure|hematome|mal au ventre|mal au dos|saign|tension arterielle|difficulte a respirer)/;
 const RE_DRUG=/(dose|dosage|posolog|combien de comprime|quel medicament|arreter|arret.*traitement|modifi.*traitement|interact|contre.indic|puis.je prendre|peux.je prendre|surdosage|intoxicat|prescri|automedic)/;
+const RE_PHARMA_NAMES=/(paracetamol|doliprane|ibuprofene|advil|tramadol|morphine|insuline|metformine|sertraline|antidepresseur|anxiolytique|somnifere|antibiotique|cortisone|anticoagulant|opioide|oxycodone|vaccin|rivotril|lyrica|pregabaline)/;
+const RE_PRIVATE=/(?:[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|(?:\+33|0[1-9])(?:[ .-]?\d\d){4}|mot de passe|numero de securite sociale|numero de carte|mon adresse|j'habite au \d)/i;
+
 
 export const RESEARCH_TOPICS=Object.freeze([
  {id:"fibromyalgia",label:"Fibromyalgie — recherches générales",query:"TITLE_ABS:fibromyalgia"},
@@ -17,7 +20,7 @@ export const RESEARCH_TOPICS=Object.freeze([
 ]);
 export function classifyIntent(input){
  const q=norm(input);
- if(RE_DRUG.test(q))return "medical";
+ if(RE_DRUG.test(q)||RE_PHARMA_NAMES.test(q))return "medical";
  if(/(bilan|resum|resume|synthes|historique|evolution|compar|tendance|statistique)/.test(q)&&/(mes|mon|observ|sympt|douleur|fatigue|sommeil|suivi)/.test(q))return "summary";
  if(/(prepar|question|fiche|bilan|recap)/.test(q)&&/(rendez.vous|medecin|consultation|soignant|pharmacien)/.test(q))return "visit";
  if(/(recherch|etude|publication|article|science|bibliograph)/.test(q)&&RE_MEDICAL.test(q))return "research";
@@ -69,13 +72,22 @@ export function planDaily(context={}){
 }
 export function nonMedicalMessages(question,history=[]){
  if(classifyIntent(question)!=="general")throw Error("Question non admissible au dialogue général.");
- const context=Array.isArray(history)?history.filter(x=>x?.purpose==="general-local"&&["user","bot"].includes(x.role)&&classifyIntent(x.body)==="general").slice(-6):[];
+ if(RE_PRIVATE.test(norm(question)))throw Error("Cette question contient des données privées : utilisez le mode documentaire local.");
+ const context=Array.isArray(history)?history.filter(x=>x?.purpose==="general-local"&&["user","bot"].includes(x.role)&&classifyIntent(x.body)==="general"&&!RE_PRIVATE.test(norm(x.body))).slice(-6):[];
  const system="Tu es FibroBot, compagnon de conversation générale de Studio Niko Design. Réponds en français, poliment, simplement et brièvement. Ne prétends pas connaître le dossier médical ou avoir consulté Internet. Tu n’as aucune information actualisée. Aucun diagnostic, conseil de traitement, dosage, interaction, posologie, modification de prescription ni évaluation de risque : pour les questions de santé, invite à utiliser les fiches sourcées et à consulter un professionnel. Ne génère aucune action automatique. Signale clairement toute incertitude factuelle.";
  return [{role:"system",content:system},...context.map(x=>({role:x.role==="bot"?"assistant":"user",content:text(x.body,450)})),{role:"user",content:text(question,1000)}];
 }
 export function cleanGeneratedReply(answer){
  const v=String(answer||"").trim();
  if(!v||v.length>2400)throw Error("Réponse locale vide ou anormalement longue.");
+ // Le modèle peut ignorer les consignes : ne jamais laisser passer une réponse
+ // contenant une prescription, une posologie, un diagnostic ou une urgence inventés.
+ const normalized=norm(v);
+ if(/(?:posolog|dosage|\bdose\b|diagnos|prescri|ordonnance|contre.indic|interact.*medic|\bmilligramme|\bmg\b|\bcomprime|arret.*traitement|arretez|prendre.*medic|traitement.*recommand|vous souffrez de|consultez.*urgence)/.test(normalized))
+  throw Error("Réponse potentiellement médicale bloquée ; moteur documentaire conservé.");
+ if(RE_PHARMA_NAMES.test(normalized)||RE_MEDICAL.test(normalized))
+  throw Error("Référence médicale dans une réponse libre : moteur documentaire conservé.");
+ if(/https?:\/\/|www\./i.test(v))throw Error("Lien non vérifié du modèle bloqué.");
  return v;
 }
 export function researchEndpoint(topic){

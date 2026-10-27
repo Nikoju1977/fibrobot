@@ -160,6 +160,11 @@ export async function generateGeneralChat(question,history=[]){
  const result=await rpc("generate",{messages});
  return cleanGeneratedReply(result.text)+"\n\n[Réponse générée localement par "+modelId+" ; vérifiez les faits importants.]";
 }
+export function cancelGemmaLoad(){
+ if(!loading)return false;
+ failAll("Téléchargement/chargement annulé à votre demande. Le mode documentaire est toujours disponible.");
+ return true;
+}
 export async function unloadGemma(){
  if(worker){try{if(modelId)await rpc("unload");}finally{worker.terminate();worker=null;}}
  modelId=null;modelsCache=null;loading=false;
