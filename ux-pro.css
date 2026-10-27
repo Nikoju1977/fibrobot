@@ -259,3 +259,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 #vault-patient-wrap[hidden]{display:none!important}
 #start-title:focus{outline:none}
 @media(max-width:670px){.ai-card summary{padding:15px}.ai-details{padding:15px}.ai-card summary small{font-size:.7rem}}
+
+/* Restore and recovery stay accessible, without overwhelming first-time patients. */
+.restore-details{border:1px solid #dceae2;background:#f7fbf8;border-radius:12px;margin:2px 0 7px}
+.restore-details>summary{padding:13px 15px;cursor:pointer;color:#286650;font-weight:750;font-size:.86rem;list-style:revert}
+.restore-details>summary:focus-visible{outline:3px solid #007e76;outline-offset:2px}
+.restore-details-body{border-top:1px solid #dceae2;padding:15px;display:flex;flex-direction:column;gap:9px}
+.restore-details-body label{font-size:.84rem}
+.restore-details-body input{width:100%;max-width:100%}
+.restore-details-body p{margin:0}
