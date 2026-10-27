@@ -31,3 +31,14 @@ test("les signes de surdosage et oppression thoracique imposent un message prior
   assert.deepEqual(result.sources,[]);
  }
 });
+
+
+test("documents officiels Ameli : causes et accompagnement de la fibromyalgie",()=>{
+ const cause=reply("Quelles sont les causes de la fibromyalgie ?",LIBRARY);
+ assert.equal(cause.kind,"documented");
+ assert.equal(cause.sources[0].id,"causes");
+ assert.match(cause.sources[0].url,/^https:\/\/www\.ameli\.fr\//);
+ const living=reply("Comment vivre avec la fibromyalgie au quotidien ?",LIBRARY);
+ assert.equal(living.kind,"documented");
+ assert.equal(living.sources[0].id,"living");
+});
