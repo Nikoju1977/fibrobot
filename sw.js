@@ -1,6 +1,6 @@
 /* FibroBot local-first : seulement les fichiers statiques, jamais IndexedDB. */
-const VERSION="fibrobot-shell-v10";
-const ASSETS=["./","./index.html","./styles.css","./ux-pro.css","./ux-pro.mjs","./app.mjs","./gemma-local.mjs","./gemma-worker.mjs","./assistant-engine.mjs","./research-library.mjs","./vault.mjs","./vault-ui.mjs","./core.mjs","./medical-library.mjs","./manifest.json","./icon.svg"];
+const VERSION="fibrobot-shell-v11";
+const ASSETS=["./","./index.html","./styles.css","./ux-pro.css","./ux-pro.mjs","./app.mjs","./gemma-local.mjs","./gemma-worker.mjs","./assistant-engine.mjs","./agent-hub.mjs","./research-library.mjs","./vault.mjs","./vault-ui.mjs","./core.mjs","./medical-library.mjs","./manifest.json","./icon.svg"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(VERSION).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });
