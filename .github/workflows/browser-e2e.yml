@@ -7,6 +7,8 @@ on:
     paths:
       - "index.html"
       - "styles.css"
+      - "ux-pro.css"
+      - "ux-pro.mjs"
       - "app.mjs"
       - "core.mjs"
       - "vault.mjs"
