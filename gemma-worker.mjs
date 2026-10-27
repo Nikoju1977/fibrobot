@@ -6,19 +6,22 @@ let engine=null,modelId=null;
 const version="https://esm.run/@mlc-ai/web-llm@0.2.86";
 const send=(id,kind,payload={})=>postMessage({id,kind,...payload});
 self.onmessage=async event=>{
- const {id,action,model,messages}=event.data||{};
+ const {id,action,model,messages,mode}=event.data||{};
  try{
   if(action==="load"){
    if(engine)throw Error("Modèle déjà chargé.");
    const pkg=await import(version);
    if(typeof pkg.CreateMLCEngine!=="function")throw Error("Runtime WebLLM absent.");
+   const available=pkg.prebuiltAppConfig?.model_list?.some(x=>x.model_id===model);
+   if(!available)throw Error("Modèle non référencé dans le catalogue officiel WebLLM "+model+".");
    const instance=await pkg.CreateMLCEngine(model,{initProgressCallback:p=>send(id,"progress",{progress:p?.progress||0,text:p?.text||"Chargement…" })});
    engine=instance;modelId=model;send(id,"result",{modelId});return;
   }
   if(action==="generate"){
    if(!engine)throw Error("Modèle non chargé.");
    if(!Array.isArray(messages)||messages.length!==2||messages.some(m=>!["system","user"].includes(m?.role)||typeof m.content!=="string"))throw Error("Format de requête local invalide.");
-   const result=await engine.chat.completions.create({messages,temperature:0,max_tokens:320});
+   if(messages.some(m=>m.content.length>1600))throw Error("Requête trop volumineuse.");
+   const result=await engine.chat.completions.create({messages,temperature:0.2,max_tokens:mode==="conversation"?420:320});
    send(id,"result",{text:result?.choices?.[0]?.message?.content||""});return;
   }
   if(action==="unload"){
