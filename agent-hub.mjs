@@ -27,7 +27,7 @@ export function routeSpecialist(question){
  if(/(organis|tache|planning|courses|menage|lessive|quotidien|journee|priorite)/.test(q)&&!/(dose|traitement|medicament)/.test(q))return "pacing";
  if(/(mon|mes) (sommeil|insomnie|nuits?)|insomnie|dormir|sommeil/.test(q))return "sleep";
  if(/fatigue|brouillard cognitif|concentration|memoire/.test(q))return "fatigue";
- if(/douleur|fibromyalgie|fibro/.test(q))return "pain";
+ if(/douleur|\bfibromyalgie\b|\bfibro\b/.test(q))return "pain";
  return null;
 }
 
