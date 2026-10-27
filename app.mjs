@@ -1,7 +1,7 @@
 import {today,text,makeSymptom,makeTask,makeCondition,makeAppointment,makeMedication,energyGuide,rankTasks,reply,dueReminders,reminderLog} from "./core.mjs";
 import {LIBRARY} from "./medical-library.mjs";
 import {openSecureDB,all,put,del,wipeDB,encryptedExport,eraseLegacy} from "./vault-ui.mjs";
-import {loadGemma,unloadGemma,canPlanWithGemma,generateLifePlan,generateGeneralChat,detectWebGPU,listLocalModels,status as llmStatus} from "./gemma-local.mjs";
+import {loadGemma,unloadGemma,cancelGemmaLoad,canPlanWithGemma,generateLifePlan,generateGeneralChat,detectWebGPU,listLocalModels,status as llmStatus} from "./gemma-local.mjs";
 import {classifyIntent,summarizeObservations,prepareVisit,planDaily} from "./assistant-engine.mjs";
 import {findScientificArticles,externalResearchLink} from "./research-library.mjs";
 import {setupPatientUX} from "./ux-pro.mjs";
@@ -125,13 +125,13 @@ function events(){
   finally{button.disabled=false;}
  });
  $("gemma-load").addEventListener("click",async()=>{
-   const button=$("gemma-load"),progress=$("gemma-progress"),status=$("gemma-status");
+   const button=$("gemma-load"),cancel=$("gemma-cancel"),progress=$("gemma-progress"),status=$("gemma-status");
    button.disabled=true;status.textContent="Vérification WebGPU…";
    try{
     const cap=await detectWebGPU();if(!cap.supported)throw Error(cap.reason);
     const desired=$("local-model-select").value;
     if(!confirm("Télécharger un modèle IA local"+(desired==="auto"?" léger":desired==="gemma"?" Gemma 4":" sélectionné")+" ? Les poids peuvent faire plusieurs Go et saturer la mémoire GPU. Le calcul a lieu sur cet appareil ; le modèle ne reçoit aucun dossier médical."))return;
-    progress.hidden=false;progress.value=0;
+    progress.hidden=false;progress.value=0;cancel.hidden=false;cancel.disabled=false;
     const result=await loadGemma({variant:$("gemma-variant").value,model:desired,onProgress:p=>{
      status.textContent=p.text||"Chargement du modèle local…";
      if(Number.isFinite(p.progress))progress.value=Math.max(0,Math.min(1,p.progress));
@@ -144,8 +144,9 @@ function events(){
     $("gemma-unload").disabled=true;
     status.textContent="Le modèle n'a pas été chargé : "+error.message+" Le mode sans IA reste disponible. Essayez « Léger automatique » ou un autre navigateur.";
     notify("Échec du modèle : FibroBot reste utilisable.");
-   }finally{button.disabled=false;progress.hidden=true;}
+   }finally{button.disabled=false;progress.hidden=true;cancel.hidden=true;cancel.disabled=true;}
  });
+ $("gemma-cancel").addEventListener("click",()=>{if(cancelGemmaLoad())$("gemma-status").textContent="Chargement annulé ; vous pouvez garder le mode sans IA ou choisir un modèle léger.";});
  $("gemma-unload").addEventListener("click",async()=>{
   try{await unloadGemma();$("gemma-use").checked=false;$("gemma-use").disabled=true;$("gemma-unload").disabled=true;$("gemma-status").textContent="Modèle déchargé ; assistant local documentaire toujours disponible.";}
   catch(error){notify("Déchargement impossible : "+error.message);}
