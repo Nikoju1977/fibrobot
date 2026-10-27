@@ -268,3 +268,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .restore-details-body label{font-size:.84rem}
 .restore-details-body input{width:100%;max-width:100%}
 .restore-details-body p{margin:0}
+
+/* Studio Niko Design — research controls and patient-first model status */
+.library-controls{margin-bottom:17px;display:flex;flex-direction:column;gap:10px}
+.library-controls label{font-weight:750;color:#225248}
+.library-controls input{min-height:49px;width:100%;border:1px solid #bfd8cf;border-radius:12px;padding:11px 15px;font:inherit;color:#173f39;background:#fff}
+.library-controls .tiny{margin:0}
+#gemma-cancel:not([hidden]){border-color:#c89d6f;background:#fff5e9;color:#74491c}
+#gemma-status{overflow-wrap:anywhere;line-height:1.6}
+#gemma-progress{display:block;max-width:100%}
+@media(max-width:670px){.library-controls{padding:16px}#gemma-options .button-row{align-items:stretch}}
