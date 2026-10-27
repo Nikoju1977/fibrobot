@@ -46,6 +46,17 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
   assert.equal(await page.locator("#gemma-load").isVisible(),false,"Gemma should be opt-in, not an obstacle for first-time users");
   await page.locator('#gemma-options summary').click();
   assert.equal(await page.locator("#gemma-load").isVisible(),true);
+  assert.equal(await page.locator('#gemma-variant option[value="lite"]').count(),1);
+  await page.locator("#prompt").fill("Planifie ma journée et mes tâches");
+  await page.locator('#chat-form button[type="submit"]').click();
+  await page.locator("#messages").getByText(/plan de journée proposé/i).waitFor({timeout:15000});
+  await page.locator("#mobile-menu-toggle").click();
+  await page.locator('#app-side [data-tab="library"]').click();
+  await page.locator("#library-search").fill("fibromyalgie");
+  assert.ok(await page.locator("#library-list article").count()>0,"Mobile library search available");
+  const final=await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
+  assert.ok(final.scroll<=final.viewport+2,"Assistant/search creates horizontal overflow");
+
   console.log(label+": UI, coffre, formulaire, XSS, responsive OK (émulation, pas de matériel réel)");
  }finally{await browser.close();}
 }
