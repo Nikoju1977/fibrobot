@@ -56,7 +56,7 @@ export async function generateLifePlan(question,context={}){
  if(!canPlanWithGemma(question))throw Error("Gemma ne traite que les tâches et l'organisation.");
  const tasks=(context.tasks||[]).filter(t=>!t.done).slice(0,12);
  if(!tasks.length)throw Error("Aucune tâche enregistrée à organiser.");
- const result=await rpc("generate",{messages:safePlanInput(question,context)});
+ const result=await rpc("generate",{messages:safePlanInput(question,{...context,tasks})});
  const indices=parseTaskOrder(result.text,tasks.length);
  if(!indices||!indices.length)throw Error("La proposition Gemma ne respecte pas le format sûr. Repli local.");
  return "Proposition d'ordre pour vos tâches : "+indices.map((i,j)=>(j+1)+". "+String(tasks[i].title||"").slice(0,90)).join(" ; ")+". Prenez des pauses et reportez ou déléguez ce qui dépasse votre énergie du jour. Ce classement n'est pas un avis médical.";
