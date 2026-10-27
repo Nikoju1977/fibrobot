@@ -62,3 +62,11 @@ La **première visite** à GitHub Pages et le téléchargement du modèle contac
 ## Contrôle complémentaire : routage du modèle et agents spécialisés
 
 Les tests `tests/agent-hub.test.mjs` couvrent le catalogue des agents, le routage des domaines, les refus de prescription, les réponses urgentes et les sorties sourcées. Le contrôle navigateur simule également le clic sur un agent. La validation du chargement réel de Gemma/Qwen nécessite encore un appareil WebGPU avec les poids du modèle : elle ne fait pas partie des tests CI.
+
+## Connecteurs Internet et sources documentaires — contrôle complémentaire
+
+- Le fichier `network-library.mjs` choisit un fournisseur selon une question **publique non médicale** : Wikipédia, OpenAlex, Crossref, Open Library et GitHub.
+- Les tests `tests/network-library.test.mjs` couvrent les domaines approuvés, les paramètres CORS, le filtrage des requêtes privées, la validation des URLs, les réponses JSON, les erreurs et les quotas.
+- Le test navigateur `tests/browser-e2e.mjs` intercepte une requête Wikipédia **simulée**, vérifie la case réseau décochée au démarrage, le refus de consentement, une confirmation explicite et des liens vers les notices.
+- Les requêtes médicales ne doivent pas être envoyées aux moteurs de culture générale. Europe PMC reste déclenché uniquement depuis Bibliothèque avec sujets prédéfinis et consentement.
+- Les tests CI ne valident pas une disponibilité réseau réelle en permanence. Les tests matériels et la vérification médicale externe restent impératifs.
