@@ -44,7 +44,11 @@ function rpc(action,params={},onProgress){
  const instance=requireWorker(),id=nextID++;
  const timeoutMs=action==="load"?600000:action==="generate"?120000:40000;
  return new Promise((resolve,reject)=>{
-  const timeout=setTimeout(()=>{pending.delete(id);reject(new Error("Délai dépassé pour "+action+". Réessayez après avoir vérifié la connexion et la mémoire."));if(action!=="generate")failAll("Chargement du moteur annulé.");},timeoutMs);
+  const timeout=setTimeout(()=>{
+   pending.delete(id);
+   reject(new Error("Délai dépassé pour "+action+". Le moteur a été réinitialisé afin d'éviter un blocage."));
+   failAll("Le moteur IA local a été réinitialisé après un délai dépassé.");
+  },timeoutMs);
   pending.set(id,{resolve,reject,onProgress,timeout});
   try{instance.postMessage({id,action,...params});}
   catch(e){clearTimeout(timeout);pending.delete(id);reject(e);}
@@ -57,30 +61,47 @@ export async function listLocalModels(){
  if(!modelsCache.length)throw Error("Aucun modèle compatible listé par cette version de WebLLM.");
  return modelsCache;
 }
-const sizeB=id=>{
- const m=String(id).match(/(?:^|[-_])(\d+(?:\.\d+)?)B(?:[-_]|$)/i);
- return m?Number(m[1]):100;
-};
-export function selectModel(models,{variant="auto",preference="auto",f16=false}={}){
- const candidates=(models||[]).filter(x=>x?.id&&
-   (f16||!/q\df16|q0f16|f16_\d|f16-mlc/i.test(x.id)) &&
+const vram=x=>Number.isFinite(x?.estimatedMB)&&x.estimatedMB>0?x.estimatedMB:99999;
+/** Selection conservatrice : d'abord la RAM GPU requise, puis un modèle compact
+ * adapté à la conversation. Le choix explicite Gemma reste disponible mais
+ * peut dépasser les ressources de certains appareils mobiles.
+ */
+export function selectModel(models,{variant="auto",preference="auto",f16=false,budgetMB=1150}={}){
+ const compatible=(models||[]).filter(x=>typeof x?.id==="string"&&
+   (f16||!(x.requiresF16||/q4f16|q0f16|q8f16/i.test(x.id))) &&
    (variant==="auto"||(variant==="f16"?/f16/i.test(x.id):!/f16/i.test(x.id))));
- if(preference!=="auto"){
-  const match=candidates.find(x=>x.id===preference);
-  if(!match)throw Error("Modèle choisi indisponible ou non compatible avec les capacités WebGPU sélectionnées.");
-  return match.id;
+ if(!compatible.length)throw Error("Aucun modèle local utilisable avec ce GPU ou cette précision.");
+ if(preference==="gemma"){
+  const gemma=compatible.filter(x=>/gemma-4-E2B/i.test(x.id)).sort((a,b)=>vram(a)-vram(b));
+  if(!gemma.length)throw Error("Gemma 4 E2B n'est pas disponible pour ce GPU dans le catalogue installé. Choisissez un modèle léger.");
+  return gemma[0].id;
  }
- if(!candidates.length)throw Error("Aucun modèle WebLLM adapté au GPU et à la précision choisis. Essayez l'autre mode ou un navigateur plus récent.");
- const scoring=x=>{
-  const id=x.id,small=sizeB(id);
-  let penalty=small*100;
-  if(/qwen3|qwen2\.5/i.test(id))penalty-=18;
-  if(/gemma-4/i.test(id))penalty-=12;
-  if(/q4f16|q4f32/i.test(id))penalty-=8;
-  if(/q0f16/i.test(id))penalty+=40;
-  return penalty;
+ if(preference!=="auto"){
+  const found=compatible.find(x=>x.id===preference);
+  if(!found)throw Error("Modèle demandé absent ou incompatible : aucun téléchargement engagé.");
+  return found.id;
+ }
+ const budget=Number.isFinite(budgetMB)&&budgetMB>0?budgetMB:1150;
+ const within=compatible.filter(x=>vram(x)<=budget);
+ if(!within.length)throw Error("Aucun modèle léger compatible avec la mémoire estimée. Vous pouvez tester une sélection manuelle, à vos risques de plantage.");
+ // Favorise des modèles instruct compacts ; interdit les configurations particulièrement volumineuses par défaut.
+ const score=x=>{
+  let s=vram(x);
+  if(/qwen/i.test(x.id))s-=65;
+  if(/smollm/i.test(x.id))s-=35;
+  if(!/instruct|it-|chat/i.test(x.id))s+=160;
+  return s;
  };
- return [...candidates].sort((a,b)=>scoring(a)-scoring(b)||a.id.localeCompare(b.id))[0].id;
+ return within.sort((a,b)=>score(a)-score(b)||a.id.localeCompare(b.id))[0].id;
+}
+export function estimatedBudgetMB(deviceMemoryGB){
+ const gb=Number(deviceMemoryGB);
+ if(!Number.isFinite(gb)||gb<=0)return 850;
+ if(gb<=2)return 430;
+ if(gb<=4)return 850;
+ if(gb<=6)return 1150;
+ if(gb<=8)return 1750;
+ return 2400;
 }
 export async function loadGemma({variant="auto",model="auto",onProgress=()=>{}}={}){
  if(modelId)return{modelId,alreadyLoaded:true};if(loading)throw Error("Chargement déjà en cours.");
@@ -89,11 +110,12 @@ export async function loadGemma({variant="auto",model="auto",onProgress=()=>{}}=
  try{
   onProgress({text:"Vérification des modèles réellement répertoriés par WebLLM…",progress:0});
   const list=modelsCache||await listLocalModels();
-  const selected=selectModel(list,{variant,preference:model,f16:cap.f16});
+  const selected=selectModel(list,{variant,preference:model,f16:cap.f16,
+   budgetMB:estimatedBudgetMB(typeof navigator==="undefined"?0:navigator.deviceMemory)});
   onProgress({text:"Chargement de "+selected+" depuis l'hébergeur du modèle (avec votre accord)…",progress:0});
   await rpc("load",{model:selected},onProgress);
   modelId=selected;return{modelId,alreadyLoaded:false};
- }catch(error){if(worker){worker.terminate();worker=null;}modelsCache=null;throw error;}
+ }catch(error){if(worker){worker.terminate();worker=null;}modelsCache=null;modelId=null;throw error;}
  finally{loading=false;}
 }
 export function canPlanWithGemma(question){
