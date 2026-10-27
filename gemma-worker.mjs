@@ -13,8 +13,10 @@ function catalog(pkg){
  const list=pkg?.prebuiltAppConfig?.model_list;
  if(!Array.isArray(list))throw Error("Le runtime ne fournit aucun catalogue de modèles vérifiable.");
  return list.filter(x=>typeof x?.model_id==="string"&&/^[a-zA-Z0-9_.-]{5,150}$/.test(x.model_id))
- .map(x=>({id:x.model_id,estimatedMB:Number.isFinite(x.vram_required_MB)?x.vram_required_MB:null}))
- .filter(x=>/(gemma|qwen|llama|phi|smollm|mistral)/i.test(x.id));
+ .filter(x=>/(gemma|qwen|llama|phi|smollm|mistral)/i.test(x.model_id)&&!/vision|vl[-_]|-vl-|embedding|embed/i.test(x.model_id))
+ .map(x=>({id:x.model_id,estimatedMB:Number.isFinite(x.vram_required_MB)?x.vram_required_MB:null,
+   requiresF16:Array.isArray(x.required_features)&&x.required_features.includes("shader-f16")}));
+
 }
 self.onmessage=async event=>{
  const {id,action,model,messages}=event.data||{};
