@@ -51,6 +51,8 @@ export function reply(input,library,context={}) {
  if(/(complement alimentaire|vitamine|regime|gluten|lactose|nutrition|alimentation)/.test(q))topic="nutrition";
  if(/(plusieurs maladies|comorbidit|maladies chroniques|autres maladies)/.test(q))topic="multi";
  if(/(gwas|genetique|genomique|kerrebijn|26 loci|patrimoine genetique)/.test(q))topic="gwas2026";
+ if(/(cause|origine|mecanisme|allodynie|hyperalgesie)/.test(q)&&/fibro|douleur/.test(q))topic="causes";
+ if(/(vivre avec|quotidien avec|education therapeutique|autonomie|adaptation du travail|habitudes de vie)/.test(q)&&/fibro|fibromyalgie/.test(q))topic="living";
  const doc=topic?library.find(x=>x.id===topic):null;
  if(doc)return{kind:"documented",message:doc.answer+" "+reportedContext(ctx),sources:[doc],followup:"Souhaitez-vous enregistrer une question pour votre prochain rendez-vous ?"};
  return{kind:"refusal",message:MEDICAL_REFUSAL,sources:[]};
