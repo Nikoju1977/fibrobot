@@ -11,9 +11,9 @@ export const WEB_MODELS=Object.freeze({
  f16:{id:"gemma-4-E2B-it-q4f16_1-MLC",label:"Gemma 4 E2B · q4f16 (si disponible)",feature:"shader-f16"},
  f32:{id:"gemma-4-E2B-it-q4f32_1-MLC",label:"Gemma 4 E2B · q4f32 (si disponible)",feature:null}
 });
-let worker=null,modelId=null,loading=false,nextID=1,modelsCache=null;
+let worker=null,modelId=null,loading=false,nextID=1,modelsCache=null,lastError="";
 const pending=new Map();
-export function status(){return{ready:!!modelId,modelId,loading};}
+export function status(){return{ready:!!modelId,modelId,loading,lastError};}
 export async function detectWebGPU(){
  if(!globalThis.isSecureContext||typeof navigator==="undefined"||!navigator.gpu)
   return{supported:false,reason:"WebGPU et HTTPS sont nécessaires. L'assistant documentaire reste disponible."};
@@ -22,7 +22,7 @@ export async function detectWebGPU(){
 }
 function failAll(message){
  for(const job of pending.values()){clearTimeout(job.timeout);job.reject(new Error(message));}
- pending.clear();worker?.terminate();worker=null;modelId=null;loading=false;modelsCache=null;
+ pending.clear();worker?.terminate();worker=null;modelId=null;loading=false;modelsCache=null;lastError=String(message||"Erreur du moteur local.");
 }
 function requireWorker(){
  if(worker)return worker;
@@ -33,8 +33,8 @@ function requireWorker(){
   if(!job)return;
   if(kind==="progress"){job.onProgress?.({progress,text});return;}
   pending.delete(id);clearTimeout(job.timeout);
-  if(kind==="error")job.reject(new Error(message||"Erreur du moteur local."));
-  else job.resolve({...values,text});
+  if(kind==="error"){lastError=message||"Erreur du moteur local.";job.reject(new Error(lastError));}
+  else{lastError="";job.resolve({...values,text});}
  };
  worker.onerror=()=>failAll("Le moteur IA local s'est arrêté ou n'a pas pu démarrer.");
  worker.onmessageerror=()=>failAll("Réponse illisible du moteur IA local.");
@@ -114,7 +114,7 @@ export async function loadGemma({variant="auto",model="auto",onProgress=()=>{}}=
    budgetMB:estimatedBudgetMB(typeof navigator==="undefined"?0:navigator.deviceMemory)});
   onProgress({text:"Chargement de "+selected+" depuis l'hébergeur du modèle (avec votre accord)…",progress:0});
   await rpc("load",{model:selected},onProgress);
-  modelId=selected;return{modelId,alreadyLoaded:false};
+  modelId=selected;lastError="";return{modelId,alreadyLoaded:false};
  }catch(error){if(worker){worker.terminate();worker=null;}modelsCache=null;modelId=null;throw error;}
  finally{loading=false;}
 }
@@ -160,6 +160,23 @@ export async function generateGeneralChat(question,history=[]){
  const result=await rpc("generate",{messages});
  return cleanGeneratedReply(result.text)+"\n\n[Réponse générée localement par "+modelId+" ; vérifiez les faits importants.]";
 }
+/**
+ * Self-test de génération sans dossier patient. Il confirme l'inférence, et
+ * pas seulement le téléchargement des poids et l'initialisation du moteur.
+ */
+export async function testLocalModel(){
+ if(!modelId)throw Error("Aucun modèle chargé dans cette session.");
+ const began=Date.now();
+ const result=await rpc("generate",{
+  messages:[
+   {role:"system",content:"Réponds à une question simple en français, sans données personnelles ni médicales. Une seule courte phrase."},
+   {role:"user",content:"Combien font 2 + 2 ?"}
+  ]
+ });
+ const answer=String(result.text||"").trim();
+ if(!answer)throw Error("Le modèle a renvoyé une réponse vide.");
+ return {modelId,answerLength:answer.length,durationMs:Date.now()-began};
+}
 export function cancelGemmaLoad(){
  if(!loading)return false;
  failAll("Téléchargement/chargement annulé à votre demande. Le mode documentaire est toujours disponible.");
@@ -167,5 +184,5 @@ export function cancelGemmaLoad(){
 }
 export async function unloadGemma(){
  if(worker){try{if(modelId)await rpc("unload");}finally{worker.terminate();worker=null;}}
- modelId=null;modelsCache=null;loading=false;
+ modelId=null;modelsCache=null;loading=false;lastError="";
 }
