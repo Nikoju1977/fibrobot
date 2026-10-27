@@ -14,14 +14,16 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
   await page.locator("#vault-password").fill("phrase de passe longue mobile 2026");
   await page.locator("#vault-confirm-password").fill("phrase de passe longue mobile 2026");
   await page.locator("#vault-ack").check();
+  await page.locator("#vault-single-patient").check();
   await page.locator("#vault-submit").click();
   await page.locator("#vault-gate").waitFor({state:"hidden",timeout:30000});
   assert.equal(requests.length,0,"No external model API should be called before consent: "+requests);
-  await page.locator('[data-tab="tasks"]').first().click();
+  await page.locator('.mobile-dock [data-tab="tasks"]').click();
   await page.locator("#task-name").fill("Préparer un courrier");
   await page.locator("#task-form button[type=submit]").click();
   await page.locator("#tasks-list").getByText("Préparer un courrier").waitFor({timeout:15000});
-  await page.locator('[data-tab="conditions"]').first().click();
+  await page.locator('#mobile-menu-toggle').click();
+  await page.locator('#app-side [data-tab="conditions"]').click();
   await page.locator("#condition-name").fill("<img src=x onerror=alert(1)>");
   await page.locator("#condition-form button[type=submit]").click();
   await page.locator("#conditions-list").getByText("<img src=x onerror=alert(1)>").waitFor({timeout:15000});
@@ -31,7 +33,10 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
     const dim=await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
     assert.ok(dim.scroll<=dim.viewport+2,label+": page overflow at "+width+" "+JSON.stringify(dim));
   }
-  await page.locator('[data-tab="chat"]').first().click();
+  await page.locator('.mobile-dock [data-tab="chat"]').click();
+  assert.equal(await page.locator("#gemma-options").isVisible(),true);
+  assert.equal(await page.locator("#gemma-load").isVisible(),false,"Gemma should be opt-in, not an obstacle for first-time users");
+  await page.locator('#gemma-options summary').click();
   assert.equal(await page.locator("#gemma-load").isVisible(),true);
   console.log(label+": UI, coffre, formulaire, XSS, responsive OK (émulation, pas de matériel réel)");
  }finally{await browser.close();}
