@@ -65,6 +65,31 @@ try{
  await page.locator("#prompt").fill("Quelle dose de médicament dois-je prendre ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/je ne peux pas déterminer/i).waitFor({timeout:10000});
+ // Medical content stays on the deterministic route even if local AI options exist.
+ await page.locator("#prompt").fill("Résume mes observations");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Synthèse descriptive/).waitFor({timeout:10000});
+ await page.locator("#prompt").fill("Préparer ma consultation médicale");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Préparation de consultation/).waitFor({timeout:10000});
+ await page.locator("#prompt").fill("Organise mes tâches");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/tâche enregistrée|Proposition d’organisation/).waitFor({timeout:10000});
+ await page.locator("#gemma-options").evaluate(x=>x.open=true);
+ assert.equal(await page.locator("#llm-check").isVisible(),true);
+ assert.equal(await page.locator("#local-model-select").inputValue(),"auto");
+ await page.locator("#llm-check").click();
+ await page.locator("#llm-device").getByText(/WebGPU|GPU|catalogue/i).waitFor({timeout:10000});
+ await page.locator('#nav [data-tab="library"]').click();
+ assert.equal(await page.locator("#research-search").isVisible(),true);
+ assert.equal(await page.locator("#research-topic").inputValue(),"fibromyalgia");
+ // Reject network consent: there must be no Europe PMC request from a single-patient vault.
+ let researchCalls=0;
+ page.on("request",r=>{if(r.url().includes("ebi.ac.uk/europepmc"))researchCalls++;});
+ page.once("dialog",d=>d.dismiss());
+ await page.locator("#research-search").click();
+ assert.equal(researchCalls,0);
+
  // Two open tabs must not silently overwrite the medical record.
  const sibling=await page.context().newPage();
  try{
