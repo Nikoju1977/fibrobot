@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {classifyIntent,summarizeObservations,prepareVisit,planDaily,nonMedicalMessages,researchEndpoint,parseResearchResults,cleanGeneratedReply} from "../assistant-engine.mjs";
 import {selectModel,estimatedBudgetMB,canPlanWithGemma,safePlanInput,parseTaskOrder} from "../gemma-local.mjs";
 test("routage : requêtes santé sensibles ne sont jamais une conversation libre",()=>{
- for(const s of ["Quel dosage de morphine ?","Peux-je prendre ce médicament ?","J'ai une douleur nouvelle","Je veux me suicider","Quels effets secondaires de mon traitement ?","Analyse mes symptômes et mon diabète","Quel médicament pour dormir ?"]){
+ for(const s of ["Quel dosage de morphine ?","Peux-je prendre ce médicament ?","J'ai une douleur nouvelle","Je veux me suicider","Quels effets secondaires de mon traitement ?","Analyse mes symptômes et mon diabète","Quel médicament pour dormir ?","J’ai mal à la tête","Je me sens mal, des vertiges","J’ai des nausées"]){
   assert.notEqual(classifyIntent(s),"general",s);
  }
  assert.equal(classifyIntent("Résume mes observations"),"summary");
