@@ -58,3 +58,7 @@ La **première visite** à GitHub Pages et le téléchargement du modèle contac
 6. Réaliser les analyses RGPD et réglementaires nécessaires selon les fonctionnalités et les données collectées, et informer les utilisateurs.
 
 **Ne pas demander aux patients de s'appuyer sur FibroBot pour décider d'une dose, d'une interaction ou d'une urgence.** En France, signes de danger immédiat : 15 ou 112 ; crise suicidaire : 3114.
+
+## Contrôle complémentaire : routage du modèle et agents spécialisés
+
+Les tests `tests/agent-hub.test.mjs` couvrent le catalogue des agents, le routage des domaines, les refus de prescription, les réponses urgentes et les sorties sourcées. Le contrôle navigateur simule également le clic sur un agent. La validation du chargement réel de Gemma/Qwen nécessite encore un appareil WebGPU avec les poids du modèle : elle ne fait pas partie des tests CI.

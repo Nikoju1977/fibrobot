@@ -91,3 +91,9 @@ test("dialogue général : médicaments courants, identité et données privées
  const m=nonMedicalMessages("Écris un poème original",history);
  assert.ok(!JSON.stringify(m).includes("rue de la Paix"));
 });
+
+test("le nom FibroBot ne bloque pas le dialogue général ni sa réponse",()=>{
+ assert.equal(classifyIntent("Bonjour FibroBot, peux-tu raconter une histoire ?"),"general");
+ assert.equal(classifyIntent("C'est quoi la fibromyalgie ?"),"medical");
+ assert.equal(cleanGeneratedReply("Bonjour, je suis FibroBot, ton assistant local."),"Bonjour, je suis FibroBot, ton assistant local.");
+});

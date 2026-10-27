@@ -62,6 +62,13 @@ try{
  await page.locator('#nav [data-tab="health"]').click();
  await page.locator("#health-list").getByText(value).waitFor();
  await page.locator('#nav [data-tab="chat"]').click();
+ await page.locator('#specialist-list [data-specialist="sleep"]').click();
+ await page.locator("#messages").getByText(/Sommeil — assistant d'information/).waitFor({timeout:10000});
+ assert.equal(await page.locator("#llm-test").isDisabled(),true,"An uninitialized model must never pretend to have passed inference tests");
+ assert.match(await page.locator("#chat-engine-state").textContent(),/agent Sommeil/);
+ await page.locator("#prompt").fill("Bonjour");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Bonjour !/).waitFor({timeout:10000});
  await page.locator("#prompt").fill("Quelle dose de médicament dois-je prendre ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/je ne peux pas déterminer/i).waitFor({timeout:10000});
