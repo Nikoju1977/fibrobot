@@ -19,6 +19,10 @@ FibroBot est un assistant de vie pour les personnes vivant avec la fibromyalgie 
 
 ## Fonctionnalités
 
+- Bibliothèque de fiches avec recherche locale, liens institutionnels et dates de référence.
+- Assistant pratique déterministe : classement quotidien, descriptif du journal, préparation de consultation et recherche de sources intégrée.
+- Dialogue local non médical facultatif avec choix automatique du moteur ou option légère et annulation du chargement.
+
 - Organiser les tâches selon une énergie que la personne renseigne, sans déduire l'énergie de la douleur.
 - Tenir un journal avec douleur, énergie, fatigue, sommeil, symptômes et maladies associées.
 - Enregistrer les autres maladies chroniques, les traitements réels (tels que déclarés), les horaires et questions à poser.
@@ -34,7 +38,15 @@ FibroBot est un assistant de vie pour les personnes vivant avec la fibromyalgie 
 
 Le volet médical utilise un moteur **déterministe et sourcé** : fiche pré-rédigée ou refus explicite. Aucune prescription ni vérification d'interactions médicamenteuses n'est générée.
 
-Gemma 4 E2B est facultatif et réservé au **classement de tâches**, après téléchargement volontaire. Seuls des indices temporaires, niveaux d'effort, priorités et énergie déclarée lui sont présentés ; aucun texte libre de tâche ou question, aucun traitement ni symptôme. L'exécution réelle sur appareils mobiles n'est pas encore validée. Les modèles génératifs peuvent halluciner, d'où la sortie limitée à des indices existants.
+### Bibliothèque LLM et routage local (Studio Niko Design)
+
+La PWA fonctionne **sans téléchargement IA** avec ses outils déterministes. Depuis l'assistant, les phrases « Planifie ma journée et mes tâches », « Fais un bilan de mon journal de santé », « Prépare ma consultation médicale » et « Cherche des sources scientifiques sur la fibromyalgie » déclenchent des fonctions locales traçables. La bibliothèque embarquée est désormais recherchable par mot-clé, hors connexion. Les fiches sont datées et renvoient à leurs sources institutionnelles ; **aucune recherche Web en direct** n'est prétendue.
+
+L'IA WebGPU est **opt-in** et exécutée dans le navigateur via WebLLM 0.2.86. Les modèles prévus sont Gemma 4 E2B (q4f16/q4f32) et, en alternative légère, SmolLM2 360M (q4f16/q4f32). Le catalogue modèle est vérifié à l'exécution. Sur les appareils annonçant 4 Go de mémoire ou moins, le mode automatique ne tente pas de charger le lourd Gemma. Le chargement peut être annulé, un échec redonne automatiquement la main au moteur documentaire et **aucun modèle n'est garanti sur un téléphone particulier**.
+
+L'IA peut trier les tâches via des indices anonymes. Pour les **questions générales non médicales**, elle reçoit la question saisie (500 caractères au maximum) dans un Worker local, uniquement après activation. Elle ne reçoit jamais les données du coffre, de santé, de traitement, d'identité, ni les intitulés des tâches dans le flux de planification. Les messages présentant des termes cliniques ou privés sont bloqués par un filtre prudent, et les sorties potentiellement dangereuses sont rejetées ; ces garde-fous **ne constituent pas une validation clinique**. Le moteur ne dispose pas d'accès Internet ou de navigation autonome. Le runtime et les poids sont téléchargés depuis des hébergeurs tiers avec accord explicite ; l'intégrité de toute la chaîne tierce reste à auditer.
+
+**Ne jamais employer ce logiciel pour fixer une dose, établir un diagnostic, contrôler des interactions ou modifier une prescription.** Les entrées médicales sont fournies par la personne et les réponses documentaires restent déterministes. Les rapports imprimés sont en clair ; l'export du coffre est chiffré. Les tests CI ne téléchargent pas les poids de plusieurs Go et ne prouvent donc pas une inférence WebGPU réelle sur un téléphone.
 
 ## Voix et météo : limitations
 
