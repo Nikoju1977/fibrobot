@@ -9,6 +9,7 @@ on:
       - "styles.css"
       - "ux-pro.css"
       - "ux-pro.mjs"
+      - "assistant-tools.mjs"
       - "app.mjs"
       - "core.mjs"
       - "vault.mjs"
