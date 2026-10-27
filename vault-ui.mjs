@@ -11,7 +11,9 @@ export async function openSecureDB(){
  if(!form||!gate)throw Error("Interface de coffre introuvable.");
  gate.hidden=false;
  const appShell=document.querySelector(".shell");
+ const mobileDock=document.querySelector(".mobile-dock");
  if(appShell)appShell.inert=true;
+ if(mobileDock)mobileDock.inert=true;
  $("vault-password").focus();
  let old=null, hasLegacy=false;
  if(!existing){try{old=await readLegacy();hasLegacy=Object.values(old).some(rows=>rows.length>0);}catch(err){status("Ancienne base illisible : "+err.message);}}
@@ -60,6 +62,7 @@ export async function openSecureDB(){
     $("vault-password").value="";$("vault-confirm-password").value="";
     gate.hidden=true;
     if(appShell)appShell.inert=false;
+    if(mobileDock)mobileDock.inert=false;
     $("main")?.focus({preventScroll:true});
     if(!$("vault-post-warning").hidden){const toast=$("toast");if(toast){toast.hidden=false;toast.textContent="Attention : une ancienne base non chiffrée est peut-être présente. Vérifiez « Mes données ».";}}
     resolve(active);
