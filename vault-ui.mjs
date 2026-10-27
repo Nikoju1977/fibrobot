@@ -51,6 +51,7 @@ export async function openSecureDB(){
       // Contrôler l'intégrité de TOUTES les données migrées avant tout effacement.
       const verified=await unseal(await readEnvelope(vaultDb),password);
       if(migrate&&JSON.stringify(verified.data)!==JSON.stringify(old))throw Error("Migration non conforme : les anciennes données n'ont pas été supprimées.");
+      // Si une autre fenêtre détient la base historique, conserver les données et avertir explicitement.
       if(migrate){try{await clearLegacy();}catch(error){status("Coffre validé, mais l'ancienne base non chiffrée n'a pas été supprimée : "+error.message);$("vault-post-warning").hidden=false;}}
      }
     }else active=await unlockVault(vaultDb,password);
