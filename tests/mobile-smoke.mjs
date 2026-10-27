@@ -18,6 +18,14 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
   await page.locator("#vault-submit").click();
   await page.locator("#vault-gate").waitFor({state:"hidden",timeout:30000});
   assert.equal(requests.length,0,"No external model API should be called before consent: "+requests);
+  // Un patient novice peut terminer la découverte puis rouvrir l'aide à volonté.
+  await page.locator("#first-steps").waitFor({state:"visible",timeout:15000});
+  await page.locator("#dismiss-guide").click();
+  await page.locator("#first-steps").waitFor({state:"hidden",timeout:15000});
+  await page.locator("#open-guide").click();
+  await page.locator("#first-steps").waitFor({state:"visible",timeout:15000});
+  await page.locator("#dismiss-guide").click();
+  await page.locator("#first-steps").waitFor({state:"hidden",timeout:15000});
   await page.locator('.mobile-dock [data-tab="tasks"]').click();
   await page.locator("#task-name").fill("Préparer un courrier");
   await page.locator("#task-form button[type=submit]").click();

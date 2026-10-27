@@ -23,6 +23,7 @@ export async function openSecureDB(){
  $("vault-confirm-ack").hidden=Boolean(existing);
  $("vault-patient-wrap").hidden=Boolean(existing);
  $("vault-import").disabled=Boolean(existing);
+ $("restore-options").hidden=Boolean(existing);
  legacy.hidden=!hasLegacy;
  if(hasLegacy)legacy.textContent="Anciennes données non chiffrées détectées. Vous pouvez les importer en sélectionnant l'option ci-dessous. Après vérification du chiffrement, leur suppression sera tentée ; si elle échoue, vous en serez averti.";
  $("vault-migrate-wrap").hidden=Boolean(existing)||!hasLegacy;
