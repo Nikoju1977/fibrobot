@@ -84,7 +84,7 @@ export function safeGeneralQuestion(input){
  if(/[\r\n]/.test(q)||/https?:\/\/|www\.|@|(?:\+33|0[1-9])(?:[ .-]?\d\d){4}/i.test(q))return false;
  if(/(?:dose|dosage|mg\b|medic|prescri|traitement|maladi|diagnos|fibro|sante|symptom|douleur|fatigu|sommeil|insomni|crise|urgence|depress|suicid|anxiet|angoiss|stress|allerg|respir|diabet|enceinte|grossess|chirurg|infection|therapi|psych|cancer|tension|ordonnance|pharmaci|patient|docteur|soignant|interaction|comprime|vitamine|poids|regime|manger|nutrition|handicap|autisme|asthme|eczema|blessure)/.test(s))return false;
  if(/(?:mon adresse|mon nom|mon numero|mon compte|mon email|ma carte|mot de passe|secret|identifiant|date de naissance)/.test(s))return false;
- if(/(?:meteo|aujourd.hui.*actualite|nouvelle[s]? du jour|qui est president|bourse en temps reel|cours actuel)/.test(s))return false;
+ if(/(?:meteo|quel temps|temps fera|temperature|aujourd.hui.*actualite|nouvelle[s]? du jour|qui est president|bourse en temps reel|cours actuel)/.test(s))return false;
  return true;
 }
 export function safeGeneratedAnswer(answer){
