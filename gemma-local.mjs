@@ -42,7 +42,7 @@ export function modelCandidates(variant,cap,deviceMemory){
  const lite=cap.f16?["lite16","lite32"]:["lite32"];
  const gemma=cap.f16?["f16","f32"]:["f32"];
  if(variant==="lite")return lite;
- if(variant==="auto")return Number(deviceMemory)>0&&Number(deviceMemory)<=4?[...lite,...gemma]:[...gemma,...lite];
+ if(variant==="auto")return Number(deviceMemory)>0&&Number(deviceMemory)<=4?lite:[...gemma,...lite];
  if(variant==="gemma")return gemma;
  if(!WEB_MODELS[variant])throw Error("Mode de modèle inconnu.");
  if(WEB_MODELS[variant].feature&&!cap.f16)throw Error("Le GPU ne prend pas en charge shader-f16.");
