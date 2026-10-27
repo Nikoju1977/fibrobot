@@ -34,6 +34,41 @@ try{
  assert.equal(await page.getByText("Studio Niko Design").first().count(),1,"Designer credit must be visible");
  await page.locator("#dismiss-guide").click();
  await page.locator("#first-steps").waitFor({state:"hidden",timeout:10000});
+ // Internet : jamais d'appel sans double consentement explicite,
+ // requête seule (pas de note patient), citations vérifiables et mode local intact.
+ await page.locator('#nav [data-tab="chat"]').click();
+ assert.equal(await page.locator("#network-mode").isChecked(),false,"Network must be opt-in");
+ let wikipediaQueries=0;
+ await page.route("https://fr.wikipedia.org/**",async route=>{
+  wikipediaQueries++;
+  await route.fulfill({status:200,contentType:"application/json",
+   headers:{"access-control-allow-origin":"*"},
+   body:JSON.stringify({query:{pages:{"102":{title:"Marie Curie",extract:"Physicienne et chimiste."}}}})});
+ });
+ await page.locator("#prompt").fill("Qui était Marie Curie ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Activez la recherche Internet/).waitFor();
+ assert.equal(wikipediaQueries,0,"Network forbidden until enabled");
+ await page.locator("#network-mode").check();
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/Qui était Marie Curie/);dialog.dismiss();});
+ await page.locator("#prompt").fill("Qui était Marie Curie ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Activez la recherche Internet/).last().waitFor();
+ assert.equal(wikipediaQueries,0,"Consent to session is not consent to send each question");
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/Wikipédia/);dialog.accept();});
+ await page.locator("#prompt").fill("Qui était Marie Curie ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages a[href*='fr.wikipedia.org/wiki/Marie_Curie']").waitFor({timeout:12000});
+ assert.equal(wikipediaQueries,1);
+ assert.match(await page.locator("#chat-engine-state").textContent(),/Internet publiques/);
+ const onlineText=await page.locator("#messages").textContent();
+ assert.match(onlineText,/Physicienne et chimiste/);
+ await page.locator("#network-mode").uncheck();
+ await page.locator("#prompt").fill("Quels traitements pour ma fibromyalgie ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/recommandations|fibromyalgie|documentation/i).first().waitFor({timeout:12000});
+ assert.equal(wikipediaQueries,1,"No patient question must hit Wikipedia");
+
  await page.locator('#nav [data-tab="health"]').click();
  await page.locator("#health-name").fill(value);
  await page.locator("#pain").fill("6");
