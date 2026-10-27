@@ -298,3 +298,20 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 #llm-test{white-space:normal}
 @media(max-width:670px){.specialists{padding:18px 15px}.specialists-grid{grid-template-columns:1fr 1fr;gap:7px}.specialist-choice{padding:12px 10px;min-height:80px}.specialist-choice strong{font-size:.78rem}.specialist-choice small{font-size:.68rem}}
 @media(max-width:345px){.specialists-grid{grid-template-columns:1fr}}
+
+/* Connecteurs Internet — consentement explicite, sans synchronisation médicale. */
+.network-card{margin:0 0 18px;padding:20px 23px}
+.network-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.network-card h3{margin:3px 0 12px;color:#184e3e}
+.network-card p{line-height:1.6}
+.network-badge{border:1px solid #d4e7d9;background:#f2fbf5;color:#24644e;border-radius:999px;font-size:.7rem;font-weight:700;padding:5px 10px;white-space:nowrap}
+.network-consent{display:flex;align-items:flex-start;gap:13px;border:1px solid #b6d6c5;background:#ecf8ef;border-radius:13px;padding:14px 15px;margin:15px 0;cursor:pointer;line-height:1.48}
+.network-consent input{width:20px;height:20px;min-width:20px;margin-top:2px;accent-color:#176f50}
+.network-consent strong{display:block;color:#174d3c;font-size:.9rem}
+.network-consent small{display:block;color:#42665c;font-size:.77rem;margin-top:5px}
+.network-examples{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 16px}
+.network-examples .chip{white-space:normal;text-align:left}
+.online-refs{display:flex;flex-direction:column;gap:7px;border-top:1px solid #c4dbce;margin-top:12px;padding-top:10px;font-size:.81rem;line-height:1.4}
+.online-refs a{color:#146a54;overflow-wrap:anywhere;font-weight:650;text-decoration:underline;text-underline-offset:2px}
+.online-refs a:focus-visible{outline:2px solid #146a54;outline-offset:3px}
+@media(max-width:670px){.network-card{padding:17px 15px}.network-heading{align-items:flex-start;flex-wrap:wrap}.network-badge{font-size:.66rem}.network-consent{padding:12px}.network-examples .chip{flex:1 1 140px;justify-content:center}}
