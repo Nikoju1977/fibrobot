@@ -65,6 +65,31 @@ try{
  await page.locator("#prompt").fill("Quelle dose de médicament dois-je prendre ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/je ne peux pas déterminer/i).waitFor({timeout:10000});
+ // Full local assistant workflows: plan, journal, preparation, sources.
+ await page.locator("#prompt").fill("Planifie ma journée et mes tâches");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Aucune tâche en attente/i).waitFor({timeout:10000});
+ await page.locator("#prompt").fill("Fais un bilan de mon journal de santé");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Résumé descriptif de votre journal/i).waitFor({timeout:10000});
+ await page.locator("#prompt").fill("Prépare ma consultation médicale");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Préparation de consultation/i).waitFor({timeout:10000});
+ await page.locator("#prompt").fill("Cherche des sources scientifiques sur la fibromyalgie");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Fiches de la bibliothèque locale/i).waitFor({timeout:10000});
+ await page.locator('#nav [data-tab="library"]').click();
+ await page.locator("#library-search").fill("fibromyalgie");
+ await page.locator("#library-result-count").getByText(/fiche/i).waitFor();
+ assert.ok(await page.locator("#library-list article").count()>0,"Scientific library search must show source-backed cards");
+ await page.locator("#library-search").fill("termeabsent12345");
+ assert.equal(await page.locator("#library-list article").count(),0);
+ await page.locator("#library-search").fill("");
+ await page.locator('#nav [data-tab="chat"]').click();
+ await page.locator('#gemma-options summary').click();
+ assert.equal(await page.locator('#gemma-variant option[value="lite"]').count(),1,"Lightweight fallback must be offered");
+ assert.equal(await page.locator("#gemma-cancel").isVisible(),false,"Cancel control only shown during loading");
+
  // Two open tabs must not silently overwrite the medical record.
  const sibling=await page.context().newPage();
  try{
@@ -103,6 +128,11 @@ try{
   await page.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
   await page.locator('#nav [data-tab="health"]').click();
   await page.locator("#health-list").getByText(value).waitFor({timeout:10000});
+  await page.locator('#nav [data-tab="chat"]').click();
+  await page.locator("#prompt").fill("Planifie ma journée et mes tâches");
+  await page.locator('#chat-form button[type="submit"]').click();
+  await page.locator("#messages").getByText(/Aucune tâche en attente/i).last().waitFor({timeout:10000});
+
  }finally{await context.setOffline(false);}
  // Restore the encrypted backup in an independent browsing context.
  const restored=await browser.newPage();
