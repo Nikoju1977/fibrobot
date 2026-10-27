@@ -98,16 +98,23 @@
   <div class="button-row">
    <button type="button" id="gemma-load" class="btn primary">2. Télécharger et charger le modèle choisi</button>
    <button type="button" id="gemma-cancel" class="btn light" hidden disabled>Annuler le chargement</button>
-   <button type="button" id="gemma-unload" class="btn light" disabled>Décharger le modèle</button>
+   <button type="button" id="gemma-unload" class="btn light" disabled>Décharger le modèle</button><button type="button" id="llm-test" class="btn light" disabled>3. Tester la réponse IA</button>
   </div>
   <p id="llm-device" class="tiny" role="status">Aucune vérification de compatibilité effectuée.</p>
   <p id="gemma-status" class="tiny" role="status">Modèle non chargé : toutes les fonctions documentaires restent utilisables.</p>
-  <p class="tiny">Le téléchargement est facultatif et peut être annulé. Les réponses générées par une IA peuvent être incorrectes ; les informations médicales proviennent des fiches distinctes.</p>
+  <p class="tiny">Quand le modèle termine son chargement, il est activé pour vos conversations générales. Après chaque fermeture de l’application, il faut le recharger en mémoire, même si les fichiers restent dans le cache. Le bouton « Tester » vérifie une vraie génération. Aucune question ni note médicale n’est envoyée au modèle. Le modèle peut se tromper.</p>
   <progress id="gemma-progress" max="1" value="0" hidden aria-label="Progression du modèle"></progress>
-  <label class="consent"><input type="checkbox" id="gemma-use" disabled>Activer le modèle local pour le dialogue général et l'organisation (jamais pour la prescription)</label>
+  <label class="consent"><input type="checkbox" id="gemma-use" disabled>Utiliser l’IA locale pour les questions générales et tâches (automatiquement activé après chargement ; jamais pour la prescription)</label>
  </div>
 </div>
-</details><div class="two chat-layout"><div class="card chat-card"><div class="messages" id="messages" role="log" aria-live="polite" aria-label="Conversation avec FibroBot"></div><form id="chat-form" class="chat-input"><label class="sr" for="prompt">Votre question</label><input id="prompt" type="text" maxlength="2000" placeholder="Posez votre question…" required autocomplete="off"><button class="btn primary" type="submit">Envoyer</button><button class="btn light" id="mic" type="button" aria-label="Dictée strictement locale" title="Dictée locale selon la compatibilité de l’appareil">🎙</button></form><p id="voice-hint" class="tiny">Voix de synthèse locale optionnelle. Utilisez la dictée de votre clavier selon ses règles de confidentialité.</p></div><div class="card suggestions"><h3>Vos aides immédiates</h3>
+</details>
+      <section class="specialists card" aria-labelledby="specialists-heading">
+       <h3 id="specialists-heading">Mes 7 agents de soutien spécialisés</h3>
+       <p class="tiny">Choisissez un agent pour obtenir un résumé local fondé sur vos notes et les fiches documentaires. Ces assistants n'ont pas de qualification médicale et ne modifient jamais vos traitements.</p>
+       <div id="specialist-list" class="specialists-grid" aria-label="Choisir un agent FibroBot"></div>
+      </section>
+      <p id="chat-engine-state" class="chat-engine-state" role="status" aria-live="polite">Assistant documentaire actif · IA locale non chargée.</p>
+      <div class="two chat-layout"><div class="card chat-card"><div class="messages" id="messages" role="log" aria-live="polite" aria-label="Conversation avec FibroBot"></div><form id="chat-form" class="chat-input"><label class="sr" for="prompt">Votre question</label><input id="prompt" type="text" maxlength="2000" placeholder="Posez votre question…" required autocomplete="off"><button class="btn primary" type="submit">Envoyer</button><button class="btn light" id="mic" type="button" aria-label="Dictée strictement locale" title="Dictée locale selon la compatibilité de l’appareil">🎙</button></form><p id="voice-hint" class="tiny">Voix de synthèse locale optionnelle. Utilisez la dictée de votre clavier selon ses règles de confidentialité.</p></div><div class="card suggestions"><h3>Vos aides immédiates</h3>
  <div class="assist-actions">
  <button class="btn light" type="button" data-assistant-action="plan"><span aria-hidden="true">☑</span> Planning de ma journée</button>
  <button class="btn light" type="button" data-assistant-action="summary"><span aria-hidden="true">♡</span> Résumé de mes observations</button>
