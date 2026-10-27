@@ -1,7 +1,8 @@
 import {today,text,makeSymptom,makeTask,makeCondition,makeAppointment,makeMedication,energyGuide,rankTasks,reply,dueReminders,reminderLog} from "./core.mjs";
 import {LIBRARY} from "./medical-library.mjs";
 import {openSecureDB,all,put,del,wipeDB,encryptedExport,eraseLegacy} from "./vault-ui.mjs";
-import {loadGemma,unloadGemma,canPlanWithGemma,generateLifePlan,detectWebGPU} from "./gemma-local.mjs";
+import {loadGemma,unloadGemma,cancelGemmaLoad,canPlanWithGemma,canGeneralChat,generateLifePlan,generateSafeChat,detectWebGPU,WEB_MODELS} from "./gemma-local.mjs";
+import {assistantToolReply,normalize} from "./assistant-tools.mjs";
 import {setupPatientUX} from "./ux-pro.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
@@ -22,12 +23,48 @@ function renderHealth(){const out=$("health-list");out.replaceChildren();if(!DAT
 function renderConditions(){const out=$("conditions-list");out.replaceChildren();if(!DATA.conditions.length)blank(out,"Aucune maladie connue enregistrée.");else DATA.conditions.forEach(c=>record(out,c.name,"Information saisie par vous",c.notes,"conditions",c.id));}
 function renderMeds(){const out=$("med-list");out.replaceChildren();if(!DATA.medications.length)blank(out,"Aucun médicament ou traitement déclaré.");else DATA.medications.forEach(m=>record(out,m.name,[m.dose&&"Dose déclarée : "+m.dose,m.schedule&&"Fréquence : "+m.schedule,m.reminderTime&&"Rappel quotidien : "+m.reminderTime,m.prescriber&&"Prescripteur : "+m.prescriber].filter(Boolean).join(" · "),m.notes,"medications",m.id));renderReminders();}
 function renderAppointments(){const out=$("appts-list");out.replaceChildren();if(!DATA.appointments.length)blank(out,"Aucun rendez-vous enregistré.");else [...DATA.appointments].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).forEach(a=>record(out,a.title,a.date+(a.time?" à "+a.time:"")+(a.place?" · "+a.place:""),a.questions&&"Questions : "+a.questions,"appointments",a.id));}
-function renderLibrary(){const out=$("library-list");out.replaceChildren();for(const d of LIBRARY){const c=dom("article");c.append(dom("h3",d.title),dom("p",d.answer),dom("small",d.source+" · "+d.date));const link=dom("a","Voir la source");link.href=d.url;link.target="_blank";link.rel="noopener noreferrer";c.append(link);out.append(c);}}
+function renderLibrary(){
+ const out=$("library-list"),query=normalize($("library-search")?.value||"").trim();
+ const docs=query?LIBRARY.filter(d=>normalize(d.title+" "+d.answer+" "+(d.keywords||[]).join(" ")).includes(query)):LIBRARY;
+ out.replaceChildren();
+ if($("library-result-count"))$("library-result-count").textContent=docs.length+" fiche(s) dans la bibliothèque embarquée. Consultation de la source externe uniquement sur clic.";
+ if(!docs.length){blank(out,"Aucune fiche trouvée. Essayez un terme plus court.");return;}
+ for(const d of docs){
+  const c=dom("article");c.append(dom("h3",d.title),dom("p",d.answer),dom("small",d.source+" · "+d.date));
+  const link=dom("a","Voir la source officielle");link.href=d.url;link.target="_blank";link.rel="noopener noreferrer";c.append(link);out.append(c);
+ }
+}
 function bubble(body,role,source){const b=dom("div",body,"bubble"+(role==="user"?" user":""));const doc=LIBRARY.find(d=>d.id===source);if(doc){const a=dom("a","Source : "+doc.source,"source");a.href=doc.url;a.target="_blank";a.rel="noopener noreferrer";b.append(a);}return b;}
 function renderChat(){const out=$("messages");out.replaceChildren();if(!DATA.conversations.length)out.append(bubble("Bonjour. Je peux vous aider à organiser vos tâches et consulter des informations médicales sourcées. Qu'aimeriez-vous faire aujourd'hui ?","bot"));else DATA.conversations.slice(-100).forEach(m=>out.append(bubble(m.body,m.role,m.sourceId)));out.scrollTop=out.scrollHeight;}
 function localVoice(){return "speechSynthesis" in window?speechSynthesis.getVoices().find(v=>v.localService===true&&v.lang.toLowerCase().startsWith("fr")):null;}
 function speak(message){if(!voice)return;const selected=localVoice();if(!selected){notify("Aucune voix française explicitement locale n'est disponible. La lecture a été désactivée.");voice=false;$("voice-toggle").textContent="Voix : off";return;}try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(message);u.lang="fr-FR";u.voice=selected;u.rate=.92;speechSynthesis.speak(u);}catch(e){notify("Synthèse vocale indisponible.");}}
-async function ask(q){const input=text(q,2000);if(!input||!db)return;try{const u={role:"user",body:input,time:Date.now()};await put(db,"conversations",u);DATA.conversations.push(u);const response=reply(input,LIBRARY,{...DATA,energy});let answer=response.message+(response.followup?"\n\n"+response.followup:"");if(response.kind==="life"&&$("gemma-use").checked&&canPlanWithGemma(input)){try{answer=await generateLifePlan(input,{energy,tasks:DATA.tasks})+"\n\n[Plan d’organisation proposé par Gemma 4, non vérifié médicalement.]";}catch(error){notify("Gemma indisponible : réponse locale utilisée. "+error.message);}}const b={role:"bot",body:answer,time:Date.now(),sourceId:response.sources?.[0]?.id||""};await put(db,"conversations",b);DATA.conversations.push(b);renderChat();tab("chat");speak(answer);if(response.kind==="urgent")notify("Une situation potentiellement urgente a été évoquée.");}catch(e){console.error(e);notify("Impossible d'enregistrer cette conversation.");}}
+function isRestrictedClinicalAction(question){
+ return /(?:dose|dosage|posolog|ordonn|prescri|diagnos|interaction|contre.indication|arret.*traitement|arreter.*medicament|prendre.*medicament|combien.*comprime|intoxica|surdosage|suicid|urgence)/.test(normalize(question));
+}
+async function ask(q){
+ const input=text(q,2000);if(!input||!db)return;
+ const submit=$("chat-form")?.querySelector('button[type="submit"]');
+ if(submit?.disabled){notify("L'assistant répond déjà. Veuillez terminer la demande précédente.");return;}
+ if(submit)submit.disabled=true;
+ try{
+  const u={role:"user",body:input,time:Date.now()};await put(db,"conversations",u);DATA.conversations.push(u);
+  const baseline=reply(input,LIBRARY,{...DATA,energy});
+  const tool=(baseline.kind==="urgent"||isRestrictedClinicalAction(input))?null:assistantToolReply(input,{...DATA,energy},LIBRARY);
+  const response=tool||baseline;
+  let answer=response.message+(response.followup?"\n\n"+response.followup:"");
+  if($("gemma-use").checked&&canPlanWithGemma(input)&&(response.kind==="plan"||response.kind==="life")){
+   try{answer=await generateLifePlan(input,{energy,tasks:DATA.tasks})+"\n\n[Classement Gemma local, non médical. Vous pouvez choisir l'ordre proposé par FibroBot sans IA.]";}
+   catch(error){notify("IA locale indisponible : proposition vérifiable conservée. "+error.message);}
+  }else if($("gemma-use").checked&&canGeneralChat(input)&&!tool&&["refusal","followup"].includes(baseline.kind)){
+   try{answer=await generateSafeChat(input);}
+   catch(error){notify("Modèle indisponible ou réponse rejetée : le moteur documentaire est conservé.");}
+  }
+  const b={role:"bot",body:answer,time:Date.now(),sourceId:response.sources?.[0]?.id||""};
+  await put(db,"conversations",b);DATA.conversations.push(b);renderChat();tab("chat");speak(answer);
+  if(baseline.kind==="urgent")notify("Une situation potentiellement urgente a été évoquée.");
+ }catch(e){console.error(e);notify("Impossible d'enregistrer cette conversation.");}
+ finally{if(submit)submit.disabled=false;}
+}
 function renderReminders(){const out=$("due-reminders");out.replaceChildren();const due=dueReminders(DATA.medications,DATA.medicationLogs);if(!due.length){blank(out,"Aucune prise à confirmer maintenant.");return;}for(const x of due){const row=dom("div",undefined,"record"),left=dom("div"),buttons=dom("div",undefined,"actions");left.append(dom("strong",x.name),dom("small","Heure prévue : "+x.time+" (déclarée)"));buttons.append(action("Pris","reminder","taken",x.medicationId),action("Ignoré","reminder","skipped",x.medicationId));row.append(left,buttons);out.append(row);if(!seen.has(x.key)){seen.add(x.key);notify("Un rappel de traitement est à vérifier dans FibroBot.");if("Notification" in window&&Notification.permission==="granted"&&document.visibilityState==="visible"){try{new Notification("FibroBot • rappel",{body:"Consultez votre prise planifiée dans FibroBot.",tag:"fibrobot-"+x.key});}catch(e){/* Indisponible sur certaines PWA */}}}}}
 async function write(store,entity,form){const id=Number(form.dataset.edit||0);if(id){const old=DATA[store].find(x=>x.id===id);if(!old)throw Error("Enregistrement introuvable.");entity={...old,...entity,id};}await put(db,store,entity);form.reset();form.dataset.edit="";$("health-date").value=today();$("appt-date").value=today();await reload();notify(id?"Modifications conservées.":"Information enregistrée sur cet appareil.");}
 function edit(store,id){const x=DATA[store].find(x=>x.id===id);if(!x)return;tab(store==="symptoms"?"health":store==="medications"?"medications":store);const f=$(FORMS[store]);f.dataset.edit=id;const values=store==="tasks"?{"task-name":x.title,"task-effort":x.effort,"task-priority":x.priority,"task-due":x.due||""}:store==="symptoms"?{"health-name":x.name,"health-date":String(x.date).slice(0,10),"health-condition":x.condition||"","pain":x.intensity,"health-energy":x.energy??"","fatigue":x.fatigue??"","sleep":x.sleep??"","health-notes":x.notes||""}:store==="conditions"?{"condition-name":x.name,"condition-notes":x.notes||""}:store==="medications"?{"med-name":x.name,"med-dose":x.dose||"","med-schedule":x.schedule||"","med-prescriber":x.prescriber||"","med-reminder-time":x.reminderTime||"","med-notes":x.notes||""}:{"appt-name":x.title,"appt-date":x.date,"appt-time":x.time||"","appt-place":x.place||"","appt-questions":x.questions||""};for(const [id,value] of Object.entries(values))$(id).value=value;f.scrollIntoView({behavior:"smooth",block:"start"});f.querySelector("input")?.focus({preventScroll:true});notify("Mode modification : enregistrez pour conserver les changements.");}
@@ -53,6 +90,7 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
+ $("library-search")?.addEventListener("input",renderLibrary);
  document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.tab)tab(b.dataset.tab);else if(b.dataset.goto)tab(b.dataset.goto);else if(b.dataset.ask)ask(b.dataset.ask);else if(b.dataset.action)command(b).catch(err=>notify(err.message));});
  $("daily-energy").addEventListener("input",e=>{energy=Number(e.target.value);$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();});
  $("daily-energy").addEventListener("change",async()=>{try{await put(db,"settings",{id:"energy",value:energy});}catch(e){notify("Énergie non sauvegardée.");}});
@@ -63,24 +101,28 @@ function events(){
  $("erase").addEventListener("click",async()=>{if(!confirm("Supprimer définitivement toutes les données FibroBot de ce navigateur ?"))return;try{db.close();await wipeDB();location.reload();}catch(e){notify("Effacement bloqué : "+e.message);}});
  $("notification-permission").addEventListener("click",async()=>{if(!("Notification" in window)||typeof Notification.requestPermission!=="function"){notify("Notifications non disponibles ici. Gardez une alarme système pour les prises essentielles.");return;}try{const state=await Notification.requestPermission();notify(state==="granted"?"Notifications autorisées tant que le navigateur le permet.":"Notifications non autorisées. Les rappels restent visibles dans FibroBot.");}catch(e){notify("Notifications non prises en charge.");}});
  $("gemma-load").addEventListener("click",async()=>{
-   const button=$("gemma-load");button.disabled=true;
-   const status=$("gemma-status"),progress=$("gemma-progress");
-   status.textContent="Vérification de WebGPU…";
-   try{
-    const capability=await detectWebGPU();if(!capability.supported)throw Error(capability.reason);
-    if(!confirm("Télécharger le moteur WebLLM et les poids Gemma 4 E2B depuis leurs hébergeurs ? Le téléchargement peut représenter plusieurs gigaoctets. Le modèle exécutera ensuite les calculs dans votre navigateur, sans envoyer le dossier de santé à une API."))return;
-    progress.hidden=false;
-    await loadGemma({variant:$("gemma-variant").value,onProgress:p=>{
-      status.textContent=p.text||"Chargement du modèle…";
-      if(Number.isFinite(p.progress))progress.value=Math.max(0,Math.min(1,p.progress));
-    }});
-    $("gemma-use").disabled=false;$("gemma-unload").disabled=false;
-    status.textContent="Gemma 4 chargé sur cet appareil. Usage limité à l’organisation quotidienne.";
-    notify("Gemma prêt. Activez la case d'organisation pour l'utiliser.");
-   }catch(error){status.textContent="Modèle non chargé : "+error.message;notify("Mode documentaire local conservé.");}
-   finally{button.disabled=false;progress.hidden=true;}
+  const button=$("gemma-load"),cancel=$("gemma-cancel"),status=$("gemma-status"),progress=$("gemma-progress");
+  button.disabled=true;cancel.hidden=false;cancel.disabled=false;
+  status.textContent="Vérification de WebGPU et de la mémoire…";
+  try{
+   const cap=await detectWebGPU();if(!cap.supported)throw Error(cap.reason);
+   if(!confirm("Installer un modèle IA dans votre navigateur ? Le téléchargement peut représenter des centaines de Mo à plusieurs Go. Les modèles et le moteur viennent de leurs hébergeurs. Le dossier médical n'est pas transmis à cette IA ; seules des requêtes pratiques non médicales ou des propriétés anonymes des tâches peuvent être traitées localement."))return;
+   progress.hidden=false;progress.value=0;
+   const loaded=await loadGemma({variant:$("gemma-variant").value,onProgress:p=>{
+    status.textContent=p.text||"Téléchargement en cours…";
+    if(Number.isFinite(p.progress))progress.value=Math.max(0,Math.min(1,p.progress));
+   }});
+   $("gemma-use").disabled=false;$("gemma-unload").disabled=false;
+   const actual=Object.values(WEB_MODELS).find(m=>m.id===loaded.modelId);
+   status.textContent=(actual?.label||loaded.modelId)+" chargé localement."+(loaded.fallback?" Un modèle plus léger a été utilisé après échec du premier.":"");
+   notify("IA locale prête. Activez son utilisation pour les demandes non médicales.");
+  }catch(error){
+   status.textContent="IA non chargée : "+error.message+". L'assistant documentaire fonctionne toujours.";
+   notify("Chargement impossible ou annulé : l'assistant documentaire reste utilisable.");
+  }finally{button.disabled=false;cancel.hidden=true;cancel.disabled=true;progress.hidden=true;}
  });
- $("gemma-unload").addEventListener("click",async()=>{try{await unloadGemma();$("gemma-use").checked=false;$("gemma-use").disabled=true;$("gemma-unload").disabled=true;$("gemma-status").textContent="Modèle déchargé. L’assistant documentaire reste actif.";}catch(e){notify("Impossible de décharger le modèle.");}});
+ $("gemma-cancel").addEventListener("click",()=>{if(cancelGemmaLoad())$("gemma-status").textContent="Annulation du téléchargement local demandée.";});
+ $("gemma-unload").addEventListener("click",async()=>{try{await unloadGemma();$("gemma-use").checked=false;$("gemma-use").disabled=true;$("gemma-unload").disabled=true;$("gemma-status").textContent="Modèle déchargé. L'assistant documentaire reste actif.";}catch(e){notify("Impossible de décharger le modèle.");}});
  $("erase-legacy").addEventListener("click",async()=>{if(!confirm("Supprimer l'ancienne base FibrobotDB non chiffrée de CE navigateur ? Vérifiez d'abord que vos données ont bien été migrées dans le coffre."))return;try{await eraseLegacy();notify("Ancienne base non chiffrée supprimée.");}catch(e){notify(e.message);}});
  $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;db?.close();location.reload();});
  $("breath-start")?.addEventListener("click",breathing);
