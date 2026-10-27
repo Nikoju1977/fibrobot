@@ -85,8 +85,8 @@ export function cleanGeneratedReply(answer){
  const normalized=norm(v);
  if(/(?:posolog|dosage|\bdose\b|diagnos|prescri|ordonnance|contre.indic|interact.*medic|\bmilligramme|\bmg\b|\bcomprime|arret.*traitement|arretez|prendre.*medic|traitement.*recommand|vous souffrez de|consultez.*urgence)/.test(normalized))
   throw Error("Réponse potentiellement médicale bloquée ; moteur documentaire conservé.");
- if(RE_PHARMA_NAMES.test(normalized))
-  throw Error("Référence à un médicament dans une réponse libre : moteur documentaire conservé.");
+ if(RE_PHARMA_NAMES.test(normalized)||RE_MEDICAL.test(normalized))
+  throw Error("Référence médicale dans une réponse libre : moteur documentaire conservé.");
  if(/https?:\/\/|www\./i.test(v))throw Error("Lien non vérifié du modèle bloqué.");
  return v;
 }
