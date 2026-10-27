@@ -11,11 +11,22 @@ const value="Observation test chiffrée";
 try{
  await page.goto(URL,{waitUntil:"networkidle"});
  await page.locator("#vault-gate").waitFor({state:"visible"});
+ // Deux onglets ayant ouvert le formulaire de création ne doivent jamais s'écraser.
+ const rival=await context.newPage();
+ await rival.goto(URL,{waitUntil:"networkidle"});
+ await rival.locator("#vault-gate").waitFor({state:"visible"});
+
  await page.locator("#vault-password").fill(secret);
  await page.locator("#vault-confirm-password").fill(secret);
  await page.locator("#vault-ack").check();
  await page.locator("#vault-submit").click();
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
+ await rival.locator("#vault-password").fill("une autre phrase secrète longue");
+ await rival.locator("#vault-confirm-password").fill("une autre phrase secrète longue");
+ await rival.locator("#vault-ack").check();
+ await rival.locator("#vault-submit").click();
+ await rival.locator("#vault-error").getByText(/coffre existe déjà|autre onglet/i).waitFor({timeout:20000});
+ await rival.close();
  await page.locator('[data-tab="health"]').first().click();
  await page.locator("#health-name").fill(value);
  await page.locator("#pain").fill("6");
@@ -72,6 +83,18 @@ try{
   }));
   assert.ok(names.length>100);
  }finally{await sibling.close();}
+ // L'application statique et le coffre doivent aussi se déverrouiller hors ligne une fois le shell mis en cache.
+ await page.evaluate(async()=>{if(!("serviceWorker" in navigator))throw Error("ServiceWorker indisponible");await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>setTimeout(()=>reject(Error("ServiceWorker non prêt après 15 secondes")),15000))]);});
+ await context.setOffline(true);
+ try{
+  await page.reload({waitUntil:"domcontentloaded"});
+  await page.locator("#vault-gate").waitFor({state:"visible",timeout:15000});
+  await page.locator("#vault-password").fill(secret);
+  await page.locator("#vault-submit").click();
+  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
+  await page.locator('[data-tab="health"]').first().click();
+  await page.locator("#health-list").getByText(value).waitFor({timeout:10000});
+ }finally{await context.setOffline(false);}
  // Restore the encrypted backup in an independent browsing context.
  const restored=await browser.newPage();
  try{

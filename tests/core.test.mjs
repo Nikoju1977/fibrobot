@@ -22,3 +22,12 @@ test("pas de source inconnue insérée",()=>{for(const d of LIBRARY){assert.ok(d
 
 test("mode crise : soutien pratique, sans prescription",()=>{const r=reply("Je fais une crise de fibromyalgie",LIBRARY,{conditions:[{name:"Fibromyalgie"}],medications:[{name:"Traitement"}],symptoms:[]});assert.equal(r.kind,"life");assert.match(r.message,/Crise|crise/);assert.match(r.message,/condition/);});
 test("recherche scientifique avec étude publiée",()=>{const r=reply("Que sait-on de la génétique de la fibromyalgie ?",LIBRARY);assert.equal(r.kind,"documented");assert.equal(r.sources[0].id,"gwas2026");});
+
+test("les signes de surdosage et oppression thoracique imposent un message prioritaire",()=>{
+ for(const q of ["J'ai pris trop de comprimés","Je crains une overdose","Je fais une intoxication médicamenteuse","J'ai une oppression thoracique"]){
+  const result=reply(q,LIBRARY);
+  assert.equal(result.kind,"urgent",q);
+  assert.ok(result.message.includes("15")&&result.message.includes("112"));
+  assert.deepEqual(result.sources,[]);
+ }
+});

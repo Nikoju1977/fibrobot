@@ -95,6 +95,6 @@ async function init(){
  forms();events();
  try{db=await openSecureDB();await reload();setInterval(()=>{if(document.visibilityState==="visible"&&db)renderReminders();},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&db)renderReminders();});}
  catch(e){console.error(e);notify("Stockage local indisponible : l'application ne peut pas enregistrer vos données. Autorisez le stockage pour ce site.");}
- if("serviceWorker" in navigator&&location.protocol==="https:"){navigator.serviceWorker.register("./sw.js").catch(()=>{/* hors ligne facultatif */});}
+ if("serviceWorker" in navigator&&window.isSecureContext){navigator.serviceWorker.register("./sw.js").catch(()=>{/* hors ligne facultatif */});}
 }
 document.addEventListener("DOMContentLoaded",init);
