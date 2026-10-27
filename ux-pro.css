@@ -186,7 +186,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .top{display:flex;align-items:flex-start;flex-wrap:wrap;gap:10px;padding-bottom:14px}
   .top h1{font-size:1.7rem}
   .date-line{font-size:.77rem}
-  .top-right{max-width:none;width:100%;justify-content:space-between;padding:5px 0 0}
+  .top-right{max-width:none;width:100%;justify-content:space-between;flex-direction:row;align-items:center;padding:5px 0 0}
   .top-right .btn{padding:9px 12px;min-height:43px;font-size:.79rem;flex:1}
   .hero{padding:27px 22px;min-height:unset;border-radius:20px}
   .hero h2{font-size:clamp(2rem,9vw,2.8rem);max-width:none}
