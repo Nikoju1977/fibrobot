@@ -19,13 +19,13 @@ try{
  await page.locator("#vault-password").fill(secret);
  await page.locator("#vault-confirm-password").fill(secret);
  await page.locator("#vault-ack").check();
- page.locator("#vault-single-patient").check();
+ await page.locator("#vault-single-patient").check();
  await page.locator("#vault-submit").click();
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
  await rival.locator("#vault-password").fill("une autre phrase secrète longue");
  await rival.locator("#vault-confirm-password").fill("une autre phrase secrète longue");
  await rival.locator("#vault-ack").check();
- rival.locator("#vault-single-patient").check();
+ await rival.locator("#vault-single-patient").check();
  await rival.locator("#vault-submit").click();
  await rival.locator("#vault-error").getByText(/coffre existe déjà|autre onglet/i).waitFor({timeout:20000});
  await rival.close();
@@ -112,7 +112,7 @@ try{
   await restored.locator("#vault-import").setInputFiles({name:"coffre-chiffre.json",mimeType:"application/json",buffer});
   await restored.locator("#vault-password").fill(secret);
   await restored.locator("#vault-ack").check();
- restored.locator("#vault-single-patient").check();
+ await restored.locator("#vault-single-patient").check();
   await restored.locator("#vault-submit").click();
   await restored.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
   await restored.locator('[data-tab="health"]').first().click();
@@ -142,7 +142,7 @@ try{
   await legacy.locator("#vault-password").fill(secret);
   await legacy.locator("#vault-confirm-password").fill(secret);
   await legacy.locator("#vault-ack").check();
- legacy.locator("#vault-single-patient").check();
+ await legacy.locator("#vault-single-patient").check();
   await legacy.locator("#vault-submit").click();
   await legacy.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
   await legacy.locator('[data-tab="health"]').first().click();
