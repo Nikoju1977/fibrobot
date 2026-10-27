@@ -76,7 +76,7 @@ async function ask(q){
   let engine="Assistant documentaire local",references=[],onlineAttempted=false;
   // Consentement au réseau valable pour cette session, puis validation de chaque
   // question exacte. Pas de synchronisation du coffre ni de recherche médicale libre.
-  if(intent==="general"&&networkEnabled&&isOnlineEligible(input)&&response.kind!=="urgent"){
+  if(intent==="general"&&networkEnabled&&isOnlineEligible(input)&&["refusal","followup"].includes(response.kind)){
    const servers=selectPublicProviders(input).map(id=>PUBLIC_PROVIDERS.find(p=>p.id===id)?.name).filter(Boolean).join(" et ");
    if(confirm("Recherche Internet facultative sur "+servers+" ?\n\nQuestion envoyée telle quelle aux services publics :\n« "+input+" »\n\nNe poursuivez pas si votre question contient une information personnelle ou médicale.")){
     onlineAttempted=true;setEngineNote("Recherche en cours sur les sources publiques…");
