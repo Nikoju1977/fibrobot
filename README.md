@@ -108,3 +108,11 @@ Le chargement est facultatif et déclenché par un clic explicite dans le chat. 
 - WebGPU Safari : https://webkit.org/blog/17333/webkit-features-in-safari-26-0/
 
 Les fichiers `native/ios` et `native/android` ne sont que des **prototypes de runners** documentés pour Gemma 4 E4B ; ils ne constituent pas des applications iOS/Android livrables et n'ont pas été compilés.
+
+## Assistant local étendu (Studio Niko Design)
+
+- Le mode sans LLM conserve toutes les fonctions de base. Les fonctions descriptives (planning sur tâches existantes, moyennes de valeurs déclarées, préparation de consultation) fonctionnent sans WebGPU ; elles ne produisent pas de diagnostic.
+- Les modèles génératifs WebLLM sont **facultatifs**. Le bouton « Vérifier mon appareil et les modèles » charge le runtime tiers et son catalogue sans télécharger les poids du modèle. « Léger automatique » sélectionne un modèle selon les informations de VRAM publiées par le runtime et un budget conservateur ; Gemma 4 E2B est un choix manuel plus exigeant. La compatibilité réelle sur smartphone reste non prouvée. Aucune garantie de repli après un crash fatal du navigateur n'est possible.
+- Le dialogue libre passe au modèle local **uniquement** si l'intention est non médicale ; aucun dossier médical, note de santé ou question médicale n'est transmis à son Worker. Les requêtes de santé gardent le refus prudent ou les fiches de sources.
+- Une recherche bibliographique Europe PMC s'effectue seulement sur clic et avec des thèmes fixes (aucune recherche textuelle libre ou donnée de santé transmise). Un article trouvé n'est pas une preuve de sécurité ou d'efficacité clinique.
+- Les rappels de traitement ne sont toujours pas garantis après fermeture du navigateur. Le modèle génératif ne conseille ni prescription, ni dosage, ni changements de traitement.
