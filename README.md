@@ -130,3 +130,25 @@ Le panneau Assistant présente **sept agents de soutien locaux** : douleurs et f
 Le LLM facultatif, sélectionné dans `gemma-local.mjs` et exécuté dans `gemma-worker.mjs`, est maintenant **activé automatiquement après le chargement volontaire**. La barre d'état indique la provenance de la réponse (agent local, bibliothèque ou IA générative) ; le bouton « 3. Tester la réponse IA » effectue une vraie génération **sans aucune donnée patient**, plutôt que de confondre « poids téléchargés » et « modèle opérationnel ». Les salutations et questions générales passent au LLM chargé ; les urgences et questions médicales restent gérées par les garde-fous documentaires. Une erreur du LLM entraîne un repli affiché, pas une réponse inventée.
 
 Après fermeture ou redémarrage de la PWA, les poids peuvent rester en cache, mais l'inférence doit être **rechargée en mémoire GPU** : le statut affiche alors « non chargé dans cette session ». Le téléchargement initial reste soumis au consentement, à la disponibilité WebGPU et à la mémoire. Test du modèle sur smartphones physiques toujours nécessaire.
+
+## Recherche Internet sourcée — connecteurs publics (octobre 2026)
+
+L’Assistant propose désormais une **recherche Internet facultative**, sans clé API ni serveur applicatif, avec cinq connecteurs publics : Wikipédia (MediaWiki Action API avec `origin=*`), OpenAlex, Crossref, Open Library et GitHub. La recherche bibliographique **Europe PMC** intégrée à Bibliothèque conserve son fonctionnement par thèmes fixes, élargi à dix thèmes ; les fiches HAS et ameli se lisent hors connexion après cache du shell.
+
+**Confidentialité :** le mode Internet est désactivé par défaut et n'est autorisé que pour la session courante. Pour chaque question de culture générale, une fenêtre indique la **question exacte et les fournisseurs concernés** et exige une confirmation. Aucune question médicale, médicament, observation de santé ni dossier chiffré n'est envoyé automatiquement. Cette protection repose sur un routage conservateur **et** la validation explicite de la question affichée. Ne confirmez pas une demande contenant une information privée. Les serveurs interrogés reçoivent l'adresse IP de l'appareil et le texte de la recherche (et peuvent avoir leur propre politique de conservation). Les réponses ne sont pas des diagnostics ni des sources de prescription.
+
+**Qualité des réponses :** des notices et extraits publics sont présentés avec des liens numérotés réellement issus des API ; FibroBot n'invente ni source ni résultat. Wikipédia et les résultats de moteurs bibliographiques doivent être vérifiés dans les publications originales : une notice indexée n'est pas une preuve scientifique. Si Internet ne marche pas, les agents locaux, le coffre et la bibliothèque embarquée restent accessibles. Les recherches externes nécessitent CORS, réseau et limites de quota propres aux fournisseurs ; la compatibilité réelle est à vérifier sur chaque appareil.
+
+**Conception de sécurité :** la liste des fournisseurs et des domaines de liens est fixe ; les réponses distantes ne sont jamais traitées comme des instructions ni insérées avec `innerHTML`. Le cache PWA `fibrobot-shell-v12` conserve les fichiers statiques nécessaires, **pas les résultats des recherches**. Les références d'une conversation peuvent être conservées **dans le coffre chiffré**, sans transfert automatique.
+
+Documentation API : [MediaWiki CORS](https://www.mediawiki.org/wiki/API:Cross-site_requests), [OpenAlex](https://help.openalex.org/api/), [Crossref](https://www.crossref.org/documentation/retrieve-metadata/rest-api/), [Open Library](https://openlibrary.org/developers/api), [GitHub REST](https://docs.github.com/en/rest/using-the-rest-api/using-cors-and-jsonp-to-make-cross-origin-requests).
+
+### Vérification manuelle après déploiement
+
+1. Ouvrir le coffre, aller dans Assistant : le mode réseau doit être **désactivé** et la PWA doit fonctionner sans Internet.
+2. Activer le réseau dans l'Assistant, demander « Qui était Marie Curie ? », vérifier la demande de confirmation et refuser une fois : aucune requête ne doit partir.
+3. Reposer la question et accepter : le résultat Wikipédia et son lien vérifiable doivent s'afficher. Vérifier les quatre autres connecteurs avec les exemples proposés.
+4. Envoyer une demande médicale : elle doit rester orientée vers les fiches médicales ou le refus prudent, sans envoyer le contenu aux bibliothèques générales.
+5. Repasser hors connexion : la navigation, le coffre et les données locales doivent rester accessibles. La recherche Internet doit simplement se replier et expliquer l'indisponibilité.
+
+L'accès HTTP réel aux cinq services, leurs quotas et la puissance du LLM WebGPU ne peuvent pas être garantis par les seuls tests automatisés.
