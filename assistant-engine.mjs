@@ -16,7 +16,12 @@ export const RESEARCH_TOPICS=Object.freeze([
  {id:"activity",label:"Activité physique adaptée",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:exercise"},
  {id:"sleep",label:"Fibromyalgie et sommeil",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:sleep"},
  {id:"pacing",label:"Gestion de l'activité (pacing)",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:pacing"},
- {id:"support",label:"Autogestion et accompagnement",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:self-management"}
+ {id:"support",label:"Autogestion et accompagnement",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:self-management"},
+ {id:"pain",label:"Douleur chronique et fibromyalgie",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:pain"},
+ {id:"fatigue",label:"Fatigue et fibromyalgie",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:fatigue"},
+ {id:"cognition",label:"Cognition et fibro-fog",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:cognition"},
+ {id:"rehabilitation",label:"Rééducation et prise en charge",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:rehabilitation"},
+ {id:"life",label:"Qualité de vie",query:"TITLE_ABS:fibromyalgia AND TITLE_ABS:quality of life"}
 ]);
 export function classifyIntent(input){
  const q=norm(input);

@@ -17,6 +17,7 @@ on:
       - "assistant-engine.mjs"
       - "agent-hub.mjs"
       - "research-library.mjs"
+      - "network-library.mjs"
       - "gemma-worker.mjs"
       - "sw.js"
       - "tests/browser-e2e.mjs"

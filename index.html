@@ -2,12 +2,13 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f6f9f7">
 <meta name="description" content="FibroBot, espace privé pour un seul patient, conçu par Studio Niko Design. Suivi, tâches et informations sourcées.">
 <meta name="author" content="Studio Niko Design">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.run https://cdn.jsdelivr.net https://esm.sh 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://www.ebi.ac.uk https://esm.run https://esm.sh https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co https://github.com https://*.githubusercontent.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.run https://cdn.jsdelivr.net https://esm.sh 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://www.ebi.ac.uk https://fr.wikipedia.org https://api.openalex.org https://api.crossref.org https://openlibrary.org https://api.github.com https://esm.run https://esm.sh https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co https://github.com https://*.githubusercontent.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
 <link rel="icon" href="./icon.svg">
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./styles.css">
@@ -108,6 +109,34 @@
  </div>
 </div>
 </details>
+      <section class="card network-card" aria-labelledby="network-title">
+       <div class="network-heading"><div><span class="section-kicker">BIBLIOTHÈQUES INTERNET GRATUITES</span><h3 id="network-title">Recherche Internet avec sources</h3></div><span class="network-badge">Sans clé API</span></div>
+       <p>FibroBot peut consulter Wikipédia, OpenAlex, Crossref, Open Library et GitHub pour les questions publiques de culture générale. Les recherches médicales passent par les fiches sourcées et la bibliothèque Europe PMC, pas par une réponse improvisée.</p>
+       <label class="network-consent" for="network-mode"><input type="checkbox" id="network-mode">
+         <span><strong>Autoriser la recherche Internet pour cette session</strong><small>Par défaut, aucun accès Internet pour vos questions. Avant chaque recherche, FibroBot affiche la question exacte et vous demande de confirmer son envoi aux sites indiqués. Le dossier médical, les traitements et les symptômes ne sont jamais utilisés pour ces recherches.</small></span>
+       </label>
+       <p class="tiny" id="network-state" role="status">Mode privé local : aucune recherche Internet libre ne sera lancée.</p>
+       <div class="network-examples">
+        <button type="button" class="chip" data-ask="Qui était Marie Curie ?">Encyclopédie</button>
+        <button type="button" class="chip" data-ask="Cherche un livre sur l'astronomie">Livres</button>
+        <button type="button" class="chip" data-ask="Cherche un logiciel open source de musique sur GitHub">Logiciels libres</button>
+        <button type="button" class="chip" data-ask="Recherche un article scientifique sur les étoiles">Recherche scientifique</button>
+       </div>
+       <p class="tiny">Les services publics peuvent être ralentis, indisponibles ou limités en volume. Une référence trouvée ne garantit pas son exactitude. Aucune synchronisation du coffre et aucun service de recherche payant.</p>
+       <details class="network-directories">
+        <summary>Accéder aux grandes bibliothèques de référence</summary>
+        <div class="network-directory-links">
+         <a href="https://www.has-sante.fr/jcms/p_3634512/fr/fibromyalgie-de-l-adulte-conduite-diagnostique-et-strategie-therapeutique" target="_blank" rel="noopener noreferrer">HAS · Recommandations françaises</a>
+         <a href="https://www.ameli.fr/assure/sante/themes/fibromyalgie/diagnostic" target="_blank" rel="noopener noreferrer">ameli · Vivre avec la fibromyalgie</a>
+         <a href="https://www.nccih.nih.gov/health/fibromyalgia-in-depth" target="_blank" rel="noopener noreferrer">NCCIH · Synthèses et qualité des preuves</a>
+         <a href="https://europepmc.org/" target="_blank" rel="noopener noreferrer">Europe PMC · Publications biomédicales</a>
+         <a href="https://pubmed.ncbi.nlm.nih.gov/" target="_blank" rel="noopener noreferrer">PubMed · Index scientifique</a>
+         <a href="https://openalex.org/" target="_blank" rel="noopener noreferrer">OpenAlex · Métadonnées scientifiques</a>
+         <a href="https://www.crossref.org/" target="_blank" rel="noopener noreferrer">Crossref · Références et DOI</a>
+         <a href="https://openlibrary.org/" target="_blank" rel="noopener noreferrer">Open Library · Livres</a>
+        </div>
+       </details>
+      </section>
       <section class="specialists card" aria-labelledby="specialists-heading">
        <h3 id="specialists-heading">Mes 7 agents de soutien spécialisés</h3>
        <p class="tiny">Choisissez un agent pour obtenir un résumé local fondé sur vos notes et les fiches documentaires. Ces assistants n'ont pas de qualification médicale et ne modifient jamais vos traitements.</p>
@@ -136,7 +165,7 @@
   <p>La recherche s'effectue uniquement si vous la demandez. Elle envoie un thème prédéfini, jamais vos symptômes, votre dossier ni vos questions libres. Elle nécessite Internet. Les résultats ne sont pas évalués cliniquement par FibroBot.</p>
   <div class="button-row">
    <label for="research-topic">Thème</label>
-   <select id="research-topic"><option value="fibromyalgia">Fibromyalgie — recherches générales</option><option value="activity">Activité physique adaptée</option><option value="sleep">Fibromyalgie et sommeil</option><option value="pacing">Gestion de l'activité</option><option value="support">Autogestion et accompagnement</option></select>
+   <select id="research-topic"><option value="fibromyalgia">Fibromyalgie — recherches générales</option><option value="activity">Activité physique adaptée</option><option value="sleep">Fibromyalgie et sommeil</option><option value="pacing">Gestion de l'activité</option><option value="support">Autogestion et accompagnement</option><option value="pain">Douleur chronique</option><option value="fatigue">Fatigue</option><option value="cognition">Troubles cognitifs et fibro-fog</option><option value="rehabilitation">Rééducation et prise en charge</option><option value="life">Qualité de vie</option></select>
    <button type="button" id="research-search" class="btn primary">Rechercher des publications</button>
   </div>
   <p id="research-status" role="status" class="tiny">Aucune recherche effectuée.</p>
