@@ -5,7 +5,7 @@
 import {rankTasks,energyGuide,today,text} from "./core.mjs";
 
 const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-const RE_MEDICAL=/(fibro|maladi|medic|traitement|douleur|sympt|diagnos|ordonnance|allerg|dose|posolog|crise|suicid|sante|soin|therap|depress|migraine|diabet|asthme|cancer|rhumat|handicap|fatigue|sommeil|insomni|pression|fievre|infection|chirurg|effet secondaire|interact|enceint|prescri|hopital|pharmac|consultation)/;
+const RE_MEDICAL=/(fibro|maladi|medic|traitement|douleur|sympt|diagnos|ordonnance|allerg|dose|posolog|crise|suicid|sante|soin|therap|depress|migraine|diabet|asthme|cancer|rhumat|handicap|fatigue|sommeil|insomni|pression|fievre|infection|chirurg|effet secondaire|interact|enceint|prescri|hopital|pharmac|consultation|j.ai mal|mal a la tete|je me sens mal|je souffre|vertige|vomiss|nausee|anxiet|angoiss|paniques|stress|suicide|deprimer|mal etre|blessure|hematome|mal au ventre|mal au dos|saign|tension arterielle|difficulte a respirer)/;
 const RE_DRUG=/(dose|dosage|posolog|combien de comprime|quel medicament|arreter|arret.*traitement|modifi.*traitement|interact|contre.indic|puis.je prendre|peux.je prendre|surdosage|intoxicat|prescri|automedic)/;
 
 export const RESEARCH_TOPICS=Object.freeze([
