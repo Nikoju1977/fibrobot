@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {connectMistral,disconnectMistral,mistralStatus,mistralCompletion,generateMistralChat,testMistralConnection,MISTRAL_MODELS,secondsToRetry} from "../mistral-bridge.mjs";
+import {connectMistral,disconnectMistral,mistralStatus,mistralCompletion,generateMistralChat,testMistralConnection,MISTRAL_MODELS,secondsToRetry,medicalEvidenceMessages,generateMistralMedicalExplanation} from "../mistral-bridge.mjs";
 
 test.afterEach(()=>disconnectMistral());
 
@@ -106,4 +106,29 @@ test("L'API 429 n'est pas contournée en changeant automatiquement de modèle",a
  await assert.rejects(mistralCompletion(q,{model:"mistral-small-latest",fetchImpl}),/429/);
  await assert.rejects(mistralCompletion(q,{model:"mistral-large-latest",fetchImpl}),/temporairement désactivé/);
  assert.equal(calls,1);
+});
+
+test("Mistral explique les fiches médicales publiques sans dossier patient",async()=>{
+ connectMistral("cle-test-personnelle-non-valide-0000");
+ let sent;
+ const passages=[{title:"Fibromyalgie",source:"HAS",excerpt:"Une prise en charge globale peut associer plusieurs approches."}];
+ const result=await generateMistralMedicalExplanation("Qu'est-ce que la fibromyalgie ?",passages,{
+  fetchImpl:async(url,opts)=>{
+   sent=JSON.parse(opts.body);
+   return {ok:true,json:async()=>({choices:[{message:{content:"La fibromyalgie nécessite une approche globale. Pour votre situation, consultez un professionnel."}}]})};
+  }
+ });
+ assert.equal(result.kind,"medical-education");
+ assert.match(result.text,/fibromyalgie/i);
+ assert.ok(sent.messages[1].content.includes("HAS"));
+ assert.ok(!JSON.stringify(sent).includes("SECRET-PATIENT"));
+});
+
+test("Mistral médical refuse l'absence de fiches et les conseils thérapeutiques générés",async()=>{
+ connectMistral("cle-test-personnelle-non-valide-0000");
+ await assert.rejects(generateMistralMedicalExplanation("Quel médicament ?",[]),/Aucune fiche/);
+ const passages=[{title:"Fibromyalgie",source:"HAS",excerpt:"Information générale."}];
+ await assert.rejects(generateMistralMedicalExplanation("Qu'est-ce que la fibromyalgie ?",passages,{
+  fetchImpl:async()=>({ok:true,json:async()=>({choices:[{message:{content:"Prenez 50 mg de ce médicament."}}]})})
+ }),/non sécurisée/);
 });
