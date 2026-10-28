@@ -204,3 +204,16 @@ Une erreur HTTP **429 Too Many Requests** peut signifier qu'une limite de requê
 - Le service worker v14 renouvelle le cache de l'application. Après un déploiement, fermer puis rouvrir la PWA ; ne pas effacer les données du site ni son IndexedDB sans sauvegarde chiffrée.
 
 Le correctif est validé avec tests API Mistral simulée 429, test du délai `Retry-After`, navigation Chrome/WebKit simulée et vérification du repli local. Il **ne peut pas lever les limites serveur du compte Mistral**, ni garantir le comportement d'un smartphone physique sans test sur cet appareil.
+
+## Mistral intégré aux réponses de FibroBot — 29 octobre 2026
+
+Lorsque **Mistral** est connecté et activé, il est prioritaire pour les questions de conversation générale. Il peut maintenant aussi :
+- **expliquer les fiches médicales publiques préapprouvées** (fibromyalgie, sommeil, activités, etc.) : l'API ne reçoit que le titre et l'extrait de la fiche institutionnelle, **jamais le texte de la question personnelle** ; la fiche de référence reste affichée en regard de la reformulation ;
+- proposer des **conseils génériques pour organiser les tâches** : aucun nom de tâche, score personnel d'énergie ni détail de santé n'est transmis ;
+- rester facultatif pour toute requête, avec un **accord distinct avant chaque transmission**.
+
+Le routage est décrit dans \`mistral-routing.mjs\` et l'appel distant protégé dans \`mistral-bridge.mjs\`. Les refus et urgences, informations personnelles, résultats du carnet, ordonnances, diagnostics, doses, consultations et données issues du coffre restent gérés par les agents et les fiches locales. Il ne s'agit pas d'une IA « autorisée à prescrire » ni d'un médecin virtuel certifié. Une maladie sans fiche vérifiée n'est pas improvisée par Mistral.
+
+**Priorité et repli :** si Mistral est désactivé, FibroBot utilise les sources Internet autorisées, le moteur WebLLM local s'il fonctionne, ou sa bibliothèque. Le code respecte les erreurs API 429 et \`Retry-After\` sans boucler ni changer de modèle pour contourner une limite. Une API Mistral fonctionnelle nécessite une clé et peut être facturée ; les limites dépendent du compte et du modèle. La compatibilité CORS de la PWA et l'inférence Mistral réelle doivent être testées sur appareil physique.
+
+**Confidentialité :** ne jamais saisir une clé API dans le chat ; seul le champ dédié est autorisé. La clé reste uniquement dans la mémoire du navigateur et les détails privés ne sont pas transférés automatiquement. L'accord par question indique exactement la catégorie de données envoyées.
