@@ -87,3 +87,12 @@ Les tests `tests/agent-hub.test.mjs` couvrent le catalogue des agents, le routag
 - \`tests/mistral-bridge.test.mjs\` vérifie en simulation l'absence de question clinique ou de note privée transmise, la validation des sorties médicales générées et le respect des erreurs 429 sans répétition.
 - \`tests/browser-e2e.mjs\` simule le consentement individuel avant Mistral, une explication sourcée et un planning anonyme, le refus des doses, puis le repli local après une erreur 429.
 - Tests réels non couverts : facturation et quotas d'un compte Mistral, politique CORS du navigateur, pertinence clinique avec patients et professionnel de santé.
+
+## Coffre chiffré de clé Mistral
+
+- Clé non enregistrée par défaut ; sauvegarde volontaire avec case explicite.
+- Lors de la sauvegarde : AES-GCM authentifié, nonce aléatoire, enveloppe dans `settings` elle-même chiffrée par le coffre.
+- L'activation depuis le coffre n'a lieu que sur clic avec coffre ouvert et ne lance aucun appel API.
+- Déconnexion, verrouillage, navigation hors page et effacement : suppression de la clé de la session lorsque possible.
+- Tests de confidentialité : secret absent de la valeur de formulaire après soumission et des données IndexedDB en clair, suppression de la copie actuelle, échec avec mauvaise clé.
+- Limitations non levées : exécution Javascript compromise, extensions, historique de sauvegardes, révocation de la clé côté prestataire, quota 429, compatibilité CORS.

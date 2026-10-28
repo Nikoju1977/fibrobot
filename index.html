@@ -114,8 +114,11 @@
        <div class="ai-details">
         <p class="callout">Mistral AI est un service distant, distinct des modèles locaux. Une clé personnelle valide et un accès API peuvent être payants. Si le navigateur bloque les requêtes directes (CORS), le mode Mistral ne fonctionnera pas sur cette PWA sans passerelle sécurisée. N'entrez pas une clé contenant des données privées.</p>
         <div class="form model-form">
-         <label for="mistral-key">Clé API Mistral personnelle (mémoire de session uniquement)</label>
-         <input id="mistral-key" type="password" maxlength="500" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Saisir la clé Mistral">
+         <label for="mistral-key">Clé API Mistral personnelle (saisie protégée)</label>
+         <input id="mistral-key" type="password" maxlength="500" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Saisir la clé Mistral" aria-describedby="mistral-key-privacy">
+         <label class="consent mistral-safe-store"><input type="checkbox" id="mistral-save-key">
+          Enregistrer aussi ma clé dans mon coffre personnel chiffré AES-256-GCM (optionnel)</label>
+         <p class="tiny" id="mistral-key-privacy">Sans cette option, la clé disparaît à la fermeture de la session. Avec cette option, elle sera chiffrée dans le coffre local, y compris dans les sauvegardes chiffrées. Elle ne sera jamais publiée sur GitHub. Ne sauvegardez pas une clé sur un téléphone partagé.</p>
          <label for="mistral-model">Modèle conversationnel</label>
          <select id="mistral-model">
           <option value="mistral-small-latest">Mistral Small · recommandé (coût potentiellement réduit)</option>
@@ -125,11 +128,13 @@
          <div class="button-row">
           <button type="button" id="mistral-connect" class="btn light">Activer ma clé</button>
           <button type="button" id="mistral-test" class="btn light" disabled>Tester Mistral</button>
-          <button type="button" id="mistral-disconnect" class="btn light" disabled>Effacer la clé</button>
+          <button type="button" id="mistral-disconnect" class="btn light" disabled>Déconnecter (effacer la mémoire)</button>
+          <button type="button" id="mistral-restore" class="btn light" disabled>Activer la clé de mon coffre</button>
+          <button type="button" id="mistral-forget" class="btn light" disabled>Supprimer la clé du coffre</button>
          </div>
          <label class="consent"><input type="checkbox" id="mistral-use" disabled>Utiliser Mistral en priorité pour les questions générales, les explications médicales documentaires et les conseils anonymes, avec confirmation à chaque demande</label>
-         <p id="mistral-status" class="tiny" role="status">Mistral désactivé. Aucune clé enregistrée.</p>
-         <p class="tiny">Une fois connecté, Mistral reçoit uniquement votre question générale confirmée, ou le texte d’une fiche médicale PUBLIQUE approuvée, ou une consigne générique d’organisation. Il ne reçoit ni vos observations, ni traitements, ni noms de tâches, ni votre question médicale personnelle. Les urgences, diagnostics, prescriptions, résumés personnels et consultations restent traités localement. La clé reste visible dans la mémoire du navigateur tant que la session est ouverte et peut être exposée par une extension malveillante : ne partagez pas votre appareil déverrouillé.</p>
+         <p id="mistral-status" class="tiny" role="status">Mistral désactivé. Aucune clé active. Déverrouillez le coffre pour utiliser une clé sauvegardée.</p>
+         <p class="tiny">Une fois connecté, Mistral reçoit uniquement votre question générale confirmée, ou le texte d’une fiche médicale PUBLIQUE approuvée, ou une consigne générique d’organisation. Il ne reçoit ni vos observations, ni traitements, ni noms de tâches, ni votre question médicale personnelle. Les urgences, diagnostics, prescriptions, résumés personnels et consultations restent traités localement. La clé est conservée en mémoire pendant la connexion ; si vous choisissez de la sauvegarder, seule sa version chiffrée est conservée dans le coffre et dans les sauvegardes chiffrées. Le chiffrement ne protège pas contre une page, un navigateur ou une extension compromis. Une clé API utilisée directement depuis le navigateur peut être exposée : limitez les permissions et le budget de votre clé Mistral.</p>
         </div>
        </div>
       </details>

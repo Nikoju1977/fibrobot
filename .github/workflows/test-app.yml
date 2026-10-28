@@ -20,6 +20,7 @@ on:
       - "knowledge-router.mjs"
       - "medical-rag.mjs"
       - "mistral-bridge.mjs"
+      - "mistral-credential-vault.mjs"
       - "mistral-routing.mjs"
       - "mcp-fibro-tools.mjs"
       - "mcp-server.mjs"
@@ -57,6 +58,7 @@ jobs:
           node --check knowledge-router.mjs
           node --check medical-rag.mjs
           node --check mistral-bridge.mjs
+          node --check mistral-credential-vault.mjs
           node --check mistral-routing.mjs
           node --check mcp-fibro-tools.mjs
           node --check mcp-server.mjs
@@ -75,7 +77,7 @@ jobs:
           assert '<script type="module" src="./app.mjs"></script>' in html
           assert not re.search(r'on(?:click|load|error)\s*=',html,re.I), "Inline event handler forbidden"
           assert not re.search(r'innerHTML\s*=|insertAdjacentHTML\s*\(|\beval\s*\(',app), "Unsafe DOM sink"
-          for f in ('index.html','app.mjs','core.mjs','medical-library.mjs','styles.css','sw.js','manifest.json','icon.svg','vault.mjs','vault-ui.mjs','gemma-local.mjs','gemma-worker.mjs','ux-pro.css','ux-pro.mjs','assistant-engine.mjs','agent-hub.mjs','research-library.mjs','network-library.mjs','knowledge-router.mjs','medical-rag.mjs','mistral-bridge.mjs','mistral-routing.mjs','mcp-fibro-tools.mjs','mcp-server.mjs'):
+          for f in ('index.html','app.mjs','core.mjs','medical-library.mjs','styles.css','sw.js','manifest.json','icon.svg','vault.mjs','vault-ui.mjs','gemma-local.mjs','gemma-worker.mjs','ux-pro.css','ux-pro.mjs','assistant-engine.mjs','agent-hub.mjs','research-library.mjs','network-library.mjs','knowledge-router.mjs','medical-rag.mjs','mistral-bridge.mjs','mistral-credential-vault.mjs','mistral-routing.mjs','mcp-fibro-tools.mjs','mcp-server.mjs'):
               assert Path(f).is_file(),f'File missing: {f}'
           for name in ('src','href'):
               for value in re.findall(rf'{name}="([^"]+)"',html):
