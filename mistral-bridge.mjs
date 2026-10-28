@@ -8,6 +8,7 @@ const ENDPOINT="https://api.mistral.ai/v1/chat/completions";
 const APPROVED_MODELS=Object.freeze(["mistral-small-latest","mistral-medium-latest","mistral-large-latest"]);
 let sessionKey=""; // Jamais dans IndexedDB, le coffre, localStorage, logs ou URL.
 let cooldownUntil=0,lastFailure="";
+const activeRequests=new Set();
 const MAX_COOLDOWN_S=900;
 const MIN_COOLDOWN_S=15;
 export function secondsToRetry(header,now=Date.now()){
@@ -33,7 +34,8 @@ export function connectMistral(key){
  if(value.length<12||value.length>500||/[\r\n\s]/.test(value))throw Error("Clé Mistral invalide. Ne la saisissez pas dans la conversation.");
  sessionKey=value;return true;
 }
-export function disconnectMistral(){sessionKey="";lastFailure="";cooldownUntil=0;}
+export function disconnectMistral(){sessionKey="";lastFailure="";cooldownUntil=0;cancelMistralRequests();}
+export function cancelMistralRequests(){for(const ctrl of activeRequests)ctrl.abort();activeRequests.clear();}
 export function mistralStatus(){
  return {connected:!!sessionKey,models:APPROVED_MODELS,cooldownSeconds:Math.max(0,Math.ceil((cooldownUntil-Date.now())/1000)),lastFailure};
 }
@@ -59,6 +61,7 @@ export async function mistralCompletion(messages,{model="mistral-small-latest",f
  validateMistralMessages(messages);
  if(typeof fetchImpl!=="function")throw Error("API fetch indisponible sur cet appareil.");
  const controller=new AbortController(),abort=()=>controller.abort();
+ activeRequests.add(controller);
  if(signal?.aborted)controller.abort();else signal?.addEventListener("abort",abort,{once:true});
  const timeout=setTimeout(abort,12000);
  try{
@@ -80,7 +83,7 @@ export async function mistralCompletion(messages,{model="mistral-small-latest",f
   if(e?.name==="AbortError")throw Error("Mistral ne répond pas dans les délais (12 s). Le moteur local reste disponible.");
   if(e instanceof TypeError)throw Error("Connexion Mistral bloquée par le réseau ou le navigateur (CORS). Utilisez l'IA locale.");
   throw e;
- }finally{clearTimeout(timeout);signal?.removeEventListener("abort",abort);}
+ }finally{clearTimeout(timeout);activeRequests.delete(controller);signal?.removeEventListener("abort",abort);}
 }
 export async function generateMistralChat(question,history=[],options={}){
  const messages=nonMedicalMessages(question,history);
