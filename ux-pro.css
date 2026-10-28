@@ -333,3 +333,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .network-directory-links a{font-size:.78rem;color:#1a6853;text-decoration:underline}
 .network-directories>summary{cursor:pointer;font-size:.86rem;color:#2e624e}
 @media(max-width:650px){#mistral-options .button-row{flex-direction:column;align-items:stretch}#mistral-options .button-row button{width:100%}.medical-directories .medical-directory-body{padding:16px 14px}}
+
+/* Mode local toujours accessible : sans chargement IA ni réseau. */
+.chat-recovery{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:8px 0 4px}
+.chat-recovery #chat-local-mode{white-space:normal;min-height:42px;border:1px solid #258a64;color:#175d45;font-size:.81rem}
+.chat-recovery .tiny{flex:1 1 200px;line-height:1.45}
+.reply-pending{opacity:.82;animation:fibrobot-pulse 1.5s ease-in-out infinite alternate}
+@keyframes fibrobot-pulse{from{opacity:.65}to{opacity:1}}
+@media(max-width:670px){.chat-recovery{align-items:stretch;gap:8px}.chat-recovery #chat-local-mode{width:100%}.chat-recovery .tiny{flex-basis:100%}}
