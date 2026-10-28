@@ -190,3 +190,17 @@ Le cerveau FibroBot combine des **outils vérifiables et gratuits** (routage, fi
 ### Qualité et limites
 
 Des tests Node et navigateur couvrent le routage, les listes de fournisseurs, les références, le système MCP, Mistral simulé, les refus à risque, le coffre chiffré, la PWA hors ligne et les écrans tactiles émulés. **Aucun modèle multi-Go ni serveur Mistral réel n'est testé automatiquement** ; la compatibilité physique Android/iPhone, la précision clinique, la conformité réglementaire et l'utilité patient nécessitent une validation indépendante par des professionnels et des utilisateurs concernés. FibroBot reste un assistant de soutien et d'information, **pas un dispositif médical certifié**.
+
+## Correction de panne Mistral 429 et dialogue permanent (28 octobre 2026)
+
+Une erreur HTTP **429 Too Many Requests** peut signifier qu'une limite de requêtes, de tokens ou de dépenses de l'espace Mistral est atteinte. Ce n'est pas une erreur réparable par une répétition immédiate. Vérifier les plafonds depuis [Mistral — Usage et limites](https://docs.mistral.ai/admin/billing-usage/usage-limits) et le tableau de bord du compte. **Aucune clé API du patient n'est nécessaire pour les fiches médicales ou les agents locaux.**
+
+- FibroBot ne boucle plus sur les erreurs 429. Il lit `Retry-After` lorsque cet en-tête est accessible au navigateur, impose un délai temporaire (15 secondes à 15 minutes) et refuse les appels répétés pendant ce délai. Ce délai **n'efface pas un plafond mensuel** ; réessayer au-delà peut encore renvoyer 429.
+- L'appel Mistral est plafonné à 12 secondes et n'emporte ni conversation médicale, ni historique, ni dossier. Une erreur peut être due aux CORS, à la clé, aux limites ou au réseau. La réponse de secours apparaît sans attendre une nouvelle tentative distante.
+- La réponse est maintenant **affichée avant sa sauvegarde** ; une erreur IndexedDB affiche un avertissement sans masquer la réponse. La zone de messages affiche immédiatement « FibroBot prépare sa réponse… » afin de distinguer un calcul lent d'un bouton sans effet.
+- Le bouton **« Mode local immédiat (sans Mistral) »** dans l'Assistant désactive les requêtes réseau libres et les inférences génératives en cours, puis permet de répondre avec les fiches et outils locaux. L'annulation d'un calcul WebLLM peut nécessiter de recharger son moteur à nouveau ; le coffre n'est jamais effacé.
+- Les générations WebLLM sont plafonnées dans cette version à 40 secondes pour ne pas bloquer indéfiniment l'interface, avec un message de secours si l'inférence échoue. Ce délai est un compromis mobile et peut être insuffisant pour certains modèles très lents.
+- Si le coffre est verrouillé, la question n'est plus effacée silencieusement : un message demande de déverrouiller le stockage.
+- Le service worker v14 renouvelle le cache de l'application. Après un déploiement, fermer puis rouvrir la PWA ; ne pas effacer les données du site ni son IndexedDB sans sauvegarde chiffrée.
+
+Le correctif est validé avec tests API Mistral simulée 429, test du délai `Retry-After`, navigation Chrome/WebKit simulée et vérification du repli local. Il **ne peut pas lever les limites serveur du compte Mistral**, ni garantir le comportement d'un smartphone physique sans test sur cet appareil.
