@@ -172,13 +172,13 @@ try{
  // Medical content stays on the deterministic route even if local AI options exist.
  await page.locator("#prompt").fill("Résume mes observations");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Synthèse descriptive/).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/Synthèse descriptive/).last().waitFor({timeout:10000});
  await page.locator("#prompt").fill("Préparer ma consultation médicale");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Préparation de consultation/).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/Préparation de consultation/).last().waitFor({timeout:10000});
  await page.locator("#prompt").fill("Organise mes tâches");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/tâche enregistrée|Proposition d’organisation/).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/tâche enregistrée|Proposition d’organisation/).last().waitFor({timeout:10000});
  await page.locator("#gemma-options").evaluate(x=>x.open=true);
  assert.equal(await page.locator("#llm-check").isVisible(),true);
  assert.equal(await page.locator("#local-model-select").inputValue(),"auto");
