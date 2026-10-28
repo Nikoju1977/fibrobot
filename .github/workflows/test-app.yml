@@ -17,6 +17,11 @@ on:
       - "agent-hub.mjs"
       - "research-library.mjs"
       - "network-library.mjs"
+      - "knowledge-router.mjs"
+      - "medical-rag.mjs"
+      - "mistral-bridge.mjs"
+      - "mcp-fibro-tools.mjs"
+      - "mcp-server.mjs"
       - "gemma-worker.mjs"
       - "manifest.json"
       - "tests/**"
@@ -48,6 +53,11 @@ jobs:
           node --check agent-hub.mjs
           node --check research-library.mjs
           node --check network-library.mjs
+          node --check knowledge-router.mjs
+          node --check medical-rag.mjs
+          node --check mistral-bridge.mjs
+          node --check mcp-fibro-tools.mjs
+          node --check mcp-server.mjs
       - name: Tests métier et garde-fous médicaux
         run: node --test tests/*.test.mjs
       - name: Contrôles de sécurité et fichiers PWA
@@ -63,7 +73,7 @@ jobs:
           assert '<script type="module" src="./app.mjs"></script>' in html
           assert not re.search(r'on(?:click|load|error)\s*=',html,re.I), "Inline event handler forbidden"
           assert not re.search(r'innerHTML\s*=|insertAdjacentHTML\s*\(|\beval\s*\(',app), "Unsafe DOM sink"
-          for f in ('index.html','app.mjs','core.mjs','medical-library.mjs','styles.css','sw.js','manifest.json','icon.svg','vault.mjs','vault-ui.mjs','gemma-local.mjs','gemma-worker.mjs','ux-pro.css','ux-pro.mjs','assistant-engine.mjs','agent-hub.mjs','research-library.mjs','network-library.mjs'):
+          for f in ('index.html','app.mjs','core.mjs','medical-library.mjs','styles.css','sw.js','manifest.json','icon.svg','vault.mjs','vault-ui.mjs','gemma-local.mjs','gemma-worker.mjs','ux-pro.css','ux-pro.mjs','assistant-engine.mjs','agent-hub.mjs','research-library.mjs','network-library.mjs','knowledge-router.mjs','medical-rag.mjs','mistral-bridge.mjs','mcp-fibro-tools.mjs','mcp-server.mjs'):
               assert Path(f).is_file(),f'File missing: {f}'
           for name in ('src','href'):
               for value in re.findall(rf'{name}="([^"]+)"',html):
