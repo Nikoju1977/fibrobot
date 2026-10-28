@@ -16,7 +16,7 @@ test("coffre : AES-GCM chiffré et déchiffrable uniquement avec la bonne phrase
  const opened=await unseal(envelope,pass);
  assert.equal(opened.data.symptoms[0].name,"Observation privée");
  await assert.rejects(unseal(envelope,"phrase totalement incorrecte"),/incorrect|endommagé/);
- const modified={...envelope,ciphertext:envelope.ciphertext.slice(0,-2)+"00"};
+ const modified={...envelope,ciphertext:envelope.ciphertext.slice(0,-2)+(envelope.ciphertext.endsWith("00")?"01":"00")};
  await assert.rejects(unseal(modified,pass),/incorrect|endommagé/);
 });
 test("coffre : refus des clés faibles, formats invalides et injections de structures",async()=>{
