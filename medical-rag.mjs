@@ -11,7 +11,8 @@ export const HEALTH_CATALOG=Object.freeze([
  {id:"fibromyalgia",label:"Fibromyalgie",aliases:["fibromyalgie","fibromyalgia"],topic:"fibro",url:"https://www.has-sante.fr/jcms/p_3634512/fr/fibromyalgie-de-l-adulte-conduite-diagnostique-et-strategie-therapeutique",publisher:"HAS",level:"Recommandations 2025"},
  {id:"diabetes",label:"Diabète de l’adulte",aliases:["diabete","diabétique"],url:"https://www.ameli.fr/assure/sante/themes/diabete-adulte",publisher:"Assurance maladie",level:"Portail institutionnel"},
  {id:"depression",label:"Dépression",aliases:["depression","troubles depressifs"],url:"https://www.ameli.fr/assure/sante/themes/depression-troubles-depressifs/comprendre-depression",publisher:"Assurance maladie",level:"Fiche institutionnelle"},
- {id:"general",label:"Index des maladies",aliases:["maladies","pathologies","autres maladies"],url:"https://www.ameli.fr/assure/sante/themes",publisher:"Assurance maladie",level:"Index institutionnel"}
+ {id:"general",label:"Index des maladies",aliases:["maladies","pathologies","autres maladies"],url:"https://www.ameli.fr/assure/sante/themes",publisher:"Assurance maladie",level:"Index institutionnel"},
+ {id:"medlineplus",label:"Encyclopédie des maladies (plus de 1 000 sujets)",aliases:["index des maladies","encyclopedie","conditions medicales","toutes les pathologies","sante"],url:"https://medlineplus.gov/healthtopics.html",publisher:"NIH / National Library of Medicine",level:"Portail institutionnel régulièrement actualisé"}
 ]);
 const hosts=new Set(["www.ameli.fr","www.has-sante.fr","www.nccih.nih.gov","www.nature.com"]);
 export function approvedMedicalURL(raw){
@@ -34,7 +35,7 @@ export function retrieveMedicalEvidence(question,{limit=3}={}){
  const q=String(question||"").trim().slice(0,700);
  if(!q)return {kind:"unknown",passages:[],catalog:[],answer:"Veuillez poser une question."};
  const gate=reply(q,LIBRARY);
- if(gate.kind==="urgent"||gate.kind==="refusal")return {kind:gate.kind,passages:[],catalog:[],answer:gate.message};
+ if(gate.kind==="urgent"||gate.kind==="refusal")return {kind:gate.kind,passages:[],catalog:gate.kind==="urgent"?[]:findMedicalCatalog(q),answer:gate.message};
  const qTerms=new Set(words(q));
  const ranked=LIBRARY.filter(d=>approvedMedicalURL(d.url)&&[...qTerms].some(w=>words(d.title+" "+(d.keywords||[]).join(" ")).includes(w)))
   .map(d=>({d,score:scoreMedicalEvidence(q,d)})).filter(x=>x.score>=1.2)
