@@ -7,6 +7,7 @@ import {classifyIntent,summarizeObservations,prepareVisit,planDaily} from "./ass
 import {findScientificArticles,externalResearchLink} from "./research-library.mjs";
 import {isOnlineEligible,selectPublicProviders,searchPublicQuestion,formatPublicAnswer,safeReferenceUrl,PUBLIC_PROVIDERS} from "./network-library.mjs";
 import {setupPatientUX} from "./ux-pro.mjs";
+import {checkAssistantCore,companionStatus,documentedAnswer} from "./assistant-diagnostics.mjs";
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
 import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,generateMistralMedicalExplanation,generateMistralPlanningAdvice,testMistralConnection} from "./mistral-bridge.mjs";
 import {mistralRoute,mistralConsentDescription} from "./mistral-routing.mjs";
@@ -163,6 +164,14 @@ async function ask(q){
     answer+="\n\nVous pouvez consulter les ressources institutionnelles proposées ci-dessous, sans en déduire un diagnostic.";
    }
    engine="Sécurité médicale : refus ou orientation documentaire";
+  }else if(intent==="medical"&&response.kind==="documented"){
+   // Conserver la fiche médicale approuvée et enrichir uniquement ses références.
+   // Ne jamais remplacer un texte sourcé par une réponse libre du LLM.
+   const grounded=documentedAnswer(input);
+   if(grounded.kind==="documented"){
+    answer=response.message+(response.followup?"\n\n"+response.followup:"");
+    references=grounded.references;engine="Fiches médicales sourcées (sans diagnostic)";
+   }
   }else if(intent==="medical"&&response.kind!=="profile"&&response.kind!=="refusal"&&response.kind!=="urgent"&&response.kind!=="life"){
    const id=routeSpecialist(input);
    if(id){const specialist=runSpecialist(id,{...DATA,energy},input);answer=specialist.answer;sourceId=specialist.sourceId;engine="Agent "+specialist.name;}
@@ -232,14 +241,16 @@ async function ask(q){
   DATA.conversations.push(userRecord,b);
   pending.remove();
   renderChat();tab("chat");speak(answer);lastSpeech=answer;
+  let saved=true;
   try{
    await put(db,"conversations",userRecord);
    await put(db,"conversations",b);
   }catch(storageError){
+   saved=false;
    notify("Réponse affichée, mais l'enregistrement dans le coffre a échoué. Vérifiez le stockage du navigateur.");
    setEngineNote("Réponse affichée · historique non enregistré : stockage indisponible.");
   }
-  if(engine!=="Assistant documentaire (repli : IA en échec)")setEngineNote("Dernière réponse : "+engine+".");
+  if(saved&&engine!=="Assistant documentaire (repli : IA en échec)")setEngineNote("Dernière réponse : "+engine+".");
   if(response.kind==="urgent")notify("Une situation potentiellement urgente a été évoquée.");
  }catch(e){
   console.error("FibroBot : traitement impossible",String(e?.message||e).slice(0,160));
@@ -293,6 +304,17 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
+ $("assistant-diagnostics-run").addEventListener("click",()=>{
+  const out=$("assistant-diagnostics-result");out.replaceChildren();
+  const core=checkAssistantCore();
+  const checks=dom("p",core.ok?"Moteur documentaire : 4 scénarios locaux réussis.":"Moteur documentaire : au moins un scénario local a échoué.");
+  out.append(checks);
+  for(const detail of companionStatus({vaultOpen:Boolean(db),webGPU:llmStatus(),mistral:mistralStatus(),internet:networkEnabled})){
+   out.append(dom("p",detail.name+" : "+detail.status+" — "+detail.detail));
+  }
+  out.append(dom("p","Ce diagnostic n'appelle aucune API et ne teste pas la disponibilité réelle de Mistral ou WebGPU. Aucune donnée patient n'est envoyée."));
+  $("assistant-diagnostics-state").textContent=core.ok?"Diagnostic local terminé. Vérifiez les états des moteurs ci-dessous.":"Diagnostic local incomplet : la bibliothèque pourrait être indisponible.";
+ });
  $("chat-local-mode").addEventListener("click",()=>{
   // Aucune intervention sur les données patient ni sur les clés enregistrées.
   $("mistral-use").checked=false;
