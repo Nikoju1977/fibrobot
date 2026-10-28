@@ -1,12 +1,15 @@
 import {today,text,makeSymptom,makeTask,makeCondition,makeAppointment,makeMedication,energyGuide,rankTasks,reply,dueReminders,reminderLog} from "./core.mjs";
 import {LIBRARY} from "./medical-library.mjs";
 import {openSecureDB,all,put,del,wipeDB,encryptedExport,eraseLegacy} from "./vault-ui.mjs";
-import {loadGemma,unloadGemma,cancelGemmaLoad,canPlanWithGemma,generateLifePlan,generateGeneralChat,testLocalModel,detectWebGPU,listLocalModels,status as llmStatus} from "./gemma-local.mjs";
+import {loadGemma,unloadGemma,cancelGemmaLoad,canPlanWithGemma,generateLifePlan,generateGeneralChat,summarizePublicSources,testLocalModel,detectWebGPU,listLocalModels,status as llmStatus} from "./gemma-local.mjs";
 import {SPECIALISTS,routeSpecialist,runSpecialist} from "./agent-hub.mjs";
 import {classifyIntent,summarizeObservations,prepareVisit,planDaily} from "./assistant-engine.mjs";
 import {findScientificArticles,externalResearchLink} from "./research-library.mjs";
 import {isOnlineEligible,selectPublicProviders,searchPublicQuestion,formatPublicAnswer,safeReferenceUrl,PUBLIC_PROVIDERS} from "./network-library.mjs";
 import {setupPatientUX} from "./ux-pro.mjs";
+import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
+import {connectMistral,disconnectMistral,mistralStatus,generateMistralChat,testMistralConnection} from "./mistral-bridge.mjs";
+import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
@@ -49,7 +52,7 @@ function setEngineNote(message){
 function updateEngineNote(){
  const state=llmStatus(),enabled=$("gemma-use")?.checked;
  setEngineNote((state.ready?(enabled?"IA locale active : "+state.modelId:"IA chargée mais désactivée : activez-la dans les options."):"Assistant documentaire actif · IA générative non chargée dans cette session.")+
- (networkEnabled?" · Internet : activé avec confirmation":" · Internet : désactivé"));
+ (networkEnabled?" · Internet : activé avec confirmation":" · Internet : désactivé")+(mistralStatus().connected?" · Mistral : connecté":""));
 }
 function renderSpecialists(){
  const out=$("specialist-list");if(!out)return;
@@ -73,7 +76,7 @@ async function ask(q){
  try{
   const intent=classifyIntent(input),response=reply(input,LIBRARY,{...DATA,energy});
   let answer=response.message+(response.followup?"\n\n"+response.followup:""),sourceId=response.sources?.[0]?.id||"";
-  let engine="Assistant documentaire local",references=[],onlineAttempted=false;
+  let engine="Assistant documentaire local",references=[],onlineAttempted=false,mistralAttempted=false;
   // Consentement au réseau valable pour cette session, puis validation de chaque
   // question exacte. Pas de synchronisation du coffre ni de recherche médicale libre.
   if(intent==="general"&&networkEnabled&&isOnlineEligible(input)&&["refusal","followup"].includes(response.kind)){
@@ -84,6 +87,13 @@ async function ask(q){
      const responseOnline=await searchPublicQuestion(input);
      answer=formatPublicAnswer(responseOnline);
      references=responseOnline.results.map(r=>({provider:r.provider,title:r.title,url:r.url,date:r.date}));
+     if(references.length&&$("source-synthesis").checked&&$("gemma-use").checked&&llmStatus().ready){
+      setEngineNote("Rédaction de la synthèse depuis les extraits publics (IA locale)…");
+      try{
+       const synthesis=await summarizePublicSources(input,responseOnline.results);
+       answer="Synthèse IA locale à vérifier dans les sources ci-dessous :\n"+synthesis+"\n\n"+answer;
+      }catch(error){notify("Synthèse locale impossible : extraits documentaires conservés.");}
+     }
      sourceId="";engine=references.length?"Sources Internet publiques vérifiables":"Recherche en ligne sans résultat";
     }catch(error){
      onlineAttempted=false;
@@ -106,10 +116,34 @@ async function ask(q){
    answer=prepareVisit(DATA);engine="Agent coordination des soins";
   }else if(intent==="research"){
    answer="Ouvrez Bibliothèque pour rechercher des publications sur un thème prédéfini avec votre accord. Aucune donnée personnelle n'est envoyée.";engine="Agent documentaire";
+  }else if(intent==="medical"&&response.kind==="refusal"){
+   // Le refus de diagnostic/prescription reste intact. Les liens vers des
+   // index publics ne constituent pas des réponses ni des avis cliniques.
+   const evidence=retrieveMedicalEvidence(input);
+   if(evidence.catalog?.length&&!/(dose|dosage|posolog|interaction|prescri|quel medicament|puis.je prendre|peux.je prendre)/i.test(input)){
+    references=evidence.catalog.filter(x=>approvedMedicalURL(x.url)).map(x=>({provider:x.publisher,title:x.label,url:x.url}));
+    answer+="\n\nVous pouvez consulter les ressources institutionnelles proposées ci-dessous, sans en déduire un diagnostic.";
+   }
+   engine="Sécurité médicale : refus ou orientation documentaire";
   }else if(intent==="medical"&&response.kind!=="profile"&&response.kind!=="refusal"&&response.kind!=="urgent"&&response.kind!=="life"){
    const id=routeSpecialist(input);
    if(id){const specialist=runSpecialist(id,{...DATA,energy},input);answer=specialist.answer;sourceId=specialist.sourceId;engine="Agent "+specialist.name;}
-  }else if(intent==="general"&&!onlineAttempted&&["refusal","followup"].includes(response.kind)&&$("gemma-use").checked&&llmStatus().ready){
+  }
+  if(intent==="general"&&!onlineAttempted&&["refusal","followup"].includes(response.kind)&&$("mistral-use").checked&&mistralStatus().connected){
+   const ok=confirm("Envoyer UNIQUEMENT cette question à l'API Mistral AI ?\n\n« "+input+" »\n\nAucun historique, symptôme, médicament ou dossier n'est transmis. Votre clé API sert à l'authentification ; cette requête peut être facturée et soumise aux règles du prestataire.");
+   if(ok){
+    setEngineNote("Mistral AI : génération distante en cours…");
+    try{
+     const result=await generateMistralChat(input,[],{model:$("mistral-model").value});
+     answer=result.text+"\n\n[Réponse de Mistral AI, non vérifiée et sans accès au dossier médical.]";
+     sourceId="";references=[];engine="Mistral AI : "+result.model;mistralAttempted=true;
+    }catch(error){
+     notify("Mistral indisponible : "+String(error.message).slice(0,145)+" ; repli local.");
+     setEngineNote("Mistral indisponible : repli documentaire/local");
+    }
+   }
+  }
+  if(intent==="general"&&!onlineAttempted&&!mistralAttempted&&["refusal","followup"].includes(response.kind)&&$("gemma-use").checked&&llmStatus().ready){
    setEngineNote("IA locale : génération de la réponse en français…");
    try{answer=await generateGeneralChat(input,DATA.conversations);sourceId="";engine="IA locale : "+llmStatus().modelId;}
    catch(error){
@@ -118,8 +152,8 @@ async function ask(q){
     notify("Impossible de générer avec le modèle local. Utilisez « Tester l’IA » dans les options.");
    }
   }
-  if(intent==="general"&&!onlineAttempted&&!($("gemma-use").checked&&llmStatus().ready)&&response.kind==="refusal"){
-   answer="Je ne dispose pas d'une réponse documentée pour cette question. Activez la recherche Internet dans l'Assistant pour consulter des sources publiques, ou chargez un modèle IA local. Je préfère ne pas inventer de faits.";
+  if(intent==="general"&&!onlineAttempted&&!mistralAttempted&&!($("gemma-use").checked&&llmStatus().ready)&&response.kind==="refusal"){
+   answer="Je ne dispose pas d'une réponse documentée pour cette question. Activez la recherche Internet, un modèle IA local ou Mistral facultatif pour les questions générales. Je préfère ne pas inventer de faits.";
    engine="Assistant local : absence de source";
   }
   await put(db,"conversations",{role:"user",body:input,time:Date.now(),purpose:intent==="general"?"general-local":intent});
@@ -169,6 +203,41 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
+ $("mistral-connect").addEventListener("click",()=>{
+  try{
+   connectMistral($("mistral-key").value);$("mistral-key").value="";
+   $("mistral-use").disabled=false;$("mistral-use").checked=false;
+   $("mistral-test").disabled=false;$("mistral-disconnect").disabled=false;
+   $("mistral-status").textContent="Clé active dans cette session. Testez la connexion. L'envoi des questions exige toujours votre accord.";
+   updateEngineNote();
+  }catch(e){$("mistral-status").textContent="Connexion refusée : "+e.message;}
+ });
+ $("mistral-test").addEventListener("click",async()=>{
+  if(!mistralStatus().connected)return;
+  if(!confirm("Tester Mistral en envoyant une question d'arithmétique publique ? Cette requête peut être facturée."))return;
+  const button=$("mistral-test");button.disabled=true;$("mistral-status").textContent="Test API Mistral en cours…";
+  try{
+   const result=await testMistralConnection({model:$("mistral-model").value});
+   $("mistral-status").textContent="Mistral a répondu au test : "+result.model+". Cochez l'utilisation pour vos conversations générales.";
+  }catch(e){
+   $("mistral-status").textContent="Échec du test : "+e.message+". Le modèle local reste disponible.";
+   $("mistral-use").checked=false;
+  }finally{button.disabled=!mistralStatus().connected;}
+ });
+ $("mistral-disconnect").addEventListener("click",()=>{
+  disconnectMistral();$("mistral-key").value="";$("mistral-use").checked=false;$("mistral-use").disabled=true;
+  $("mistral-test").disabled=true;$("mistral-disconnect").disabled=true;
+  $("mistral-status").textContent="Clé effacée de la mémoire de cette session.";updateEngineNote();
+ });
+ $("mistral-use").addEventListener("change",updateEngineNote);
+ $("medical-knowledge-open").addEventListener("click",()=>{
+  const out=$("medical-knowledge-results");out.replaceChildren();
+  const current=HEALTH_CATALOG.find(x=>x.id===$("medical-knowledge-topic").value);
+  if(!current){out.append(dom("p","Référence indisponible."));return;}
+  out.append(dom("h4",current.label),dom("p",current.level+" · "+current.publisher));
+  const link=dom("a","Ouvrir la ressource institutionnelle");link.href=current.url;link.target="_blank";link.rel="noopener noreferrer";out.append(link);
+  if(current.id!=="fibromyalgia")out.append(dom("p","Pour cette maladie, FibroBot ne dispose pas encore d'une synthèse clinique vérifiée. Consultez les informations officielles et votre professionnel."));
+ });
  $("network-mode").addEventListener("change",e=>{
   networkEnabled=Boolean(e.target.checked);
   $("network-state").textContent=networkEnabled
