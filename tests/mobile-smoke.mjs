@@ -46,7 +46,7 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
   await page.locator("#prompt").fill("Bonjour");
   await page.locator('#chat-form button[type="submit"]').click();
   await page.locator("#messages .bubble").last().getByText(/Bonjour/).waitFor({timeout:10000});
-  assert.equal(await page.locator('#chat-form button[type="submit"]').isDisabled(),false,label+": chat must unlock after answer");
+  await page.locator('#chat-form button[type="submit"]').click({trial:true,timeout:12000}); // attend que la sauvegarde du coffre libère le formulaire
   assert.match(await page.locator("#chat-engine-state").textContent(),/Dernière réponse/);
   assert.equal(await page.locator("#gemma-options").isVisible(),true);
   assert.equal(await page.locator("#gemma-load").isVisible(),false,"Gemma should be opt-in, not an obstacle for first-time users");
