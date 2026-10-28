@@ -231,3 +231,11 @@ Le routage est décrit dans \`mistral-routing.mjs\` et l'appel distant protégé
 **Limites importantes :** une API appelée directement depuis une PWA statique est utilisée dans le navigateur : le chiffrement au repos ne protège pas une clé lorsqu'elle est déchiffrée pour un appel réseau. Un navigateur, une extension ou un script tiers compromis peut l'intercepter. Une clé API ne devient véritablement secrète côté serveur qu'avec un **proxy/backend de confiance**, idéalement avec contrôle d'authentification et de débit. GitHub Pages seul ne peut pas offrir ce niveau d'isolation. Ne jamais commiter de clé API dans le dépôt et ne pas la transmettre dans le chat.
 
 Tests : `tests/mistral-credential-vault.test.mjs` (chiffrement, restauration, suppression, détection des altérations, refus coffre verrouillé) et scénario navigateur E2E (aucune exposition en clair dans IndexedDB, restauration volontaire, retrait de la clé).
+
+## Fiabilité de l'assistant et diagnostic autonome — octobre 2026
+
+Dans **Assistant → Diagnostic du cerveau de FibroBot**, le bouton **Tester les réponses locales et les moteurs** réalise **quatre contrôles de réponse sans réseau, sans clé API ni dossier patient** : accueil, fiche fibromyalgie sourcée, refus de prescription et orientation d'urgence. Il expose séparément l'état du coffre, de la bibliothèque médicale, du modèle WebLLM, de Mistral (y compris la durée de limitation HTTP 429) et de la recherche Internet.
+
+Les questions médicales documentées sont maintenant conservées **dans le texte de la fiche institutionnelle**, et ne sont plus automatiquement remplacées par une explication d'agent plus générale. Jusqu'à trois liens de référence issus des fiches locales approuvées sont affichés pour contrôle. Les questions de prescription ou d'urgence n'obtiennent pas de citations générées artificiellement.
+
+Le diagnostic hors ligne **ne valide pas l'accès à Mistral, sa facturation, les quotas, la présence d'un modèle en VRAM, ni une efficacité médicale** : il vérifie le moteur local et affiche les états disponibles. Un test réel de Mistral nécessite toujours la clé de l'utilisateur, sa confirmation et le réseau. En cas de 429, le mécanisme de repli déjà publié reste actif.

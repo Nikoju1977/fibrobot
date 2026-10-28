@@ -37,6 +37,14 @@ try{
  // Internet : jamais d'appel sans double consentement explicite,
  // requête seule (pas de note patient), citations vérifiables et mode local intact.
  await page.locator('#nav [data-tab="chat"]').click();
+ // Tous les scénarios de diagnostic utilisent uniquement les moteurs locaux.
+ await page.locator("#assistant-diagnostics-panel summary").click();
+ await page.locator("#assistant-diagnostics-run").click();
+ assert.match(await page.locator("#assistant-diagnostics-state").textContent(),/Diagnostic local terminé/);
+ const diagnosis=await page.locator("#assistant-diagnostics-result").textContent();
+ assert.match(diagnosis,/4 scénarios locaux réussis/);
+ assert.match(diagnosis,/Bibliothèque médicale locale : prêt/);
+ assert.match(diagnosis,/Mistral AI : déconnecté/);
  assert.equal(await page.locator("#network-mode").isChecked(),false,"Network must be opt-in");
  let wikipediaQueries=0;
  await page.route("https://fr.wikipedia.org/**",async route=>{

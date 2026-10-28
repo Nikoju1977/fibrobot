@@ -15,6 +15,7 @@ on:
       - "vault-ui.mjs"
       - "gemma-local.mjs"
       - "assistant-engine.mjs"
+      - "assistant-diagnostics.mjs"
       - "agent-hub.mjs"
       - "research-library.mjs"
       - "network-library.mjs"
