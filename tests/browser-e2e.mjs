@@ -89,6 +89,14 @@ try{
    return;
   }
   mistralCalls++;bodyMistral=req.postData()||"";
+  const mistralPayload=JSON.parse(bodyMistral);
+  const lastUser=mistralPayload.messages?.at(-1)?.content||"";
+  let mockedAnswer="Voici une histoire de test sur la lune.";
+  if(lastUser.includes("Explique cette fiche documentaire publique"))
+   mockedAnswer="La fibromyalgie comprend notamment des douleurs persistantes et une fatigue. Ceci reste une information générale.";
+  else if(lastUser.includes("sans données concernant une personne"))
+   mockedAnswer="Fractionnez les activités en étapes simples, avec des pauses régulières.";
+
   if(mistralRateLimited){
    await route.fulfill({status:429,contentType:"application/json",
     headers:{"access-control-allow-origin":"*","access-control-expose-headers":"retry-after","retry-after":"120"},
@@ -96,20 +104,35 @@ try{
    return;
   }
   await route.fulfill({status:200,contentType:"application/json",headers:{"access-control-allow-origin":"*"},
-   body:JSON.stringify({choices:[{message:{content:"Voici une histoire de test sur la lune."}}]})});
+   body:JSON.stringify({choices:[{message:{content:mockedAnswer}}]})});
  });
  page.once("dialog",dialog=>{assert.match(dialog.message(),/histoire courte/);dialog.accept();});
  await page.locator("#prompt").fill("Raconte une histoire courte sur la lune");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/histoire de test sur la lune/).waitFor({timeout:14000});
  assert.equal(mistralCalls,1);
+ // Mistral explique une fiche médicale publique sans recevoir la question patient.
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/Fiche publique/);dialog.accept();});
+ await page.locator("#prompt").fill("Quels sont les symptômes de la fibromyalgie ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Mistral explique une fiche médicale publique/).last().waitFor({timeout:13000});
+ assert.equal(mistralCalls,2,"Mistral should explain source-backed fibromyalgia guidance.");
+ assert.doesNotMatch(bodyMistral,/Quels sont les symptômes de la fibromyalgie/,"Medical user question must not be sent.");
+ assert.match(bodyMistral,/Explique cette fiche documentaire publique/);
+ // Organisation : Mistral ne reçoit ni les tâches réelles ni le journal.
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/ORGANISATION|GENERIQUES/i);dialog.accept();});
+ await page.locator("#prompt").fill("Comment organiser mes tâches aujourd'hui ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Conseils généraux formulés par Mistral/).last().waitFor({timeout:13000});
+ assert.equal(mistralCalls,3);
+ assert.doesNotMatch(bodyMistral,/Comment organiser mes tâches aujourd'hui/);
  assert.ok(!bodyMistral.includes(value),"Patient note leaked to external LLM.");
  assert.ok(!bodyMistral.includes(secret),"Vault secret leaked to external LLM.");
  assert.ok(!bodyMistral.includes("medications"),"No clinical context sent.");
  await page.locator("#prompt").fill("Quelle dose de morphine dois-je prendre ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/je ne peux pas déterminer/i).last().waitFor({timeout:10000});
- assert.equal(mistralCalls,1,"Medical query must not invoke remote Mistral.");
+ assert.equal(mistralCalls,3,"Prescription query must not invoke remote Mistral.");
  // Régression observée chez les utilisateurs : après HTTP 429, FibroBot
  // doit continuer à répondre immédiatement via ses ressources locales.
  mistralRateLimited=true;
@@ -117,14 +140,14 @@ try{
  await page.locator("#prompt").fill("Raconte une histoire courte sur la lune");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/Mode secours : Mistral temporairement indisponible/).last().waitFor({timeout:15000});
- assert.equal(mistralCalls,2,"One request only on 429");
+ assert.equal(mistralCalls,4,"One request only on 429");
  assert.match(await page.locator("#mistral-status").textContent(),/429/);
  assert.equal(await page.locator("#mistral-use").isChecked(),false,"Disable Mistral automatically when rate-limited");
  assert.equal(await page.locator('#chat-form button[type="submit"]').isDisabled(),false,"Chat form must be re-enabled");
  await page.locator("#prompt").fill("Bonjour");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/Bonjour !/).last().waitFor({timeout:10000});
- assert.equal(mistralCalls,2,"Local chat still works, no extra Mistral calls");
+ assert.equal(mistralCalls,4,"Local chat still works, no extra Mistral calls");
  await page.locator("#chat-local-mode").click();
  assert.equal(await page.locator("#network-mode").isChecked(),false);
  assert.equal(await page.locator("#mistral-use").isChecked(),false);
@@ -132,7 +155,7 @@ try{
  await page.locator("#prompt").fill("Quels sont les symptômes de la fibromyalgie ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/fibromyalgie/i).last().waitFor({timeout:10000});
- assert.equal(mistralCalls,2,"Documented medical reply remains fully offline after 429");
+ assert.equal(mistralCalls,4,"Documented medical reply remains fully offline after 429");
  await page.locator("#mistral-disconnect").click();
  assert.equal(await page.locator("#mistral-use").isChecked(),false);
  await page.locator('#nav [data-tab="health"]').click();
