@@ -341,3 +341,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .reply-pending{opacity:.82;animation:fibrobot-pulse 1.5s ease-in-out infinite alternate}
 @keyframes fibrobot-pulse{from{opacity:.65}to{opacity:1}}
 @media(max-width:670px){.chat-recovery{align-items:stretch;gap:8px}.chat-recovery #chat-local-mode{width:100%}.chat-recovery .tiny{flex-basis:100%}}
+
+/* Diagnostic du cerveau, utilisable au clavier et sur petit écran */
+.assistant-diagnostics-card{margin:0 0 15px}
+.assistant-diagnostics-card>summary{padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:.9rem;color:#1f604a}
+.assistant-diagnostics-card>summary:focus-visible{outline:3px solid #1b7f5d;outline-offset:2px}
+.assistant-diagnostics-body{padding:14px 18px 17px;border-top:1px solid #d1e4da;line-height:1.6}
+.assistant-diagnostics-body>p{margin:4px 0 12px}
+.assistant-diagnostics-result{font-size:.8rem;color:#285a48;display:grid;gap:7px;margin-top:12px}
+.assistant-diagnostics-result p{padding:9px 12px;background:#edf7f1;border-radius:9px;margin:0;overflow-wrap:anywhere}
+@media(max-width:650px){.assistant-diagnostics-card>summary{padding:13px}.assistant-diagnostics-body{padding:12px}.assistant-diagnostics-body .btn{width:100%;min-height:45px}}
