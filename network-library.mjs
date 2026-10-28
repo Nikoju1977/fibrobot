@@ -162,7 +162,7 @@ export async function searchPublicQuestion(question,{fetchImpl=globalThis.fetch,
  let results=checks.flatMap(x=>x.results);
  // En secours encyclopédique : Wikipédia anglais, sans envoyer de dossier
  // supplémentaire et uniquement après le même consentement explicite.
- if(providers.includes("wikipedia")&&!checks.find(x=>x.id==="wikipedia")?.results.length&&!signal?.aborted){
+ if(providers.includes("wikipedia")&&!checks.find(x=>x.id==="wikipedia")?.results.length&&!results.length&&!signal?.aborted){
   const fallback=await lookUp("wikipedia-en");
   if(fallback.failure)failures.push(fallback.failure);
   results.push(...fallback.results);
