@@ -19,7 +19,7 @@ test("Mistral explique des fiches médicales publiques, sans transmettre la ques
  assert.equal(r.mode,"medical-reference");
  assert.equal(r.topic,"fibro");
  assert.doesNotMatch(mistralConsentDescription(r),/Quels sont les symptômes/);
- assert.match(mistralConsentDescription(r),/PUBLIQUE/);
+ assert.match(mistralConsentDescription(r),/PUBLIC/);
  const q2="Que recommande la HAS pour la fibromyalgie ?";
  const second=route(q2);
  assert.equal(second.mode,"medical-reference");
