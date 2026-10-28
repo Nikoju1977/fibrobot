@@ -10,6 +10,7 @@ import {setupPatientUX} from "./ux-pro.mjs";
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
 import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,generateMistralMedicalExplanation,generateMistralPlanningAdvice,testMistralConnection} from "./mistral-bridge.mjs";
 import {mistralRoute,mistralConsentDescription} from "./mistral-routing.mjs";
+import {CREDENTIAL_ID,validStoredMistralCredential,saveMistralCredential,loadMistralCredential,deleteMistralCredential} from "./mistral-credential-vault.mjs";
 import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
@@ -23,7 +24,7 @@ function tab(name){if(!TITLES[name])return;document.querySelectorAll(".page").fo
 function blank(target,message){target.replaceChildren(dom("div",message,"empty"));}
 function action(label,method,store,id){const b=dom("button",label,"mini");b.type="button";b.dataset.action=method;b.dataset.store=store;b.dataset.id=String(id);return b;}
 function record(target,title,subtitle,notes,store,id,extra={}){const row=dom("div",undefined,"record"),copy=dom("div"),buttons=dom("div",undefined,"actions");copy.append(dom("strong",title,extra.done?"done":""));if(subtitle)copy.append(dom("small",subtitle));if(notes)copy.append(dom("p",notes));if(extra.tag)copy.append(dom("span",extra.tag,extra.tag==="À reporter"?"tag later":"tag"));if(store==="tasks")buttons.append(action(extra.done?"Réouvrir":"Terminer","toggle",store,id));if(FORMS[store])buttons.append(action("Modifier","edit",store,id));if(store)buttons.append(action("Supprimer","delete",store,id));row.append(copy,buttons);target.append(row);}
-async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;render();}
+async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;refreshMistralVaultControls();render();}
 function render(){ $("count-tasks").textContent=DATA.tasks.filter(x=>!x.done).length;$("count-health").textContent=DATA.symptoms.length;$("count-conditions").textContent=DATA.conditions.length;$("daily-energy").value=energy;$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();renderHealth();renderConditions();renderMeds();renderAppointments();renderLibrary();renderChat();patientUX?.refreshGuide(); }
 function renderTasks(){const tasks=rankTasks(DATA.tasks,energy),out=$("tasks-list"),home=$("today-tasks");out.replaceChildren();home.replaceChildren();if(!tasks.length)blank(home,"Aucune tâche urgente. Vous pouvez vous reposer.");else tasks.slice(0,5).forEach(t=>record(home,t.title,"Effort "+t.effort+"/3",null,null,t.id,{tag:t.adapted?"Effort compatible":"À reporter"}));if(!DATA.tasks.length)blank(out,"Vous pouvez ajouter vos tâches ici.");else [...tasks,...DATA.tasks.filter(x=>x.done)].forEach(t=>record(out,t.title,(t.priority==="important"?"Essentielle":t.priority==="delegable"?"Délégable":"Flexible")+" · effort "+t.effort+"/3"+(t.due?" · "+t.due:""),null,"tasks",t.id,{done:t.done,tag:t.done?"Terminée":t.adapted?"Effort compatible":"À reporter"}));}
 function renderHealth(){const out=$("health-list");out.replaceChildren();if(!DATA.symptoms.length)blank(out,"Aucune observation enregistrée.");else [...DATA.symptoms].sort((a,b)=>String(b.date).localeCompare(String(a.date))).forEach(s=>{const notes=[s.energy!=null?"Énergie "+s.energy+"/10":"",s.fatigue!=null?"Fatigue "+s.fatigue+"/10":"",s.sleep!=null?"Sommeil "+s.sleep+"/10":"",s.notes].filter(Boolean).join(" · ");record(out,s.name,String(s.date).slice(0,10)+" · Intensité "+s.intensity+"/10"+(s.condition?" · "+s.condition:""),notes,"symptoms",s.id);});const select=$("health-condition"),old=select.value;select.replaceChildren();let option=dom("option","Non précisée");option.value="";select.append(option);for(const c of DATA.conditions){option=dom("option",c.name);option.value=c.name;select.append(option);}select.value=old;}
@@ -46,6 +47,26 @@ function bubble(body,role,source,references=[]){
   if(links.childNodes.length)b.append(links);
  }
  return b;
+}
+function refreshMistralVaultControls(){
+ const saved=DATA.settings.some(x=>x?.id===CREDENTIAL_ID&&validStoredMistralCredential(x.value));
+ $("mistral-restore").disabled=!saved;
+ $("mistral-forget").disabled=!saved;
+ if(saved&&!mistralStatus().connected)
+  $("mistral-status").textContent="Une clé Mistral est conservée chiffrée dans ton coffre. Cliquez sur « Activer la clé de mon coffre » pour l'utiliser dans cette session.";
+ return saved;
+}
+function enableMistralSession(){
+ $("mistral-use").disabled=false;$("mistral-use").checked=false;
+ $("mistral-test").disabled=false;$("mistral-disconnect").disabled=false;
+ updateEngineNote();
+}
+function disableMistralSession(){
+ disconnectMistral();
+ $("mistral-key").value="";
+ $("mistral-use").checked=false;$("mistral-use").disabled=true;
+ $("mistral-test").disabled=true;$("mistral-disconnect").disabled=true;
+ updateEngineNote();
 }
 function setEngineNote(message){
  const node=$("chat-engine-state");if(node)node.textContent=message;
@@ -286,14 +307,57 @@ function events(){
   setEngineNote("Mode secours local activé : réponses documentaires et agents disponibles sans Mistral.");
   notify("Mode local activé. Vous pouvez poser votre question, même sans Mistral.");
  });
- $("mistral-connect").addEventListener("click",()=>{
+ $("mistral-connect").addEventListener("click",async()=>{
+  const source=$("mistral-key"),secret=source.value,save=$("mistral-save-key").checked;
+  source.value=""; // Ne jamais laisser le secret dans le formulaire après soumission.
   try{
-   connectMistral($("mistral-key").value);$("mistral-key").value="";
-   $("mistral-use").disabled=false;$("mistral-use").checked=false;
-   $("mistral-test").disabled=false;$("mistral-disconnect").disabled=false;
-   $("mistral-status").textContent="Clé active dans cette session. Testez la connexion. L'envoi des questions exige toujours votre accord.";
-   updateEngineNote();
-  }catch(e){$("mistral-status").textContent="Connexion refusée : "+e.message;}
+   connectMistral(secret);
+   enableMistralSession();
+   if(save){
+    if(!db)throw Error("Le coffre doit être déverrouillé pour enregistrer une clé.");
+    try{
+     await saveMistralCredential(db,secret);
+     DATA.settings=await all(db,"settings");
+     refreshMistralVaultControls();
+     $("mistral-status").textContent="Clé activée et enregistrée chiffrée dans le coffre AES-256-GCM. Elle ne sera pas réutilisée sans déverrouillage et action explicite.";
+    }catch(error){
+     $("mistral-status").textContent="Mistral activé uniquement pour cette session : enregistrement chiffré impossible ("+error.message+").";
+    }
+   }else{
+    $("mistral-status").textContent="Clé activée en mémoire seulement. Aucune clé enregistrée en clair. Utilise le bouton de test, puis active Mistral pour discuter.";
+   }
+  }catch(error){
+   disableMistralSession();
+   $("mistral-status").textContent="Clé Mistral non activée : "+error.message;
+  }finally{$("mistral-save-key").checked=false;}
+ });
+ $("mistral-restore").addEventListener("click",async()=>{
+  const button=$("mistral-restore");button.disabled=true;
+  try{
+   if(!db)throw Error("Déverrouillez le coffre.");
+   const secret=await loadMistralCredential(db);
+   connectMistral(secret);
+   enableMistralSession();
+   $("mistral-status").textContent="Clé déchiffrée et activée pour cette session. Rien n'a été envoyé à Mistral ; seul le test ou une question autorisée appellera l'API.";
+  }catch(error){
+   disableMistralSession();
+   $("mistral-status").textContent="Restauration de la clé impossible : "+error.message;
+  }finally{refreshMistralVaultControls();}
+ });
+ $("mistral-forget").addEventListener("click",async()=>{
+  if(!db)return;
+  if(!confirm("Supprimer définitivement la copie chiffrée de la clé Mistral de ce coffre et déconnecter la session ? Les anciennes sauvegardes chiffrées peuvent encore la contenir. Pour révoquer une clé exposée, faites-le dans votre compte Mistral."))return;
+  const button=$("mistral-forget");button.disabled=true;
+  try{
+   await deleteMistralCredential(db);
+   DATA.settings=await all(db,"settings");
+   disableMistralSession();
+   refreshMistralVaultControls();
+   $("mistral-status").textContent="Copie chiffrée supprimée du coffre actuel. Session Mistral déconnectée. Les anciennes sauvegardes ne sont pas modifiées.";
+  }catch(error){
+   $("mistral-status").textContent="Suppression impossible : "+error.message;
+   refreshMistralVaultControls();
+  }
  });
  $("mistral-test").addEventListener("click",async()=>{
   if(!mistralStatus().connected)return;
@@ -308,9 +372,11 @@ function events(){
   }finally{button.disabled=!mistralStatus().connected;}
  });
  $("mistral-disconnect").addEventListener("click",()=>{
-  disconnectMistral();$("mistral-key").value="";$("mistral-use").checked=false;$("mistral-use").disabled=true;
-  $("mistral-test").disabled=true;$("mistral-disconnect").disabled=true;
-  $("mistral-status").textContent="Clé effacée de la mémoire de cette session.";updateEngineNote();
+  disableMistralSession();
+  const saved=refreshMistralVaultControls();
+  $("mistral-status").textContent=saved?
+   "Clé effacée de la mémoire de session. La copie chiffrée est conservée dans votre coffre jusqu'à sa suppression volontaire.":
+   "Clé effacée de la mémoire de session. Aucune copie conservée dans le coffre.";
  });
  $("mistral-use").addEventListener("change",updateEngineNote);
  $("medical-knowledge-open").addEventListener("click",()=>{
@@ -352,7 +418,7 @@ function events(){
  $("mic").addEventListener("click",async()=>{const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Speech||typeof Speech.available!=="function"){notify("Reconnaissance vocale strictement locale non vérifiable ici. Utilisez le clavier de l'appareil ; sa dictée suit les règles du fabricant.");return;}try{const availability=await Speech.available({langs:["fr-FR"],processLocally:true});if(availability!=="available"){notify("Modèle de dictée locale non installé ou indisponible.");return;}const recognition=new Speech();recognition.processLocally=true;recognition.lang="fr-FR";recognition.onresult=e=>{$("prompt").value=e.results[0][0].transcript;notify("Texte dicté localement. Vérifiez-le avant d'envoyer.");};recognition.onerror=()=>notify("La dictée locale n'a pas abouti.");recognition.start();}catch(e){notify("Dictée locale indisponible sur ce navigateur.");}});
  $("export").addEventListener("click",()=>exportBackup().catch(e=>notify("Export impossible : "+e.message)));
  $("print-report").addEventListener("click",printReport);
- $("erase").addEventListener("click",async()=>{if(!confirm("Supprimer définitivement toutes les données FibroBot de ce navigateur ?"))return;try{db.close();await wipeDB();location.reload();}catch(e){notify("Effacement bloqué : "+e.message);}});
+ $("erase").addEventListener("click",async()=>{if(!confirm("Supprimer définitivement toutes les données FibroBot de ce navigateur ?"))return;try{disableMistralSession();db.close();await wipeDB();location.reload();}catch(e){notify("Effacement bloqué : "+e.message);}});
  $("notification-permission").addEventListener("click",async()=>{if(!("Notification" in window)||typeof Notification.requestPermission!=="function"){notify("Notifications non disponibles ici. Gardez une alarme système pour les prises essentielles.");return;}try{const state=await Notification.requestPermission();notify(state==="granted"?"Notifications autorisées tant que le navigateur le permet.":"Notifications non autorisées. Les rappels restent visibles dans FibroBot.");}catch(e){notify("Notifications non prises en charge.");}});
  $("llm-check").addEventListener("click",async()=>{
   const button=$("llm-check");button.disabled=true;
@@ -441,7 +507,7 @@ function events(){
   speak(lastSpeech);
  });
  $("erase-legacy").addEventListener("click",async()=>{if(!confirm("Supprimer l'ancienne base FibrobotDB non chiffrée de CE navigateur ? Vérifiez d'abord que vos données ont bien été migrées dans le coffre."))return;try{await eraseLegacy();notify("Ancienne base non chiffrée supprimée.");}catch(e){notify(e.message);}});
- $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;db?.close();location.reload();});
+ $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;disableMistralSession();db?.close();location.reload();});
  $("breath-start")?.addEventListener("click",breathing);
  $("relax-script")?.addEventListener("click",()=>{
    const script="Vous pouvez arrêter à tout moment. Installez-vous si possible dans une position confortable. Prenez conscience des points de contact de votre corps avec le support. Laissez votre respiration trouver son rythme naturel, sans la forcer. Observez les sons autour de vous. Si vous ressentez de l'inconfort, ouvrez les yeux et arrêtez. Vous n'avez rien à réussir. Quel petit geste pourrait rendre cet instant plus confortable ?";
@@ -451,6 +517,17 @@ function events(){
 }
 async function init(){
  renderSpecialists();updateEngineNote();
+ window.addEventListener("pagehide",()=>{
+  disconnectMistral();
+  const field=$("mistral-key");if(field)field.value="";
+ });
+ window.addEventListener("pageshow",event=>{
+  if(event.persisted){
+   $("mistral-use").checked=false;$("mistral-use").disabled=true;
+   $("mistral-test").disabled=true;$("mistral-disconnect").disabled=true;
+   refreshMistralVaultControls();updateEngineNote();
+  }
+ });
  $("today-date").textContent=new Intl.DateTimeFormat("fr-FR",{dateStyle:"long"}).format(new Date());
  $("health-date").value=today();$("appt-date").value=today();
  forms();events();
