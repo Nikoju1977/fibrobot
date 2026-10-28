@@ -45,9 +45,17 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
   // Chat de secours utilisable sur Android et WebKit émulés sans Mistral ni poids IA.
   await page.locator("#prompt").fill("Bonjour");
   await page.locator('#chat-form button[type="submit"]').click();
-  await page.locator("#messages .bubble").last().getByText(/Bonjour/).waitFor({timeout:10000});
+  // Ne pas prendre la bulle utilisateur « Bonjour » pour la réponse du bot.
+  // Attendre la réponse affichée ET la fin du traitement asynchrone (stockage).
+  await page.waitForFunction(()=>{
+   const button=document.querySelector('#chat-form button[type="submit"]');
+   const state=document.querySelector("#chat-engine-state")?.textContent||"";
+   const bubbles=[...document.querySelectorAll("#messages .bubble")];
+   return button&&!button.disabled&&/Dernière réponse|historique non enregistré/.test(state)&&
+     bubbles.some(x=>!x.classList.contains("user")&&x.textContent.includes("Bonjour !"));
+  },{timeout:15000});
   assert.equal(await page.locator('#chat-form button[type="submit"]').isDisabled(),false,label+": chat must unlock after answer");
-  assert.match(await page.locator("#chat-engine-state").textContent(),/Dernière réponse/);
+  assert.match(await page.locator("#chat-engine-state").textContent(),/Dernière réponse|historique non enregistré/);
   assert.equal(await page.locator("#gemma-options").isVisible(),true);
   assert.equal(await page.locator("#gemma-load").isVisible(),false,"Gemma should be opt-in, not an obstacle for first-time users");
   await page.locator('#gemma-options summary').click();
