@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {connectMistral,disconnectMistral,mistralStatus,mistralCompletion,generateMistralChat,testMistralConnection,MISTRAL_MODELS} from "../mistral-bridge.mjs";
+import {connectMistral,disconnectMistral,mistralStatus,mistralCompletion,generateMistralChat,testMistralConnection,MISTRAL_MODELS,secondsToRetry} from "../mistral-bridge.mjs";
 
 test.afterEach(()=>disconnectMistral());
 
@@ -51,9 +51,10 @@ test("Mistral : aucun accès direct aux requêtes de santé et prescriptions",as
 test("Mistral : erreurs HTTP et repli explicites",async()=>{
  connectMistral("cle-test-personnelle-non-valide-0000");
  const q=[{role:"system",content:"Réponds en français"},{role:"user",content:"Raconte une histoire courte"}];
- await assert.rejects(mistralCompletion(q,{fetchImpl:async()=>({ok:false,status:429})}),/429/);
  await assert.rejects(mistralCompletion(q,{model:"evil-model",fetchImpl:async()=>({ok:true})}),/non approuvé/);
  await assert.rejects(mistralCompletion(q,{fetchImpl:async()=>{throw TypeError("Network blocked");}}),/CORS/);
+ await assert.rejects(mistralCompletion(q,{fetchImpl:async()=>({ok:false,status:429})}),/429/);
+ assert.ok(mistralStatus().cooldownSeconds>0);
 });
 
 test("Mistral : filtre les sorties cliniques générées même à partir d'un prompt général",async()=>{
@@ -72,4 +73,37 @@ test("Test Mistral n'envoie qu'une simple opération et aucun dossier",async()=>
  }});
  assert.equal(res.text,"Quatre.");
  assert.equal(messages.at(-1).content,"Combien font deux plus deux ?");
+});
+
+test("429 Mistral : un seul appel, respect de Retry-After, sans boucle ni requête suivante",async()=>{
+ connectMistral("cle-test-personnelle-non-valide-0000");
+ let requests=0;
+ const mock=async()=>{requests++;return {ok:false,status:429,headers:{get:name=>name==="retry-after"?"87":null}};};
+ const messages=[{role:"system",content:"Réponds en français"},{role:"user",content:"Raconte une histoire courte"}];
+ await assert.rejects(mistralCompletion(messages,{fetchImpl:mock}),/429/);
+ assert.equal(requests,1,"429 must NOT trigger repeated API retries");
+ assert.ok(mistralStatus().cooldownSeconds>=85);
+ assert.match(mistralStatus().lastFailure,/429/);
+ await assert.rejects(mistralCompletion(messages,{fetchImpl:mock}),/temporairement désactivé/);
+ assert.equal(requests,1,"Cooldown prevents accidental second remote call");
+ disconnectMistral();
+ assert.equal(mistralStatus().cooldownSeconds,0);
+});
+
+test("Retry-After : secondes, date HTTP, absence et valeurs excessives",()=>{
+ assert.equal(secondsToRetry("120"),120);
+ assert.equal(secondsToRetry("1"),15);
+ assert.equal(secondsToRetry("999999"),900);
+ assert.equal(secondsToRetry(null),60);
+ assert.ok(secondsToRetry(new Date(Date.now()+30000).toUTCString())>=15);
+});
+
+test("L'API 429 n'est pas contournée en changeant automatiquement de modèle",async()=>{
+ connectMistral("cle-test-personnelle-non-valide-0000");
+ let calls=0;
+ const fetchImpl=async()=>{calls++;return {ok:false,status:429,headers:{get:()=>null}};};
+ const q=[{role:"system",content:"Réponds en français"},{role:"user",content:"Raconte une histoire originale"}];
+ await assert.rejects(mistralCompletion(q,{model:"mistral-small-latest",fetchImpl}),/429/);
+ await assert.rejects(mistralCompletion(q,{model:"mistral-large-latest",fetchImpl}),/temporairement désactivé/);
+ assert.equal(calls,1);
 });

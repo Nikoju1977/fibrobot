@@ -47,13 +47,13 @@ try{
  });
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Activez la recherche Internet/).waitFor();
+ await page.locator("#messages").getByText(/Je ne dispose pas encore d.une réponse vérifiée/).waitFor();
  assert.equal(wikipediaQueries,0,"Network forbidden until enabled");
  await page.locator("#network-mode").check();
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Qui était Marie Curie/);dialog.dismiss();});
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Activez la recherche Internet/).last().waitFor();
+ await page.locator("#messages").getByText(/Je ne dispose pas encore d.une réponse vérifiée/).last().waitFor();
  assert.equal(wikipediaQueries,0,"Consent to session is not consent to send each question");
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Wikipédia/);dialog.accept();});
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
@@ -81,7 +81,7 @@ try{
  await page.locator("#mistral-connect").click();
  assert.equal(await page.locator("#mistral-key").inputValue(),"","The API key must leave the input after connecting.");
  await page.locator("#mistral-use").check();
- let mistralCalls=0,bodyMistral="";
+ let mistralCalls=0,bodyMistral="",mistralRateLimited=false;
  await page.route("https://api.mistral.ai/**",async route=>{
   const req=route.request();
   if(req.method()==="OPTIONS"){
@@ -89,6 +89,12 @@ try{
    return;
   }
   mistralCalls++;bodyMistral=req.postData()||"";
+  if(mistralRateLimited){
+   await route.fulfill({status:429,contentType:"application/json",
+    headers:{"access-control-allow-origin":"*","access-control-expose-headers":"retry-after","retry-after":"120"},
+    body:JSON.stringify({object:"error",code:"rate_limit_error",message:"Too many requests"})});
+   return;
+  }
   await route.fulfill({status:200,contentType:"application/json",headers:{"access-control-allow-origin":"*"},
    body:JSON.stringify({choices:[{message:{content:"Voici une histoire de test sur la lune."}}]})});
  });
@@ -104,6 +110,29 @@ try{
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/je ne peux pas déterminer/i).last().waitFor({timeout:10000});
  assert.equal(mistralCalls,1,"Medical query must not invoke remote Mistral.");
+ // Régression observée chez les utilisateurs : après HTTP 429, FibroBot
+ // doit continuer à répondre immédiatement via ses ressources locales.
+ mistralRateLimited=true;
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/histoire courte/);dialog.accept();});
+ await page.locator("#prompt").fill("Raconte une histoire courte sur la lune");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Mode secours : Mistral temporairement indisponible/).last().waitFor({timeout:15000});
+ assert.equal(mistralCalls,2,"One request only on 429");
+ assert.match(await page.locator("#mistral-status").textContent(),/429/);
+ assert.equal(await page.locator("#mistral-use").isChecked(),false,"Disable Mistral automatically when rate-limited");
+ assert.equal(await page.locator('#chat-form button[type="submit"]').isDisabled(),false,"Chat form must be re-enabled");
+ await page.locator("#prompt").fill("Bonjour");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Bonjour !/).last().waitFor({timeout:10000});
+ assert.equal(mistralCalls,2,"Local chat still works, no extra Mistral calls");
+ await page.locator("#chat-local-mode").click();
+ assert.equal(await page.locator("#network-mode").isChecked(),false);
+ assert.equal(await page.locator("#mistral-use").isChecked(),false);
+ assert.match(await page.locator("#chat-engine-state").textContent(),/Mode secours local activé/);
+ await page.locator("#prompt").fill("Quels sont les symptômes de la fibromyalgie ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/fibromyalgie/i).last().waitFor({timeout:10000});
+ assert.equal(mistralCalls,2,"Documented medical reply remains fully offline after 429");
  await page.locator("#mistral-disconnect").click();
  assert.equal(await page.locator("#mistral-use").isChecked(),false);
  await page.locator('#nav [data-tab="health"]').click();
@@ -136,20 +165,20 @@ try{
  assert.match(await page.locator("#chat-engine-state").textContent(),/agent Sommeil/);
  await page.locator("#prompt").fill("Bonjour");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Bonjour !/).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/Bonjour !/).last().waitFor({timeout:10000});
  await page.locator("#prompt").fill("Quelle dose de médicament dois-je prendre ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/je ne peux pas déterminer/i).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/je ne peux pas déterminer/i).last().waitFor({timeout:10000});
  // Medical content stays on the deterministic route even if local AI options exist.
  await page.locator("#prompt").fill("Résume mes observations");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Synthèse descriptive/).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/Synthèse descriptive/).last().waitFor({timeout:10000});
  await page.locator("#prompt").fill("Préparer ma consultation médicale");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Préparation de consultation/).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/Préparation de consultation/).last().waitFor({timeout:10000});
  await page.locator("#prompt").fill("Organise mes tâches");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/tâche enregistrée|Proposition d’organisation/).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/tâche enregistrée|Proposition d’organisation/).last().waitFor({timeout:10000});
  await page.locator("#gemma-options").evaluate(x=>x.open=true);
  assert.equal(await page.locator("#llm-check").isVisible(),true);
  assert.equal(await page.locator("#local-model-select").inputValue(),"auto");

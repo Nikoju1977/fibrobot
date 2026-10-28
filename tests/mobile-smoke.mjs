@@ -42,6 +42,12 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
     assert.ok(dim.scroll<=dim.viewport+2,label+": page overflow at "+width+" "+JSON.stringify(dim));
   }
   await page.locator('.mobile-dock [data-tab="chat"]').click();
+  // Chat de secours utilisable sur Android et WebKit émulés sans Mistral ni poids IA.
+  await page.locator("#prompt").fill("Bonjour");
+  await page.locator('#chat-form button[type="submit"]').click();
+  await page.locator("#messages .bubble").last().getByText(/Bonjour/).waitFor({timeout:10000});
+  assert.equal(await page.locator('#chat-form button[type="submit"]').isDisabled(),false,label+": chat must unlock after answer");
+  assert.match(await page.locator("#chat-engine-state").textContent(),/Dernière réponse/);
   assert.equal(await page.locator("#gemma-options").isVisible(),true);
   assert.equal(await page.locator("#gemma-load").isVisible(),false,"Gemma should be opt-in, not an obstacle for first-time users");
   await page.locator('#gemma-options summary').click();

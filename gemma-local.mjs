@@ -43,7 +43,7 @@ function requireWorker(){
 }
 function rpc(action,params={},onProgress){
  const instance=requireWorker(),id=nextID++;
- const timeoutMs=action==="load"?600000:action==="generate"?120000:40000;
+ const timeoutMs=action==="load"?600000:action==="generate"?40000:40000;
  return new Promise((resolve,reject)=>{
   const timeout=setTimeout(()=>{
    pending.delete(id);
@@ -187,6 +187,14 @@ export async function testLocalModel(){
  const answer=String(result.text||"").trim();
  if(!answer)throw Error("Le modèle a renvoyé une réponse vide.");
  return {modelId,answerLength:answer.length,durationMs:Date.now()-began};
+}
+/** Annule immédiatement l'inférence locale lors du passage en mode secours.
+ * Le moteur WebGPU devra être rechargé depuis son cache pour être réutilisé.
+ */
+export function cancelLocalGeneration(){
+ if(!modelId||!pending.size)return false;
+ failAll("Génération IA locale interrompue : mode secours activé.");
+ return true;
 }
 export function cancelGemmaLoad(){
  if(!loading)return false;
