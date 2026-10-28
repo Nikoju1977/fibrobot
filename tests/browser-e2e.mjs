@@ -78,7 +78,11 @@ try{
  await page.locator('#nav [data-tab="chat"]').click();
  await page.locator("#mistral-options summary").click();
  await page.locator("#mistral-key").fill("cle-fictive-de-test-non-utilisable");
+ await page.locator("#mistral-save-key").check();
  await page.locator("#mistral-connect").click();
+ await page.waitForFunction(()=>!document.getElementById("mistral-restore").disabled,{timeout:15000});
+ assert.equal(await page.locator("#mistral-save-key").isChecked(),false,"Saving key is opt-in each time");
+ assert.match(await page.locator("#mistral-status").textContent(),/chiffrée/);
  assert.equal(await page.locator("#mistral-key").inputValue(),"","The API key must leave the input after connecting.");
  await page.locator("#mistral-use").check();
  let mistralCalls=0,bodyMistral="",mistralRateLimited=false;
@@ -158,6 +162,18 @@ try{
  assert.equal(mistralCalls,4,"Documented medical reply remains fully offline after 429");
  await page.locator("#mistral-disconnect").click();
  assert.equal(await page.locator("#mistral-use").isChecked(),false);
+ assert.equal(await page.locator("#mistral-restore").isDisabled(),false,"Encrypted key remains available after disconnect.");
+ await page.locator("#mistral-restore").click();
+ await page.waitForFunction(()=>!document.getElementById("mistral-use").disabled,{timeout:12000});
+ assert.equal(mistralCalls,4,"Restoring encrypted key must not call Mistral.");
+ assert.equal(await page.locator("#mistral-key").inputValue(),"","Restored secret never enters a visible field.");
+ assert.match(await page.locator("#mistral-status").textContent(),/déchiffrée et activée/);
+ page.once("dialog",dialog=>dialog.accept());
+ await page.locator("#mistral-forget").click();
+ await page.waitForFunction(()=>document.getElementById("mistral-restore").disabled,{timeout:12000});
+ assert.equal(await page.locator("#mistral-forget").isDisabled(),true);
+ assert.equal(await page.locator("#mistral-use").isDisabled(),true);
+ assert.equal(mistralCalls,4,"Forgetting key is an offline operation.");
  await page.locator('#nav [data-tab="health"]').click();
  const envelope=await page.evaluate(async()=>{
    return await new Promise((resolve,reject)=>{
@@ -168,6 +184,7 @@ try{
  });
  assert.equal(envelope?.algorithm,"AES-GCM-256");
  assert.ok(!JSON.stringify(envelope).includes(value),"No plaintext in vault IndexedDB");
+ assert.ok(!JSON.stringify(envelope).includes("cle-fictive-de-test-non-utilisable"),"API key must never be stored in IndexedDB plaintext");
  page.once("dialog",dialog=>dialog.accept());
  await page.locator("#lock-vault").click();
  await page.locator("#vault-gate").waitFor({state:"visible",timeout:15000});
