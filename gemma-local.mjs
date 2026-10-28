@@ -4,6 +4,7 @@
  * La compatibilité matérielle et les poids téléchargés restent à vérifier par appareil.
  */
 import {nonMedicalMessages,cleanGeneratedReply} from "./assistant-engine.mjs";
+import {buildGroundedMessages} from "./knowledge-router.mjs";
 export const WEBLLM_VERSION="0.2.86";
 export const WEBLLM_URL="https://esm.run/@mlc-ai/web-llm@0.2.86";
 // Candidats historiques non garantis disponibles ; le catalogue effectif fait autorité.
@@ -159,6 +160,16 @@ export async function generateGeneralChat(question,history=[]){
  const messages=nonMedicalMessages(question,history);
  const result=await rpc("generate",{messages});
  return cleanGeneratedReply(result.text)+"\n\n[Réponse générée localement par "+modelId+" ; vérifiez les faits importants.]";
+}
+/**
+ * Synthèse des notices PUBLIQUES déjà fournies. Jamais d'historique clinique.
+ * La synthèse reste indicative ; les extraits et sources sont affichés.
+ */
+export async function summarizePublicSources(question,sources=[]){
+ if(!modelId)throw Error("Aucun modèle local chargé.");
+ const messages=buildGroundedMessages(question,sources);
+ const result=await rpc("generate",{messages});
+ return cleanGeneratedReply(result.text);
 }
 /**
  * Self-test de génération sans dossier patient. Il confirme l'inférence, et
