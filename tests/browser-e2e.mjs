@@ -165,10 +165,10 @@ try{
  assert.match(await page.locator("#chat-engine-state").textContent(),/agent Sommeil/);
  await page.locator("#prompt").fill("Bonjour");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Bonjour !/).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/Bonjour !/).last().waitFor({timeout:10000});
  await page.locator("#prompt").fill("Quelle dose de médicament dois-je prendre ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/je ne peux pas déterminer/i).waitFor({timeout:10000});
+ await page.locator("#messages").getByText(/je ne peux pas déterminer/i).last().waitFor({timeout:10000});
  // Medical content stays on the deterministic route even if local AI options exist.
  await page.locator("#prompt").fill("Résume mes observations");
  await page.locator('#chat-form button[type="submit"]').click();
