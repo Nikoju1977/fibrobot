@@ -142,7 +142,7 @@
          <option value="fibromyalgia">Fibromyalgie</option>
          <option value="diabetes">Diabète</option>
          <option value="depression">Dépression</option>
-         <option value="general">Toutes les pathologies (index médical)</option>
+         <option value="general">Toutes les pathologies (index médical)</option><option value="medlineplus">Encyclopédie MedlinePlus (anglais)</option>
         </select>
         <button id="medical-knowledge-open" type="button" class="btn light">Voir les sources officielles</button>
         <div id="medical-knowledge-results" class="medical-knowledge-results" aria-live="polite"></div>
@@ -150,11 +150,11 @@
       </details>
       <section class="card network-card" aria-labelledby="network-title">
        <div class="network-heading"><div><span class="section-kicker">BIBLIOTHÈQUES INTERNET GRATUITES</span><h3 id="network-title">Recherche Internet avec sources</h3></div><span class="network-badge">Sans clé API</span></div>
-       <p>FibroBot peut consulter Wikipédia, OpenAlex, Crossref, Open Library et GitHub pour les questions publiques de culture générale. Les recherches médicales passent par les fiches sourcées et la bibliothèque Europe PMC, pas par une réponse improvisée.</p>
+       <p>FibroBot peut consulter Wikipédia, Wikidata, Wiktionnaire, OpenAlex, Crossref, Open Library et GitHub pour les questions publiques de culture générale. Les recherches médicales passent par les fiches sourcées et la bibliothèque Europe PMC, pas par une réponse improvisée.</p>
        <label class="network-consent" for="network-mode"><input type="checkbox" id="network-mode">
          <span><strong>Autoriser la recherche Internet pour cette session</strong><small>Par défaut, aucun accès Internet pour vos questions. Avant chaque recherche, FibroBot affiche la question exacte et vous demande de confirmer son envoi aux sites indiqués. Le dossier médical, les traitements et les symptômes ne sont jamais utilisés pour ces recherches.</small></span>
        </label>
-       <p class="tiny" id="network-state" role="status">Mode privé local : aucune recherche Internet libre ne sera lancée.</p>
+       <p class="tiny" id="network-state" role="status">Mode privé local : aucune recherche Internet libre ne sera lancée.</p><label class="consent"><input type="checkbox" id="source-synthesis">Synthétiser les extraits publics avec le LLM local chargé et afficher les sources originales</label>
        <div class="network-examples">
         <button type="button" class="chip" data-ask="Qui était Marie Curie ?">Encyclopédie</button>
         <button type="button" class="chip" data-ask="Cherche un livre sur l'astronomie">Livres</button>
