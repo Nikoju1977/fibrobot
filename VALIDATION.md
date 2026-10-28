@@ -80,3 +80,10 @@ Les tests `tests/agent-hub.test.mjs` couvrent le catalogue des agents, le routag
 5. Recherche médicale extractive à partir de fiches intégrées sourcées ; les index d'autres maladies restent des **liens**, non une base clinique exhaustive.
 6. Tests `tests/brain-mcp.test.mjs`, `tests/mistral-bridge.test.mjs`, `tests/network-library.test.mjs`, `tests/browser-e2e.mjs`, workflow static et cache PWA.
 7. Ne pas confondre « protocole MCP compatible », « réponse d'un modèle mocké », « poids téléchargés », « moteur exécuté sur téléphone réel » et « efficacité médicale validée ». Chacun nécessite un contrôle distinct.
+
+## Validation supplémentaire — couverture Mistral sans données médicales privées
+
+- \`tests/mistral-routing.test.mjs\` prouve le routage : question générale → Mistral ; question fibromyalgie documentée → fiche **publique** ; organisation → instructions **génériques** ; urgence, diagnostic, dose, dossier personnel et médecine inconnue → local.
+- \`tests/mistral-bridge.test.mjs\` vérifie en simulation l'absence de question clinique ou de note privée transmise, la validation des sorties médicales générées et le respect des erreurs 429 sans répétition.
+- \`tests/browser-e2e.mjs\` simule le consentement individuel avant Mistral, une explication sourcée et un planning anonyme, le refus des doses, puis le repli local après une erreur 429.
+- Tests réels non couverts : facturation et quotas d'un compte Mistral, politique CORS du navigateur, pertinence clinique avec patients et professionnel de santé.

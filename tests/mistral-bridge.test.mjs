@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {connectMistral,disconnectMistral,mistralStatus,mistralCompletion,generateMistralChat,testMistralConnection,MISTRAL_MODELS,secondsToRetry} from "../mistral-bridge.mjs";
+import {connectMistral,disconnectMistral,mistralStatus,mistralCompletion,generateMistralChat,testMistralConnection,MISTRAL_MODELS,secondsToRetry,generateMistralMedicalExplanation,generateMistralPlanningAdvice,cleanMedicalExplanation} from "../mistral-bridge.mjs";
 
 test.afterEach(()=>disconnectMistral());
 
@@ -106,4 +106,64 @@ test("L'API 429 n'est pas contournée en changeant automatiquement de modèle",a
  await assert.rejects(mistralCompletion(q,{model:"mistral-small-latest",fetchImpl}),/429/);
  await assert.rejects(mistralCompletion(q,{model:"mistral-large-latest",fetchImpl}),/temporairement désactivé/);
  assert.equal(calls,1);
+});
+
+test("Mistral explique une source médicale officielle sans question ni profil personnel",async()=>{
+ connectMistral("cle-test-personnelle-non-valide-0000");
+ let calls=0;
+ const res=await generateMistralMedicalExplanation("fibro",{fetchImpl:async(url,init)=>{
+  calls++;
+  const body=JSON.parse(init.body);
+  assert.equal(body.messages.length,2);
+  assert.match(body.messages[1].content,/fibromyalgie/i);
+  assert.match(body.messages[1].content,/Source :/);
+  assert.doesNotMatch(JSON.stringify(body),/mon dossier patient|SECRET-MEDICAL|Quelle dose de morphine/);
+  assert.equal(body.model,"mistral-small-latest");
+  return {ok:true,json:async()=>({choices:[{message:{content:"La fibromyalgie associe des douleurs diffuses persistantes et de la fatigue. L'information provient de la fiche fournie."}}]})};
+ }});
+ assert.equal(calls,1);
+ assert.match(res.text,/douleurs diffuses/);
+});
+
+test("Mistral ne peut pas interroger une source médicale inexistante",async()=>{
+ connectMistral("cle-test-personnelle-non-valide-0000");
+ let count=0;
+ await assert.rejects(generateMistralMedicalExplanation("unknown",{fetchImpl:async()=>{count++;return {ok:true};}}),/non approuvée/);
+ assert.equal(count,0);
+});
+
+test("L'explication médicale générée est rejetée si elle contient prescription, dose ou diagnostic individuel",async()=>{
+ connectMistral("cle-test-personnelle-non-valide-0000");
+ for(const value of [
+  "Vous avez une fibromyalgie et je confirme votre diagnostic.",
+  "Prenez 200 mg de ce traitement matin et soir.",
+  "Arrêtez immédiatement votre médicament.",
+  "Pour en savoir plus, voyez https://site-piege.example/faux."
+ ]){
+  await assert.rejects(generateMistralMedicalExplanation("fibro",{
+   fetchImpl:async()=>({ok:true,json:async()=>({choices:[{message:{content:value}}]})})
+  }),/potentiellement clinique bloquée/);
+ }
+ assert.match(cleanMedicalExplanation("Une fibromyalgie peut entraîner des douleurs et une fatigue persistantes."),/fatigue/);
+});
+
+test("Mistral peut conseiller l'organisation sans titres de tâches ni symptômes du patient",async()=>{
+ connectMistral("cle-test-personnelle-non-valide-0000");
+ let sent="";
+ const result=await generateMistralPlanningAdvice({fetchImpl:async(url,init)=>{
+  sent=init.body;
+  return {ok:true,json:async()=>({choices:[{message:{content:"Découpez une grande tâche en petites étapes et prévoyez une pause."}}]})};
+ }});
+ assert.match(result.text,/petites étapes/);
+ assert.doesNotMatch(sent,/ma douleur|mon médicament|mes rendez-vous|SECRET-MEDICAL/);
+ assert.match(sent,/sans données concernant une personne/);
+});
+
+test("429 bloque aussi les modes médicaux et organisationnels sans répétition automatique",async()=>{
+ connectMistral("cle-test-personnelle-non-valide-0000");
+ let count=0;
+ const mock=async()=>{count++;return {ok:false,status:429,headers:{get:()=>String(90)}};};
+ await assert.rejects(generateMistralMedicalExplanation("fibro",{fetchImpl:mock}),/429/);
+ await assert.rejects(generateMistralPlanningAdvice({fetchImpl:mock}),/temporairement désactivé/);
+ assert.equal(count,1);
 });
