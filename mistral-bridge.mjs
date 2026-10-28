@@ -3,6 +3,7 @@
  * L'accès navigateur dépend des politiques CORS du prestataire ; sinon repli local.
  */
 import {nonMedicalMessages,cleanGeneratedReply} from "./assistant-engine.mjs";
+import {publicMedicalExplanationMessages} from "./medical-rag.mjs";
 
 const ENDPOINT="https://api.mistral.ai/v1/chat/completions";
 const APPROVED_MODELS=Object.freeze(["mistral-small-latest","mistral-medium-latest","mistral-large-latest"]);
@@ -53,12 +54,18 @@ export function validateMistralMessages(messages){
  return messages;
 }
 const errorFromStatus=n=>n===401?"Clé API Mistral rejetée (401).":n===403?"Clé sans autorisation pour ce modèle (403).":n===429?"Limite de requêtes ou de crédit Mistral atteinte (429).":n===402?"Crédit Mistral insuffisant (402).":"Service Mistral indisponible (HTTP "+n+").";
-export async function mistralCompletion(messages,{model="mistral-small-latest",fetchImpl=globalThis.fetch,signal}={}){
+// This private function is the ONLY path that accepts approved medical or
+// planning prompts. Public mistralCompletion continues to reject clinical text.
+async function sendMistral(messages,{model="mistral-small-latest",fetchImpl=globalThis.fetch,signal}={},scope="general"){
  if(!sessionKey)throw Error("Mistral n'est pas connecté dans cette session.");
  const remaining=Math.ceil((cooldownUntil-Date.now())/1000);
  if(remaining>0)throw Error("Mistral est temporairement désactivé après l'erreur 429 ("+remaining+" s restantes). Le mode local reste disponible.");
  if(!APPROVED_MODELS.includes(model))throw Error("Modèle non approuvé.");
- validateMistralMessages(messages);
+ if(scope==="general")validateMistralMessages(messages);
+ else if(!["public-medical","anonymous-planning"].includes(scope)||!Array.isArray(messages)||messages.length!==2||
+  messages[0]?.role!=="system"||messages[1]?.role!=="user"||
+  messages.some(x=>typeof x.content!=="string"||x.content.length>1800))
+  throw Error("Requête documentaire ou organisationnelle non autorisée.");
  if(typeof fetchImpl!=="function")throw Error("API fetch indisponible sur cet appareil.");
  const controller=new AbortController(),abort=()=>controller.abort();
  activeRequests.add(controller);
@@ -76,7 +83,7 @@ export async function mistralCompletion(messages,{model="mistral-small-latest",f
   const payload=await res.json();
   const raw=payload?.choices?.[0]?.message?.content;
   const answer=Array.isArray(raw)?raw.filter(x=>x?.type==="text").map(x=>String(x.text||"")).join(" "):raw;
-  const text=cleanGeneratedReply(answer);
+  const text=scope==="public-medical"?cleanMedicalExplanation(answer):cleanGeneratedReply(answer);
   cooldownUntil=0;lastFailure="";
   return {text,model};
  }catch(e){
@@ -84,6 +91,33 @@ export async function mistralCompletion(messages,{model="mistral-small-latest",f
   if(e instanceof TypeError)throw Error("Connexion Mistral bloquée par le réseau ou le navigateur (CORS). Utilisez l'IA locale.");
   throw e;
  }finally{clearTimeout(timeout);activeRequests.delete(controller);signal?.removeEventListener("abort",abort);}
+}
+/** Scrutinize educational medical output: never expose treatment instructions,
+ * personalized diagnostics, dose calculations, or invented links. The original
+ * evidence note remains visible even if Mistral returns an unsafe reply.
+ */
+export function cleanMedicalExplanation(value){
+ const text=String(value||"").replace(/[\\u0000-\\u001f\\u007f]/g," ").trim();
+ if(text.length<10||text.length>1900)throw Error("Explication médicale vide ou anormalement longue.");
+ const fold=text.toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"");
+ if(/https?:\\/\\/|www\\.|(?:posolog|dosage|\\bdose\\b|\\bmg\\b|milligram|\\bcomprimes?\\b|\\bprescri|ordonnance|automedic|augment(?:e|ez)|diminu(?:e|ez)|arr[eê]t(?:e|ez)|commenc(?:e|ez)|\\bprenez\\b|\\bvous devez\\b|\\btu dois\\b|\\bvous (?:avez|souffrez) (?:une?|de la|du|des)\\b)/i.test(fold))
+  throw Error("Explication potentiellement clinique bloquée : fiche institutionnelle conservée.");
+ return text;
+}
+export async function mistralCompletion(messages,options={}){
+ return sendMistral(messages,options,"general");
+}
+export async function generateMistralMedicalExplanation(topic,options={}){
+ // The topic ID is a public, approved library key. No raw patient question.
+ return sendMistral(publicMedicalExplanationMessages(topic),options,"public-medical");
+}
+export async function generateMistralPlanningAdvice(options={}){
+ // Nothing from the user's tasks, health data or chat history is sent.
+ const messages=[
+  {role:"system",content:"Tu es un assistant d'organisation non médical. Propose en français trois conseils génériques, concrets, courts et accessibles pour fractionner les tâches quotidiennes avec des pauses. Ne fais aucune suggestion clinique, aucun diagnostic, dosage ou traitement."},
+  {role:"user",content:"Donne trois conseils généraux pour diviser de grandes tâches domestiques en petites étapes, en prévoyant des pauses, sans données concernant une personne."}
+ ];
+ return sendMistral(messages,options,"anonymous-planning");
 }
 export async function generateMistralChat(question,history=[],options={}){
  const messages=nonMedicalMessages(question,history);
