@@ -7,7 +7,8 @@ import {LIBRARY} from "./medical-library.mjs";
 const approved=new Set(LIBRARY.map(x=>x.id));
 export function mistralRoute(question,intent,response){
  if(typeof question!=="string"||!question.trim()||!response||typeof response!=="object")return null;
- if(["urgent","refusal","profile"].includes(response.kind))return null;
+ if(["urgent","profile"].includes(response.kind))return null;
+ if(response.kind==="refusal"&&intent!=="general")return null;
  if(intent==="general"&&["followup","refusal"].includes(response.kind))
   return {mode:"general",label:"Question générale",preview:question.trim().slice(0,1000)};
  if(intent==="planning"&&response.kind!=="refusal")
