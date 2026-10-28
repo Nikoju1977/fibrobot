@@ -1,14 +1,14 @@
 import {today,text,makeSymptom,makeTask,makeCondition,makeAppointment,makeMedication,energyGuide,rankTasks,reply,dueReminders,reminderLog} from "./core.mjs";
 import {LIBRARY} from "./medical-library.mjs";
 import {openSecureDB,all,put,del,wipeDB,encryptedExport,eraseLegacy} from "./vault-ui.mjs";
-import {loadGemma,unloadGemma,cancelGemmaLoad,canPlanWithGemma,generateLifePlan,generateGeneralChat,summarizePublicSources,testLocalModel,detectWebGPU,listLocalModels,status as llmStatus} from "./gemma-local.mjs";
+import {loadGemma,unloadGemma,cancelGemmaLoad,canPlanWithGemma,generateLifePlan,generateGeneralChat,summarizePublicSources,testLocalModel,cancelLocalGeneration,detectWebGPU,listLocalModels,status as llmStatus} from "./gemma-local.mjs";
 import {SPECIALISTS,routeSpecialist,runSpecialist} from "./agent-hub.mjs";
 import {classifyIntent,summarizeObservations,prepareVisit,planDaily} from "./assistant-engine.mjs";
 import {findScientificArticles,externalResearchLink} from "./research-library.mjs";
 import {isOnlineEligible,selectPublicProviders,searchPublicQuestion,formatPublicAnswer,safeReferenceUrl,PUBLIC_PROVIDERS} from "./network-library.mjs";
 import {setupPatientUX} from "./ux-pro.mjs";
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
-import {connectMistral,disconnectMistral,mistralStatus,generateMistralChat,testMistralConnection} from "./mistral-bridge.mjs";
+import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,testMistralConnection} from "./mistral-bridge.mjs";
 import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
@@ -249,6 +249,21 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
+ $("chat-local-mode").addEventListener("click",()=>{
+  // Aucune intervention sur les données patient ni sur les clés enregistrées.
+  $("mistral-use").checked=false;
+  $("gemma-use").checked=false;
+  networkEnabled=false;$("network-mode").checked=false;
+  $("network-state").textContent="Mode local : aucune recherche Internet libre ne sera lancée.";
+  cancelMistralRequests();
+  const cancelled=cancelLocalGeneration();
+  if(cancelled){
+   $("gemma-use").disabled=true;$("gemma-unload").disabled=true;$("llm-test").disabled=true;
+   $("gemma-status").textContent="Inférence interrompue : rechargez le modèle local depuis son cache quand vous le souhaitez.";
+  }
+  setEngineNote("Mode secours local activé : réponses documentaires et agents disponibles sans Mistral.");
+  notify("Mode local activé. Vous pouvez poser votre question, même sans Mistral.");
+ });
  $("mistral-connect").addEventListener("click",()=>{
   try{
    connectMistral($("mistral-key").value);$("mistral-key").value="";
