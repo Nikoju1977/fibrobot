@@ -4,6 +4,7 @@
  * Les réponses distantes sont des métadonnées non fiables, jamais des instructions.
  */
 import {classifyIntent} from "./assistant-engine.mjs";
+import {knowledgeDomain,knowledgeKeywords,rankKnowledgeResults} from "./knowledge-router.mjs";
 
 const clean=s=>String(s??"").replace(/<[^>]*>/g," ").replace(/&(?:nbsp|amp|quot|lt|gt);/gi," ").replace(/[\u0000-\u001f\u007f]/g," ").replace(/\s+/g," ").trim();
 const shorten=(s,n)=>clean(s).slice(0,n);
@@ -19,10 +20,13 @@ const PROVIDERS=Object.freeze([
  {id:"openalex",name:"OpenAlex",kind:"publications",origin:"https://api.openalex.org"},
  {id:"crossref",name:"Crossref",kind:"références scientifiques",origin:"https://api.crossref.org"},
  {id:"openlibrary",name:"Open Library",kind:"livres",origin:"https://openlibrary.org"},
- {id:"github",name:"GitHub",kind:"logiciels libres",origin:"https://api.github.com"}
+ {id:"github",name:"GitHub",kind:"logiciels libres",origin:"https://api.github.com"},
+ {id:"wikidata",name:"Wikidata",kind:"entités et descriptions",origin:"https://www.wikidata.org"},
+ {id:"wiktionary",name:"Wiktionnaire",kind:"langues et définitions",origin:"https://fr.wiktionary.org"},
+ {id:"wikipedia-en",name:"Wikipédia anglophone",kind:"encyclopédie de secours",origin:"https://en.wikipedia.org"}
 ]);
 export const PUBLIC_PROVIDERS=PROVIDERS.map(x=>Object.freeze({...x}));
-export const SAFE_LINK_HOSTS=Object.freeze(["fr.wikipedia.org","openalex.org","doi.org","openlibrary.org","github.com","europepmc.org","www.ebi.ac.uk","api.openalex.org"]);
+export const SAFE_LINK_HOSTS=Object.freeze(["fr.wikipedia.org","en.wikipedia.org","www.wikidata.org","fr.wiktionary.org","openalex.org","doi.org","openlibrary.org","github.com","europepmc.org","www.ebi.ac.uk","api.openalex.org","www.ameli.fr","www.has-sante.fr","www.nccih.nih.gov","medlineplus.gov","www.medlineplus.gov"]);
 export function safeReferenceUrl(url){
  try{const u=new URL(String(url));return u.protocol==="https:"&&!u.username&&!u.password&&SAFE_LINK_HOSTS.includes(u.hostname)&&!u.port&&u.href.length<800?u.href:null;}
  catch{return null;}
@@ -30,20 +34,23 @@ export function safeReferenceUrl(url){
 const providerById=id=>{const found=PROVIDERS.find(x=>x.id===id);if(!found)throw Error("Connecteur non approuvé.");return found;};
 export function selectPublicProviders(question){
  if(!isOnlineEligible(question))return [];
- const q=accentless(question);
- if(/\b(github|depot|repo|open.source|logiciel|code source|bibliotheque javascript|programme informatique|application opensource)/.test(q))return ["github","wikipedia"];
- if(/\b(livre|roman|auteur|ecrivain|litterature|ouvrage|bibliotheque de livres)/.test(q))return ["openlibrary","wikipedia"];
- if(/\b(etude|publication|article scientifique|research|scientifi|chercheurs|revue scientifique)/.test(q))return ["openalex","crossref"];
- return ["wikipedia"];
+ switch(knowledgeDomain(question)){
+  case "software":return ["github","wikipedia"];
+  case "books":return ["openlibrary","wikipedia"];
+  case "science":return ["openalex","crossref","wikipedia"];
+  case "language":return ["wiktionary","wikipedia"];
+  default:return ["wikipedia","wikidata"];
+ }
 }
+
 export function makePublicSearchURL(provider,question){
  const p=providerById(provider);
  if(!isOnlineEligible(question))throw Error("Cette question ne peut pas être envoyée à un moteur public. Elle sera traitée localement.");
- const q=shorten(question,300);
+ const q=knowledgeKeywords(question);
  switch(p.id){
   case "wikipedia":{
    const u=new URL("/w/api.php",p.origin);
-   const params={action:"query",generator:"search",gsrsearch:q,gsrlimit:"4",prop:"extracts",exintro:"1",explaintext:"1",exchars:"490",format:"json",origin:"*"};
+   const params={action:"query",generator:"search",gsrsearch:q,gsrlimit:"5",prop:"extracts",exintro:"1",explaintext:"1",exchars:"1100",format:"json",origin:"*"};
    Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));return u.href;
   }
   case "openalex":{
@@ -60,12 +67,23 @@ export function makePublicSearchURL(provider,question){
   case "github":{
    const u=new URL("/search/repositories",p.origin);u.searchParams.set("q",q);u.searchParams.set("per_page","4");return u.href;
   }
+  case "wikidata":{
+   const u=new URL("/w/api.php",p.origin);
+   Object.entries({action:"wbsearchentities",search:q,language:"fr",uselang:"fr",limit:"5",format:"json",origin:"*"}).forEach(([k,v])=>u.searchParams.set(k,v));
+   return u.href;
+  }
+  case "wiktionary":
+  case "wikipedia-en":{
+   const u=new URL("/w/api.php",p.origin);
+   Object.entries({action:"query",generator:"search",gsrsearch:q,gsrlimit:"5",prop:"extracts",exintro:"1",explaintext:"1",exchars:"950",format:"json",origin:"*"}).forEach(([k,v])=>u.searchParams.set(k,v));
+   return u.href;
+  }
  }
  throw Error("Connecteur inconnu.");
 }
 const citation=(provider,title,summary,url,date="")=>{
  const safe=safeReferenceUrl(url);
- return safe&&shorten(title,160)?{provider,title:shorten(title,160),summary:shorten(summary,480),url:safe,date:shorten(date,30)}:null;
+ return safe&&shorten(title,160)?{provider,title:shorten(title,160),summary:shorten(summary,980),url:safe,date:shorten(date,30)}:null;
 };
 export function parsePublicResults(provider,payload){
  if(!PROVIDERS.some(x=>x.id===provider))throw Error("Source non approuvée.");
@@ -73,9 +91,23 @@ export function parsePublicResults(provider,payload){
  let rows=[];
  switch(provider){
  case "wikipedia":{
-  const pages=Object.values(payload.query?.pages||{}).filter(x=>x&&typeof x==="object");
+  const pages=Object.values(payload.query?.pages||{}).filter(x=>x&&typeof x==="object").sort((a,b)=>(a.index??999)-(b.index??999));
   rows=pages.map(x=>citation("Wikipédia",x.title,x.extract||"Article encyclopédique à consulter.",
     "https://fr.wikipedia.org/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))));
+  break;
+ }
+ case "wiktionary":
+ case "wikipedia-en":{
+  const pages=Object.values(payload.query?.pages||{}).filter(x=>x&&typeof x==="object").sort((a,b)=>(a.index??999)-(b.index??999));
+  const host=provider==="wiktionary"?"fr.wiktionary.org":"en.wikipedia.org",name=provider==="wiktionary"?"Wiktionnaire":"Wikipédia (EN)";
+  rows=pages.map(x=>citation(name,x.title,x.extract||"Consulter l'article original.",
+    "https://"+host+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))));
+  break;
+ }
+ case "wikidata":{
+  rows=(Array.isArray(payload.search)?payload.search:[]).filter(x=>/^Q[1-9]\d{0,12}$/.test(String(x.id||""))).map(x=>
+   citation("Wikidata",x.label,x.description||"Notice factuelle : vérifier les propriétés de l'entité.",
+    "https://www.wikidata.org/wiki/"+x.id));
   break;
  }
  case "openalex":
@@ -111,30 +143,44 @@ export async function searchPublicQuestion(question,{fetchImpl=globalThis.fetch,
  const providers=selectPublicProviders(question);
  if(!providers.length)throw Error("Requête réservée au traitement local pour protéger les données.");
  if(typeof fetchImpl!=="function")throw Error("La connexion réseau est indisponible.");
- const results=[],failures=[];
- for(const id of providers){
-  const timer=withTimeout(11000,signal);
+ const lookUp=async id=>{
+  const timer=withTimeout(10000,signal);
   try{
+   if(signal?.aborted)throw Error("Recherche interrompue.");
    const endpoint=makePublicSearchURL(id,question);
    const response=await fetchImpl(endpoint,{method:"GET",mode:"cors",credentials:"omit",cache:"no-store",signal:timer.signal});
    if(!response.ok)throw Error("HTTP "+response.status);
    const payload=await response.json();
-   results.push(...parsePublicResults(id,payload));
-  }catch(e){failures.push(providerById(id).name+" : "+(e?.name==="AbortError"?"délai dépassé":shorten(e?.message||e,90)));}
-  finally{timer.dispose();}
-  if(signal?.aborted)break;
+   return {id,results:parsePublicResults(id,payload),failure:null};
+  }catch(e){
+   const message=e?.name==="AbortError"?"délai dépassé":shorten(e?.message||e,90);
+   return {id,results:[],failure:providerById(id).name+" : "+message};
+  }finally{timer.dispose();}
+ };
+ const checks=await Promise.all(providers.map(lookUp));
+ const failures=checks.filter(x=>x.failure).map(x=>x.failure);
+ let results=checks.flatMap(x=>x.results);
+ // En secours encyclopédique : Wikipédia anglais, sans envoyer de dossier
+ // supplémentaire et uniquement après le même consentement explicite.
+ if(providers.includes("wikipedia")&&!checks.find(x=>x.id==="wikipedia")?.results.length&&!results.length&&!signal?.aborted){
+  const fallback=await lookUp("wikipedia-en");
+  if(fallback.failure)failures.push(fallback.failure);
+  results.push(...fallback.results);
  }
- const unique=[...new Map(results.map(x=>[x.url,x])).values()].slice(0,6);
- return {results:unique,providers,failures};
+ const unique=[...new Map(results.map(x=>[x.url,x])).values()];
+ return {results:rankKnowledgeResults(question,unique).slice(0,6),providers,failures};
 }
+
 export function formatPublicAnswer(response){
  const refs=Array.isArray(response?.results)?response.results.slice(0,6):[];
  if(!refs.length)return "Les sources publiques consultées n'ont fourni aucun résultat exploitable. Je ne vais pas inventer une réponse. Consultez les bibliothèques intégrées ou essayez des mots-clés plus précis.";
- const first=refs[0],lead=first.summary||first.title;
- const lines=["Informations trouvées sur des sources publiques (elles ne constituent pas une validation indépendante) :",
- "1. "+first.title+(lead?" — "+lead:"")];
- for(let i=1;i<Math.min(4,refs.length);i++)lines.push((i+1)+". "+refs[i].title+(refs[i].summary?" — "+refs[i].summary:""));
- if(response.failures?.length)lines.push("Certaines sources sont indisponibles : "+response.failures.join(" ; ")+".");
- lines.push("Ouvrez les liens numérotés ci-dessous pour vérifier le contenu. Les résultats de recherche peuvent être incomplets, anciens ou incorrects.");
+ const first=refs[0],lead=first.summary||"Pas d'extrait vérifiable disponible : ouvrez la notice.";
+ const lines=["Résultats documentaires pour votre question :",first.title+" — "+lead];
+ if(refs.length>1){
+  lines.push("\nAutres références possibles :");
+  for(let i=1;i<Math.min(5,refs.length);i++)lines.push((i+1)+". "+refs[i].title+(refs[i].summary?" — "+refs[i].summary:""));
+ }
+ if(response.failures?.length)lines.push("\nCertaines sources sont indisponibles : "+response.failures.join(" ; ")+".");
+ lines.push("\nOuvrez les liens numérotés ci-dessous pour vérifier le contenu. Les résultats de recherche peuvent être incomplets, anciens ou incorrects.");
  return lines.join("\n");
 }

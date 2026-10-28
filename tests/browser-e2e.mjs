@@ -74,6 +74,39 @@ try{
  await page.locator("#pain").fill("6");
  await page.locator("#health-form button[type=submit]").click();
  await page.locator("#health-list").getByText(value).waitFor();
+ // JARVIS distant : mémoire volatile, double consentement, aucun patient.
+ await page.locator('#nav [data-tab="chat"]').click();
+ await page.locator("#mistral-options summary").click();
+ await page.locator("#mistral-key").fill("cle-fictive-de-test-non-utilisable");
+ await page.locator("#mistral-connect").click();
+ assert.equal(await page.locator("#mistral-key").inputValue(),"","The API key must leave the input after connecting.");
+ await page.locator("#mistral-use").check();
+ let mistralCalls=0,bodyMistral="";
+ await page.route("https://api.mistral.ai/**",async route=>{
+  const req=route.request();
+  if(req.method()==="OPTIONS"){
+   await route.fulfill({status:204,headers:{"access-control-allow-origin":"*","access-control-allow-methods":"POST, OPTIONS","access-control-allow-headers":"authorization, content-type"}});
+   return;
+  }
+  mistralCalls++;bodyMistral=req.postData()||"";
+  await route.fulfill({status:200,contentType:"application/json",headers:{"access-control-allow-origin":"*"},
+   body:JSON.stringify({choices:[{message:{content:"Voici une histoire de test sur la lune."}}]})});
+ });
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/histoire courte/);dialog.accept();});
+ await page.locator("#prompt").fill("Raconte une histoire courte sur la lune");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/histoire de test sur la lune/).waitFor({timeout:14000});
+ assert.equal(mistralCalls,1);
+ assert.ok(!bodyMistral.includes(value),"Patient note leaked to external LLM.");
+ assert.ok(!bodyMistral.includes(secret),"Vault secret leaked to external LLM.");
+ assert.ok(!bodyMistral.includes("medications"),"No clinical context sent.");
+ await page.locator("#prompt").fill("Quelle dose de morphine dois-je prendre ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/je ne peux pas déterminer/i).last().waitFor({timeout:10000});
+ assert.equal(mistralCalls,1,"Medical query must not invoke remote Mistral.");
+ await page.locator("#mistral-disconnect").click();
+ assert.equal(await page.locator("#mistral-use").isChecked(),false);
+ await page.locator('#nav [data-tab="health"]').click();
  const envelope=await page.evaluate(async()=>{
    return await new Promise((resolve,reject)=>{
      const req=indexedDB.open("FibroBotVault-v1");

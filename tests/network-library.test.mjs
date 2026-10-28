@@ -4,8 +4,8 @@ import {PUBLIC_PROVIDERS,SAFE_LINK_HOSTS,isOnlineEligible,selectPublicProviders,
  parsePublicResults,safeReferenceUrl,searchPublicQuestion,formatPublicAnswer} from "../network-library.mjs";
 
 test("catalogue réseau explicite et sécurisé, sans serveur proxy",()=>{
- assert.deepEqual(PUBLIC_PROVIDERS.map(x=>x.id),["wikipedia","openalex","crossref","openlibrary","github"]);
- assert.equal(PUBLIC_PROVIDERS.length,5);
+ assert.deepEqual(PUBLIC_PROVIDERS.map(x=>x.id),["wikipedia","openalex","crossref","openlibrary","github","wikidata","wiktionary","wikipedia-en"]);
+ assert.equal(PUBLIC_PROVIDERS.length,8);
  assert.ok(SAFE_LINK_HOSTS.every(x=>!x.includes("*")));
  assert.throws(()=>makePublicSearchURL("fake","Qui était Marie Curie ?"),/approuvé/);
 });
@@ -28,14 +28,14 @@ test("pas de données personnelles, santé, prescription, maladie ni question no
 });
 
 test("connecteurs publics et requêtes séparées selon l'intention",()=>{
- assert.deepEqual(selectPublicProviders("Qui était Marie Curie ?"),["wikipedia"]);
+ assert.deepEqual(selectPublicProviders("Qui était Marie Curie ?"),["wikipedia","wikidata"]);
  assert.deepEqual(selectPublicProviders("Cherche un livre sur l'astronomie"),["openlibrary","wikipedia"]);
  assert.deepEqual(selectPublicProviders("Cherche un projet GitHub de musique"),["github","wikipedia"]);
- assert.deepEqual(selectPublicProviders("Recherche un article scientifique sur les étoiles"),["openalex","crossref"]);
+ assert.deepEqual(selectPublicProviders("Recherche un article scientifique sur les étoiles"),["openalex","crossref","wikipedia"]);
  const wiki=new URL(makePublicSearchURL("wikipedia","Qui était Marie Curie ?"));
  assert.equal(wiki.origin,"https://fr.wikipedia.org");
  assert.equal(wiki.searchParams.get("origin"),"*");
- assert.equal(wiki.searchParams.get("gsrsearch"),"Qui était Marie Curie ?");
+ assert.equal(wiki.searchParams.get("gsrsearch"),"Marie Curie");
  assert.equal(new URL(makePublicSearchURL("github","Cherche un projet GitHub de musique")).host,"api.github.com");
 });
 
@@ -49,6 +49,10 @@ test("parsing minimal : citations externes et texte source jamais HTML exécutab
  const wikipedia=parsePublicResults("wikipedia",{query:{pages:{1:{title:"Marie Curie",extract:"Chercheuse en physique."}}}});
  assert.equal(wikipedia.length,1);
  assert.equal(wikipedia[0].provider,"Wikipédia");
+ const entities=parsePublicResults("wikidata",{search:[{id:"Q7186",label:"Marie Curie",description:"Physicienne et chimiste"},{id:"not-a-q",label:"fake"}]});
+ assert.equal(entities.length,1);assert.match(entities[0].url,/wikidata.org/);
+ const dictionary=parsePublicResults("wiktionary",{query:{pages:{1:{title:"anatomie",extract:"Étude de la structure des êtres vivants."}}}});
+ assert.equal(dictionary[0].provider,"Wiktionnaire");
  assert.match(wikipedia[0].url,/fr\.wikipedia\.org/);
  const books=parsePublicResults("openlibrary",{docs:[{key:"/works/OL123W",title:"Cosmos",author_name:["Carl Sagan"],first_publish_year:1980},{key:"/secret/notvalid",title:"Secret"}]});
  assert.equal(books.length,1);

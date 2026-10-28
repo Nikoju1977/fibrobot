@@ -152,3 +152,41 @@ Documentation API : [MediaWiki CORS](https://www.mediawiki.org/wiki/API:Cross-si
 5. Repasser hors connexion : la navigation, le coffre et les données locales doivent rester accessibles. La recherche Internet doit simplement se replier et expliquer l'indisponibilité.
 
 L'accès HTTP réel aux cinq services, leurs quotas et la puissance du LLM WebGPU ne peuvent pas être garantis par les seuls tests automatisés.
+
+## JARVIS fibromyalgie — moteur de connaissances v2 (28 octobre 2026)
+
+Le cerveau FibroBot combine des **outils vérifiables et gratuits** (routage, fiches, agents, sélection des extraits, bibliothèques institutionnelles), un **LLM local facultatif** (WebLLM dans le navigateur avec WebGPU) et **Mistral AI facultatif** (API distante nécessitant une clé personnelle, facturation possible).
+
+### Recherche générale et bibliothèques
+
+- La question de culture générale peut être envoyée après une double autorisation explicite, renouvelée pour chaque question.
+- Un routeur de connaissances (`knowledge-router.mjs`) détecte les domaines « encyclopédie », « livres », « logiciels », « publications » ou « langue ». Le module `network-library.mjs` recherche Wikipédia FR, Wikidata, Wiktionnaire, OpenAlex, Crossref, Open Library, GitHub et, si nécessaire, Wikipédia EN. Les résultats sont classés selon les intitulés et mots-clés. **Les notices ne constituent pas une validation indépendante.**
+- Si l'utilisateur active « Synthétiser les extraits publics », le LLM local déjà chargé peut les reformuler à partir d'un prompt borné, sans notes de santé, et les **sources originales restent visibles**. La synthèse peut contenir des erreurs ; les recherches et références subsistent même si le LLM plante.
+
+### Base médicale
+
+- **Fibromyalgie** : fiches intégrées, références HAS 2025, ameli, NCCIH, bibliographie Europe PMC et outils locaux spécialisés.
+- **Autres pathologies** : index français d'ameli, catégories institutionnelles et MedlinePlus (NLM/NIH, anglais) via liens. L'application **ne prétend pas posséder ni valider les connaissances de toutes les maladies**. Une fiche absente n'est pas remplacée par des conseils cliniques générés.
+- `medical-rag.mjs` trie les fiches médicales embarquées et n'affiche que des extraits existants et référencés. Les portails institutionnels sont proposés comme liens, sans scraping ni requête de dossier.
+- L'IA générative n'est jamais utilisée pour une prescription, un diagnostic, une modification de dose ou une estimation de risque. Toute information sur des symptômes nouveaux ou inquiétants doit être discutée avec un professionnel.
+
+### MCP spécialisé
+
+- `mcp-fibro-tools.mjs` fournit huit outils à arguments fermés : agents, fiches médicales, sujets scientifiques, bilan descriptif, préparation d'une consultation, planning quotidien et orientation de sécurité.
+- La PWA utilise les mêmes outils pour son écran « agents spécialisés » ; ils tournent **localement**, une fois le coffre déverrouillé.
+- `node mcp-server.mjs` démarre un **serveur MCP stdio facultatif** pour les clients compatibles. Il n'expose que les outils documentaires **publics** : aucune lecture du coffre, aucune donnée de symptômes, aucun agent patient privé. Le protocole MCP ne transforme pas les sept outils en sept modèles entraînés.
+- Ce serveur est distinct de GitHub Pages et ne s'exécute pas de façon persistante dans la PWA Android/iOS.
+
+### Mistral AI — option réseau
+
+1. Ouvrir Assistant → **Mistral AI · moteur facultatif en ligne**. Saisir sa **propre clé API** : elle reste uniquement en mémoire de l'onglet et n'est pas sauvegardée dans le coffre, les réglages, une URL ou le dépôt.
+2. Cliquer sur **Activer ma clé**, puis éventuellement **Tester Mistral** (requête publique d'arithmétique ; potentiellement facturée).
+3. Cocher l'utilisation pour le dialogue général. Avant **chaque** question, FibroBot affiche le texte exact et demande une autorisation distincte d'envoi.
+4. Seule la question générale acceptée est envoyée : **aucun historique de conversation, traitement ni observation patient**. Si Mistral échoue (CORS, 401, 402, 429, perte de connexion), le mode local/documentaire reste disponible.
+5. Cliquer **Effacer la clé** pour la retirer de la mémoire du navigateur. Un navigateur compromis, une extension malveillante ou un appareil déverrouillé peuvent néanmoins exposer toute clé saisie dans une page. Ne pas partager de clés ni de dossiers médicaux.
+
+**Important :** l'appel API navigateur direct peut être bloqué par les règles CORS de Mistral. Aucune passerelle distante de clés et aucun hébergement payant n'ont été ajoutés. Même si l'API répond, Mistral n'est pas un modèle médical validé, et son accès peut nécessiter un contrat ou un paiement. Les modèles WebLLM (par exemple Qwen, Gemma et autres modèles réellement répertoriés) restent une alternative locale suivant la mémoire et WebGPU.
+
+### Qualité et limites
+
+Des tests Node et navigateur couvrent le routage, les listes de fournisseurs, les références, le système MCP, Mistral simulé, les refus à risque, le coffre chiffré, la PWA hors ligne et les écrans tactiles émulés. **Aucun modèle multi-Go ni serveur Mistral réel n'est testé automatiquement** ; la compatibilité physique Android/iPhone, la précision clinique, la conformité réglementaire et l'utilité patient nécessitent une validation indépendante par des professionnels et des utilisateurs concernés. FibroBot reste un assistant de soutien et d'information, **pas un dispositif médical certifié**.

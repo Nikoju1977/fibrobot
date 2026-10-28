@@ -70,3 +70,13 @@ Les tests `tests/agent-hub.test.mjs` couvrent le catalogue des agents, le routag
 - Le test navigateur `tests/browser-e2e.mjs` intercepte une requête Wikipédia **simulée**, vérifie la case réseau décochée au démarrage, le refus de consentement, une confirmation explicite et des liens vers les notices.
 - Les requêtes médicales ne doivent pas être envoyées aux moteurs de culture générale. Europe PMC reste déclenché uniquement depuis Bibliothèque avec sujets prédéfinis et consentement.
 - Les tests CI ne valident pas une disponibilité réseau réelle en permanence. Les tests matériels et la vérification médicale externe restent impératifs.
+
+## Critères de qualité v2 — moteur JARVIS et sécurité patient
+
+1. Aucun appel Internet à l'ouverture, avant le déverrouillage ou sans consentement par question.
+2. Aucune requête privée ou médicale envoyée aux bibliothèques de culture générale ou à Mistral. Les sorties génératives sont filtrées et le dossier reste chiffré au repos.
+3. Aucune clé Mistral enregistrée ; erreur API, CORS, quota ou refus de l'utilisateur gérés sans perte des données ni panne du module documentaire.
+4. Les huit outils MCP refusent les noms et paramètres non autorisés ; le serveur MCP stdio ne publie **aucun** outil pouvant lire les dossiers patients.
+5. Recherche médicale extractive à partir de fiches intégrées sourcées ; les index d'autres maladies restent des **liens**, non une base clinique exhaustive.
+6. Tests `tests/brain-mcp.test.mjs`, `tests/mistral-bridge.test.mjs`, `tests/network-library.test.mjs`, `tests/browser-e2e.mjs`, workflow static et cache PWA.
+7. Ne pas confondre « protocole MCP compatible », « réponse d'un modèle mocké », « poids téléchargés », « moteur exécuté sur téléphone réel » et « efficacité médicale validée ». Chacun nécessite un contrôle distinct.
