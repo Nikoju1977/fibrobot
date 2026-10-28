@@ -236,7 +236,10 @@ function events(){
   if(!current){out.append(dom("p","Référence indisponible."));return;}
   out.append(dom("h4",current.label),dom("p",current.level+" · "+current.publisher));
   const link=dom("a","Ouvrir la ressource institutionnelle");link.href=current.url;link.target="_blank";link.rel="noopener noreferrer";out.append(link);
-  if(current.id!=="fibromyalgia")out.append(dom("p","Pour cette maladie, FibroBot ne dispose pas encore d'une synthèse clinique vérifiée. Consultez les informations officielles et votre professionnel."));
+  if(current.id==="fibromyalgia"){
+   const reference=callFibroTool("fibro.guidance",{topic:"fibro"});
+   out.append(dom("p",reference.answer),dom("small","Source : "+reference.source+" · "+reference.date));
+  }else out.append(dom("p","Pour cette maladie, FibroBot ne dispose pas encore d'une synthèse clinique vérifiée. Consultez les informations officielles et votre professionnel."));
  });
  $("network-mode").addEventListener("change",e=>{
   networkEnabled=Boolean(e.target.checked);
@@ -249,7 +252,7 @@ function events(){
  if(b.dataset.specialist){
   if(!db){notify("Déverrouillez le coffre personnel.");return;}
   try{
-   const result=runSpecialist(b.dataset.specialist,{...DATA,energy});
+   const result=callFibroTool("fibro.agent",{id:b.dataset.specialist},{...DATA,energy});
    const record={role:"bot",body:result.answer,time:Date.now(),sourceId:result.sourceId,purpose:"specialist"};
    put(db,"conversations",record).then(()=>{DATA.conversations.push(record);renderChat();tab("chat");lastSpeech=result.answer;setEngineNote("Dernière réponse : agent "+result.name+".");speak(result.answer);}).catch(err=>notify("Agent indisponible : "+err.message));
   }catch(err){notify("Agent indisponible : "+err.message);}
