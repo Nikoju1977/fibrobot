@@ -49,9 +49,10 @@ function bubble(body,role,source,references=[]){
  return b;
 }
 function refreshMistralVaultControls(){
- const saved=DATA.settings.some(x=>x?.id===CREDENTIAL_ID&&validStoredMistralCredential(x.value));
+ const entry=DATA.settings.find(x=>x?.id===CREDENTIAL_ID);
+ const saved=Boolean(entry&&validStoredMistralCredential(entry.value));
  $("mistral-restore").disabled=!saved;
- $("mistral-forget").disabled=!saved;
+ $("mistral-forget").disabled=!entry;
  if(saved&&!mistralStatus().connected)
   $("mistral-status").textContent="Une clé Mistral est conservée chiffrée dans ton coffre. Cliquez sur « Activer la clé de mon coffre » pour l'utiliser dans cette session.";
  return saved;
@@ -308,7 +309,7 @@ function events(){
   notify("Mode local activé. Vous pouvez poser votre question, même sans Mistral.");
  });
  $("mistral-connect").addEventListener("click",async()=>{
-  const source=$("mistral-key"),secret=source.value,save=$("mistral-save-key").checked;
+  const source=$("mistral-key"),secret=source.value.trim(),save=$("mistral-save-key").checked;
   source.value=""; // Ne jamais laisser le secret dans le formulaire après soumission.
   try{
    connectMistral(secret);
