@@ -8,7 +8,7 @@ import {findScientificArticles,externalResearchLink} from "./research-library.mj
 import {isOnlineEligible,selectPublicProviders,searchPublicQuestion,formatPublicAnswer,safeReferenceUrl,PUBLIC_PROVIDERS} from "./network-library.mjs";
 import {setupPatientUX} from "./ux-pro.mjs";
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
-import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,testMistralConnection} from "./mistral-bridge.mjs";
+import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,generateMistralMedicalExplanation,testMistralConnection} from "./mistral-bridge.mjs";
 import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
@@ -140,6 +140,35 @@ async function ask(q){
   }else if(intent==="medical"&&response.kind!=="profile"&&response.kind!=="refusal"&&response.kind!=="urgent"&&response.kind!=="life"){
    const id=routeSpecialist(input);
    if(id){const specialist=runSpecialist(id,{...DATA,energy},input);answer=specialist.answer;sourceId=specialist.sourceId;engine="Agent "+specialist.name;}
+  }
+  // Le moteur Mistral peut également expliquer les fiches médicales
+  // PUBLIQUES, sans jamais recevoir le coffre patient. Urgences et
+  // prescriptions personnalisées restent traitées localement.
+  if(intent==="medical"&&response.kind!=="urgent"&&$("mistral-use").checked&&mistralStatus().connected){
+   const evidence=retrieveMedicalEvidence(input);
+   if(evidence.kind==="documented"&&evidence.passages.length){
+    if(mistralStatus().cooldownSeconds>0){
+     mistralProblem="Mistral temporairement limité (429) : fiches médicales locales conservées.";
+    }else{
+     const ok=confirm("Autoriser Mistral à recevoir cette question médicale EXACTE et des extraits de fiches publiques ?\n\n« "+input+" »\n\nNe confirmez pas si elle contient des données de santé personnelles ou identifiantes. Aucun dossier patient ni historique n'est transmis. Le résultat est éducatif, non un diagnostic, et la requête peut être facturée.");
+     if(ok){
+      setEngineNote("Mistral : explication de fiches médicales sourcées…");
+      try{
+       const result=await generateMistralMedicalExplanation(input,evidence.passages,{model:$("mistral-model").value});
+       answer=result.text+"\n\n[Explication générée à vérifier : ce n'est pas un avis médical.]";
+       references=evidence.passages.map(p=>({provider:p.source,title:p.title,url:p.url}));
+       sourceId="";engine="Mistral : pédagogie médicale sourcée";mistralAttempted=true;
+      }catch(error){
+       mistralProblem="Mistral indisponible : "+String(error.message||error).slice(0,170);
+       answer=evidence.answer;
+       references=evidence.passages.map(p=>({provider:p.source,title:p.title,url:p.url}));
+       engine="Documentation médicale locale (repli Mistral)";
+       $("mistral-status").textContent=mistralProblem;
+       if(mistralStatus().cooldownSeconds>0)$("mistral-use").checked=false;
+      }
+     }
+    }
+   }
   }
   if(intent==="general"&&!onlineAttempted&&["refusal","followup"].includes(response.kind)&&$("mistral-use").checked&&mistralStatus().connected&&mistralStatus().cooldownSeconds>0){
    mistralProblem="Mistral est temporairement limité (429), réponse locale utilisée.";
