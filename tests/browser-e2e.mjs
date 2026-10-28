@@ -81,7 +81,7 @@ try{
  await page.locator("#mistral-connect").click();
  assert.equal(await page.locator("#mistral-key").inputValue(),"","The API key must leave the input after connecting.");
  await page.locator("#mistral-use").check();
- let mistralCalls=0,bodyMistral="";
+ let mistralCalls=0,bodyMistral="",mistralRateLimited=false;
  await page.route("https://api.mistral.ai/**",async route=>{
   const req=route.request();
   if(req.method()==="OPTIONS"){
@@ -89,6 +89,12 @@ try{
    return;
   }
   mistralCalls++;bodyMistral=req.postData()||"";
+  if(mistralRateLimited){
+   await route.fulfill({status:429,contentType:"application/json",
+    headers:{"access-control-allow-origin":"*","access-control-expose-headers":"retry-after","retry-after":"120"},
+    body:JSON.stringify({object:"error",code:"rate_limit_error",message:"Too many requests"})});
+   return;
+  }
   await route.fulfill({status:200,contentType:"application/json",headers:{"access-control-allow-origin":"*"},
    body:JSON.stringify({choices:[{message:{content:"Voici une histoire de test sur la lune."}}]})});
  });
@@ -104,6 +110,21 @@ try{
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/je ne peux pas déterminer/i).last().waitFor({timeout:10000});
  assert.equal(mistralCalls,1,"Medical query must not invoke remote Mistral.");
+ // Régression observée chez les utilisateurs : après HTTP 429, FibroBot
+ // doit continuer à répondre immédiatement via ses ressources locales.
+ mistralRateLimited=true;
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/histoire courte/);dialog.accept();});
+ await page.locator("#prompt").fill("Raconte une histoire courte sur la lune");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Mode secours : Mistral temporairement indisponible/).last().waitFor({timeout:15000});
+ assert.equal(mistralCalls,2,"One request only on 429");
+ assert.match(await page.locator("#mistral-status").textContent(),/429/);
+ assert.equal(await page.locator("#mistral-use").isChecked(),false,"Disable Mistral automatically when rate-limited");
+ assert.equal(await page.locator('#chat-form button[type="submit"]').isDisabled(),false,"Chat form must be re-enabled");
+ await page.locator("#prompt").fill("Bonjour");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Bonjour !/).last().waitFor({timeout:10000});
+ assert.equal(mistralCalls,2,"Local chat still works, no extra Mistral calls");
  await page.locator("#mistral-disconnect").click();
  assert.equal(await page.locator("#mistral-use").isChecked(),false);
  await page.locator('#nav [data-tab="health"]').click();
