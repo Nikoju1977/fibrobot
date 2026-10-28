@@ -97,10 +97,10 @@ async function sendMistral(messages,{model="mistral-small-latest",fetchImpl=glob
  * evidence note remains visible even if Mistral returns an unsafe reply.
  */
 export function cleanMedicalExplanation(value){
- const text=String(value||"").replace(/[\\u0000-\\u001f\\u007f]/g," ").trim();
+ const text=String(value||"").replace(/[\u0000-\u001f\u007f]/g," ").trim();
  if(text.length<10||text.length>1900)throw Error("Explication médicale vide ou anormalement longue.");
- const fold=text.toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"");
- if(/https?:\\/\\/|www\\.|(?:posolog|dosage|\\bdose\\b|\\bmg\\b|milligram|\\bcomprimes?\\b|\\bprescri|ordonnance|automedic|augment(?:e|ez)|diminu(?:e|ez)|arr[eê]t(?:e|ez)|commenc(?:e|ez)|\\bprenez\\b|\\bvous devez\\b|\\btu dois\\b|\\bvous (?:avez|souffrez) (?:une?|de la|du|des)\\b)/i.test(fold))
+ const fold=text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+ if(/https?:\/\/|www\.|(?:posolog|dosage|\bdose\b|\bmg\b|milligram|\bcomprimes?\b|\bprescri|ordonnance|automedic|augment(?:e|ez)|diminu(?:e|ez)|arr[eê]t(?:e|ez)|commenc(?:e|ez)|\bprenez\b|\bvous devez\b|\btu dois\b|\bvous (?:avez|souffrez) (?:une?|de la|du|des)\b)/i.test(fold))
   throw Error("Explication potentiellement clinique bloquée : fiche institutionnelle conservée.");
  return text;
 }
