@@ -21,6 +21,7 @@ on:
       - "knowledge-router.mjs"
       - "medical-rag.mjs"
       - "mistral-bridge.mjs"
+      - "mistral-routing.mjs"
       - "mcp-fibro-tools.mjs"
       - "mcp-server.mjs"
       - "gemma-worker.mjs"
