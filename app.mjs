@@ -8,7 +8,8 @@ import {findScientificArticles,externalResearchLink} from "./research-library.mj
 import {isOnlineEligible,selectPublicProviders,searchPublicQuestion,formatPublicAnswer,safeReferenceUrl,PUBLIC_PROVIDERS} from "./network-library.mjs";
 import {setupPatientUX} from "./ux-pro.mjs";
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
-import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,testMistralConnection} from "./mistral-bridge.mjs";
+import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,generateMistralMedicalExplanation,generateMistralPlanningAdvice,testMistralConnection} from "./mistral-bridge.mjs";
+import {mistralRoute,mistralConsentDescription} from "./mistral-routing.mjs";
 import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
@@ -91,7 +92,10 @@ async function ask(q){
   let engine="Assistant documentaire local",references=[],onlineAttempted=false,mistralAttempted=false,mistralProblem="";
   // Consentement au réseau valable pour cette session, puis validation de chaque
   // question exacte. Pas de synchronisation du coffre ni de recherche médicale libre.
-  if(intent==="general"&&networkEnabled&&isOnlineEligible(input)&&["refusal","followup"].includes(response.kind)){
+  // When active, Mistral answers general questions first. Source search
+  // remains available when it is disabled or temporarily rate-limited.
+  if(intent==="general"&&networkEnabled&&isOnlineEligible(input)&&["refusal","followup"].includes(response.kind)&&
+   (!($("mistral-use").checked&&mistralStatus().connected)||mistralStatus().cooldownSeconds>0)){
    const servers=selectPublicProviders(input).map(id=>PUBLIC_PROVIDERS.find(p=>p.id===id)?.name).filter(Boolean).join(" et ");
    if(confirm("Recherche Internet facultative sur "+servers+" ?\n\nQuestion envoyée telle quelle aux services publics :\n« "+input+" »\n\nNe poursuivez pas si votre question contient une information personnelle ou médicale.")){
     onlineAttempted=true;setEngineNote("Recherche en cours sur les sources publiques…");
@@ -141,26 +145,44 @@ async function ask(q){
    const id=routeSpecialist(input);
    if(id){const specialist=runSpecialist(id,{...DATA,energy},input);answer=specialist.answer;sourceId=specialist.sourceId;engine="Agent "+specialist.name;}
   }
-  if(intent==="general"&&!onlineAttempted&&["refusal","followup"].includes(response.kind)&&$("mistral-use").checked&&mistralStatus().connected&&mistralStatus().cooldownSeconds>0){
-   mistralProblem="Mistral est temporairement limité (429), réponse locale utilisée.";
-   $("mistral-status").textContent=mistralProblem+" Réessayez dans "+mistralStatus().cooldownSeconds+" s au plus tôt.";
-  }
-  if(intent==="general"&&!onlineAttempted&&["refusal","followup"].includes(response.kind)&&$("mistral-use").checked&&mistralStatus().connected&&mistralStatus().cooldownSeconds===0){
-   const ok=confirm("Envoyer UNIQUEMENT cette question à l'API Mistral AI ?\n\n« "+input+" »\n\nAucun historique, symptôme, médicament ou dossier n'est transmis. Votre clé API sert à l'authentification ; cette requête peut être facturée et soumise aux règles du prestataire.");
-   if(ok){
-    setEngineNote("Mistral AI : génération distante en cours…");
-    try{
-     const result=await generateMistralChat(input,[],{model:$("mistral-model").value});
-     answer=result.text+"\n\n[Réponse de Mistral AI, non vérifiée et sans accès au dossier médical.]";
-     sourceId="";references=[];engine="Mistral AI : "+result.model;mistralAttempted=true;
-    }catch(error){
-     mistralProblem="Mistral indisponible : "+String(error.message||error).slice(0,200);
-     $("mistral-status").textContent=mistralProblem+" — L'assistant local fonctionne sans Mistral.";
-     notify("Mistral indisponible. Réponse locale utilisée.");
-     setEngineNote("Mistral indisponible : réponse locale en cours");
-     if(mistralStatus().cooldownSeconds>0){
-      $("mistral-use").checked=false; // évite de rappeler sans cesse l'API limitée
-      updateEngineNote();
+  const route=mistralRoute(input,intent,response);
+  if(route&&!onlineAttempted&&$("mistral-use").checked&&mistralStatus().connected){
+   const state=mistralStatus();
+   if(state.cooldownSeconds>0){
+    mistralProblem="Mistral temporairement limité (429), réponse locale conservée.";
+    $("mistral-status").textContent=mistralProblem+" Réessayez dans "+state.cooldownSeconds+" s au plus tôt.";
+   }else{
+    const description=mistralConsentDescription(route);
+    const permission=confirm("Activer Mistral AI pour cette réponse ?\n\n"+description+"\n\nCet appel peut être facturé. Mistral ne recevra pas les notes ou le dossier patient.");
+    if(permission){
+     setEngineNote("Mistral AI : "+route.label.toLowerCase()+" en cours…");
+     try{
+      const options={model:$("mistral-model").value};
+      if(route.mode==="general"){
+       const result=await generateMistralChat(input,[],options);
+       answer=result.text+"\n\n[Réponse de Mistral AI, sans vérification des faits.]";
+       sourceId="";references=[];engine="Mistral AI : "+result.model;
+      }else if(route.mode==="medical-reference"){
+       const result=await generateMistralMedicalExplanation(route.topic,options);
+       const source=LIBRARY.find(x=>x.id===route.topic);
+       answer="Mistral explique une fiche médicale publique :\n"+result.text+
+        "\n\nFiche de référence (« "+source.source+" ») :\n"+source.answer+
+        "\n\nCette explication ne constitue pas un diagnostic, une prescription ou une conduite à tenir personnalisée.";
+       sourceId=route.topic;engine="Mistral pédagogique + fiche institutionnelle";
+      }else if(route.mode==="planning"){
+       const result=await generateMistralPlanningAdvice(options);
+       answer=planDaily({...DATA,energy})+"\n\nConseils généraux formulés par Mistral :\n"+result.text;
+       engine="Mistral + agent local d'organisation";
+      }
+      mistralAttempted=true;
+     }catch(error){
+      mistralProblem="Mistral indisponible : "+String(error.message||error).slice(0,200);
+      $("mistral-status").textContent=mistralProblem+" — FibroBot conserve la réponse locale.";
+      notify("Mistral indisponible : affichage de la réponse locale.");
+      setEngineNote("Mistral indisponible : réponse locale disponible");
+      if(mistralStatus().cooldownSeconds>0){
+       $("mistral-use").checked=false;updateEngineNote();
+      }
      }
     }
    }
@@ -279,7 +301,7 @@ function events(){
   const button=$("mistral-test");button.disabled=true;$("mistral-status").textContent="Test API Mistral en cours…";
   try{
    const result=await testMistralConnection({model:$("mistral-model").value});
-   $("mistral-status").textContent="Mistral a répondu au test : "+result.model+". Cochez l'utilisation pour vos conversations générales.";
+   $("mistral-status").textContent="Test Mistral réussi ("+result.model+"). Vous pouvez activer les réponses générales et les explications de fiches médicales publiques.";
   }catch(e){
    $("mistral-status").textContent="Échec du test : "+e.message+". Le modèle local reste disponible.";
    $("mistral-use").checked=false;
