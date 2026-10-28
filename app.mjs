@@ -101,7 +101,7 @@ async function ask(q){
     }
    }
   }
-  if(response.kind==="urgent"||intent==="medical"&&response.kind==="refusal"){
+  if(response.kind==="urgent"){
    engine="Sécurité médicale : réponse encadrée";
   }else if(intent==="planning"&&response.kind!=="refusal"){
    answer=planDaily({...DATA,energy});engine="Agent activités et énergie";
