@@ -33,7 +33,7 @@ export function connectMistral(key){
  if(value.length<12||value.length>500||/[\r\n\s]/.test(value))throw Error("Clé Mistral invalide. Ne la saisissez pas dans la conversation.");
  sessionKey=value;return true;
 }
-export function disconnectMistral(){sessionKey="";lastFailure="";}
+export function disconnectMistral(){sessionKey="";lastFailure="";cooldownUntil=0;}
 export function mistralStatus(){
  return {connected:!!sessionKey,models:APPROVED_MODELS,cooldownSeconds:Math.max(0,Math.ceil((cooldownUntil-Date.now())/1000)),lastFailure};
 }
