@@ -23,7 +23,7 @@ export const FIBRO_MCP_TOOLS=Object.freeze([
 ]);
 const allowedTopics=Object.freeze(["fibro","activity","sleep","care","daily","multi","mindfulness","hypnosis","complementary","nutrition","gwas2026","living","causes"]);
 const topicAliases=Object.freeze({
- general:"fibro",douleurs:"fibro",pain:"fibro",sommeil:"sleep",fatigue:"daily",
+ general:"fibro",fibromyalgie:"fibro",douleurs:"fibro",pain:"fibro",sommeil:"sleep",fatigue:"daily",
  activite:"activity",exercise:"activity",therapie:"care",recherche:"fibro",
  medecin:"care",traitements:"care",psychologie:"mindfulness",genetique:"gwas2026",
  autonomie:"living",nutrition:"nutrition",acupuncture:"complementary"
