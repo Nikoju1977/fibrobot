@@ -125,6 +125,14 @@ try{
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/Bonjour !/).last().waitFor({timeout:10000});
  assert.equal(mistralCalls,2,"Local chat still works, no extra Mistral calls");
+ await page.locator("#chat-local-mode").click();
+ assert.equal(await page.locator("#network-mode").isChecked(),false);
+ assert.equal(await page.locator("#mistral-use").isChecked(),false);
+ assert.match(await page.locator("#chat-engine-state").textContent(),/Mode secours local activé/);
+ await page.locator("#prompt").fill("Quels sont les symptômes de la fibromyalgie ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/fibromyalgie/i).last().waitFor({timeout:10000});
+ assert.equal(mistralCalls,2,"Documented medical reply remains fully offline after 429");
  await page.locator("#mistral-disconnect").click();
  assert.equal(await page.locator("#mistral-use").isChecked(),false);
  await page.locator('#nav [data-tab="health"]').click();
