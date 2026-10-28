@@ -110,7 +110,7 @@
 </div>
 </details>
       <details class="card ai-card" id="mistral-options">
-       <summary><span class="ai-summary-icon" aria-hidden="true">◎</span><span><strong>Mistral AI · moteur facultatif en ligne</strong><small>Conversation générale en français, clé personnelle temporaire, sans synchronisation du dossier</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
+       <summary><span class="ai-summary-icon" aria-hidden="true">◎</span><span><strong>Mistral AI · cerveau conversationnel facultatif</strong><small>Questions générales, explications de fiches médicales publiques et organisation, avec consentement</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
        <div class="ai-details">
         <p class="callout">Mistral AI est un service distant, distinct des modèles locaux. Une clé personnelle valide et un accès API peuvent être payants. Si le navigateur bloque les requêtes directes (CORS), le mode Mistral ne fonctionnera pas sur cette PWA sans passerelle sécurisée. N'entrez pas une clé contenant des données privées.</p>
         <div class="form model-form">
@@ -127,9 +127,9 @@
           <button type="button" id="mistral-test" class="btn light" disabled>Tester Mistral</button>
           <button type="button" id="mistral-disconnect" class="btn light" disabled>Effacer la clé</button>
          </div>
-         <label class="consent"><input type="checkbox" id="mistral-use" disabled>Utiliser Mistral pour les conversations générales, avec une confirmation à chaque question</label>
+         <label class="consent"><input type="checkbox" id="mistral-use" disabled>Utiliser Mistral en priorité pour les questions générales, les explications médicales documentaires et les conseils anonymes, avec confirmation à chaque demande</label>
          <p id="mistral-status" class="tiny" role="status">Mistral désactivé. Aucune clé enregistrée.</p>
-         <p class="tiny">Une fois connecté, Mistral reçoit uniquement la question générale que vous confirmez explicitement, sans l'historique, les symptômes ou les traitements. Ne jamais envoyer de dossier patient ou de question médicale. La clé reste visible dans la mémoire du navigateur tant que la session est ouverte et peut être exposée par une extension malveillante : ne partagez pas votre appareil déverrouillé.</p>
+         <p class="tiny">Une fois connecté, Mistral reçoit uniquement votre question générale confirmée, ou le texte d’une fiche médicale PUBLIQUE approuvée, ou une consigne générique d’organisation. Il ne reçoit ni vos observations, ni traitements, ni noms de tâches, ni votre question médicale personnelle. Les urgences, diagnostics, prescriptions, résumés personnels et consultations restent traités localement. La clé reste visible dans la mémoire du navigateur tant que la session est ouverte et peut être exposée par une extension malveillante : ne partagez pas votre appareil déverrouillé.</p>
         </div>
        </div>
       </details>
@@ -150,7 +150,7 @@
       </details>
       <section class="card network-card" aria-labelledby="network-title">
        <div class="network-heading"><div><span class="section-kicker">BIBLIOTHÈQUES INTERNET GRATUITES</span><h3 id="network-title">Recherche Internet avec sources</h3></div><span class="network-badge">Sans clé API</span></div>
-       <p>FibroBot peut consulter Wikipédia, Wikidata, Wiktionnaire, OpenAlex, Crossref, Open Library et GitHub pour les questions publiques de culture générale. Les recherches médicales passent par les fiches sourcées et la bibliothèque Europe PMC, pas par une réponse improvisée.</p>
+       <p>FibroBot peut consulter Wikipédia, Wikidata, Wiktionnaire, OpenAlex, Crossref, Open Library et GitHub pour les questions publiques de culture générale. Lorsque Mistral est activé, il a priorité sur ces recherches pour les questions générales ; désactivez Mistral pour obtenir directement les résultats des bibliothèques. Les recherches médicales passent par les fiches sourcées et la bibliothèque Europe PMC, pas par une réponse improvisée.</p>
        <label class="network-consent" for="network-mode"><input type="checkbox" id="network-mode">
          <span><strong>Autoriser la recherche Internet pour cette session</strong><small>Par défaut, aucun accès Internet pour vos questions. Avant chaque recherche, FibroBot affiche la question exacte et vous demande de confirmer son envoi aux sites indiqués. Le dossier médical, les traitements et les symptômes ne sont jamais utilisés pour ces recherches.</small></span>
        </label>
