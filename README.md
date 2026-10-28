@@ -217,3 +217,17 @@ Le routage est décrit dans \`mistral-routing.mjs\` et l'appel distant protégé
 **Priorité et repli :** si Mistral est désactivé, FibroBot utilise les sources Internet autorisées, le moteur WebLLM local s'il fonctionne, ou sa bibliothèque. Le code respecte les erreurs API 429 et \`Retry-After\` sans boucler ni changer de modèle pour contourner une limite. Une API Mistral fonctionnelle nécessite une clé et peut être facturée ; les limites dépendent du compte et du modèle. La compatibilité CORS de la PWA et l'inférence Mistral réelle doivent être testées sur appareil physique.
 
 **Confidentialité :** ne jamais saisir une clé API dans le chat ; seul le champ dédié est autorisé. La clé reste uniquement dans la mémoire du navigateur et les détails privés ne sont pas transférés automatiquement. L'accord par question indique exactement la catégorie de données envoyées.
+
+## Protection renforcée de la clé API Mistral — coffre chiffré (29 octobre 2026)
+
+**Comportement par défaut :** lorsque vous saisissez la clé Mistral, FibroBot efface immédiatement la zone de saisie et conserve la clé **uniquement en mémoire durant cette session**, sans la publier, l'ajouter à une URL, l'écrire dans les journaux ou l'enregistrer dans une base en clair.
+
+**Sauvegarde volontaire :** si vous cochez **« Enregistrer aussi ma clé dans mon coffre personnel chiffré »** avant l'activation, `mistral-credential-vault.mjs` chiffre la clé par **AES-256-GCM avec un nonce aléatoire et un contexte d'authentification dédié**, puis conserve seulement l'objet chiffré dans la table `settings` du coffre patient. Le coffre principal est lui-même chiffré par AES-256-GCM avec une clé dérivée de votre phrase secrète (PBKDF2-SHA256). Les sauvegardes exportées du coffre contiennent cette **copie chiffrée**, jamais la clé en clair.
+
+**Après fermeture ou verrouillage :** Mistral est déconnecté et le secret effacé de la mémoire de session autant que JavaScript le permet. À la prochaine ouverture, déverrouillez le coffre, puis cliquez sur **« Activer la clé de mon coffre »**. Le déchiffrement exige le coffre ouvert et un clic explicite ; aucune requête Mistral n'est déclenchée par le déchiffrement lui-même. L'utilisation pour une question reste séparément autorisée.
+
+**Suppression :** « Déconnecter » efface seulement la clé de la mémoire de session. « Supprimer la clé du coffre » supprime la copie enregistrée et déconnecte le moteur. Cela ne supprime pas les **anciennes sauvegardes** du coffre et ne révoque pas la clé côté Mistral. Pour une clé exposée, révoquez-la depuis le compte Mistral, puis créez une nouvelle clé avec limites de budget et permissions adaptées.
+
+**Limites importantes :** une API appelée directement depuis une PWA statique est utilisée dans le navigateur : le chiffrement au repos ne protège pas une clé lorsqu'elle est déchiffrée pour un appel réseau. Un navigateur, une extension ou un script tiers compromis peut l'intercepter. Une clé API ne devient véritablement secrète côté serveur qu'avec un **proxy/backend de confiance**, idéalement avec contrôle d'authentification et de débit. GitHub Pages seul ne peut pas offrir ce niveau d'isolation. Ne jamais commiter de clé API dans le dépôt et ne pas la transmettre dans le chat.
+
+Tests : `tests/mistral-credential-vault.test.mjs` (chiffrement, restauration, suppression, détection des altérations, refus coffre verrouillé) et scénario navigateur E2E (aucune exposition en clair dans IndexedDB, restauration volontaire, retrait de la clé).
