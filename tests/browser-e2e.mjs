@@ -47,13 +47,13 @@ try{
  });
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Activez la recherche Internet/).waitFor();
+ await page.locator("#messages").getByText(/Je ne dispose pas encore d.une réponse vérifiée/).waitFor();
  assert.equal(wikipediaQueries,0,"Network forbidden until enabled");
  await page.locator("#network-mode").check();
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Qui était Marie Curie/);dialog.dismiss();});
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Activez la recherche Internet/).last().waitFor();
+ await page.locator("#messages").getByText(/Je ne dispose pas encore d.une réponse vérifiée/).last().waitFor();
  assert.equal(wikipediaQueries,0,"Consent to session is not consent to send each question");
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Wikipédia/);dialog.accept();});
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
