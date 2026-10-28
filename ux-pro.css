@@ -315,3 +315,21 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .online-refs a{color:#146a54;overflow-wrap:anywhere;font-weight:650;text-decoration:underline;text-underline-offset:2px}
 .online-refs a:focus-visible{outline:2px solid #146a54;outline-offset:3px}
 @media(max-width:670px){.network-card{padding:17px 15px}.network-heading{align-items:flex-start;flex-wrap:wrap}.network-badge{font-size:.66rem}.network-consent{padding:12px}.network-examples .chip{flex:1 1 140px;justify-content:center}}
+
+/* JARVIS fibromyalgie : moteur distant facultatif, preuves et outils MCP. */
+#mistral-options .ai-details{display:flex;flex-direction:column;gap:7px}
+#mistral-key{width:100%;min-height:45px;border:1px solid #aecbbb;border-radius:10px;padding:10px 13px;color:#234a3e;background:#fff}
+#mistral-options .button-row{gap:9px}
+#mistral-options .button-row button{min-height:44px}
+.medical-directories{margin:0 0 15px}
+.medical-directories>summary{cursor:pointer;padding:17px 20px;font-size:.92rem;color:#245a47}
+.medical-directories .medical-directory-body{border-top:1px solid #d5e5db;padding:17px 20px;display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.medical-directory-body label{font-weight:700}
+.medical-directory-body select{min-height:46px;min-width:min(100%,350px);max-width:100%;padding:10px;background:#fff;border:1px solid #c1d8cc;border-radius:10px}
+.medical-knowledge-results{padding:10px 0;line-height:1.55;overflow-wrap:anywhere}
+.medical-knowledge-results h4{color:#1e5b45;margin:0 0 6px}
+.medical-knowledge-results a{font-weight:700;text-decoration:underline;color:#11684b}
+.network-directory-links{display:flex;flex-wrap:wrap;gap:10px;margin:13px 0}
+.network-directory-links a{font-size:.78rem;color:#1a6853;text-decoration:underline}
+.network-directories>summary{cursor:pointer;font-size:.86rem;color:#2e624e}
+@media(max-width:650px){#mistral-options .button-row{flex-direction:column;align-items:stretch}#mistral-options .button-row button{width:100%}.medical-directories .medical-directory-body{padding:16px 14px}}
