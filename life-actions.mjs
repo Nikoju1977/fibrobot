@@ -5,6 +5,7 @@
 const SITES=Object.freeze([
  {id:"youtube",label:"YouTube",url:"https://www.youtube.com/",words:/\byoutube\b/},
  {id:"facebook",label:"Facebook",url:"https://www.facebook.com/",words:/\bfacebook\b/},
+ {id:"whatsapp",label:"WhatsApp",url:"https://web.whatsapp.com/",words:/\bwhatsapp\b/},
  {id:"google-maps",label:"Google Maps",url:"https://www.google.com/maps",words:/\b(?:google maps|maps|cartes google)\b/},
  {id:"wikipedia",label:"Wikipédia",url:"https://fr.wikipedia.org/",words:/\b(?:wikipedia|wikip[eé]dia)\b/},
  {id:"gmail",label:"Gmail",url:"https://mail.google.com/",words:/\bgmail\b/},

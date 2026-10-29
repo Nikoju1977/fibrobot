@@ -58,10 +58,37 @@ export function reply(input,library,context={}) {
  return{kind:"refusal",message:MEDICAL_REFUSAL,sources:[]};
 }
 // Legacy plaintext write APIs removed in favor of vault.mjs.
-export function makeMedication(v){const name=text(v.name,160),dose=text(v.dose,160),schedule=text(v.schedule,200),prescriber=text(v.prescriber,160),notes=text(v.notes,1000),reminderTime=text(v.reminderTime,5);if(!name)throw Error("Indiquez le nom tel qu'inscrit sur votre ordonnance.");if(reminderTime&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(reminderTime))throw Error("Heure de rappel invalide.");return{name,dose,schedule,prescriber,notes,reminderTime,created:Date.now()};}
+/** Several DECLARED daily reminder times; never infer dosage or frequency. */
+export function medicationReminderTimes(medication){
+ const raw=String(medication?.reminderTimes??medication?.reminderTime??"").trim();
+ if(!raw)return [];
+ const times=raw.split(/[;,\s]+/).filter(Boolean);
+ if(times.length>8||times.some(t=>!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)))throw Error("Heures de rappel invalides (HH:MM, 8 maximum).");
+ return [...new Set(times)].sort();
+}
+export function makeMedication(v){
+ const name=text(v.name,160),dose=text(v.dose,160),schedule=text(v.schedule,200),prescriber=text(v.prescriber,160),notes=text(v.notes,1000);
+ if(!name)throw Error("Indiquez le nom tel qu'inscrit sur votre ordonnance.");
+ const times=medicationReminderTimes({reminderTimes:v.reminderTimes??v.reminderTime});
+ return{name,dose,schedule,prescriber,notes,reminderTime:times[0]||"",reminderTimes:times.join(", "),created:Date.now()};
+}
 export function dueReminders(medications,logs,now=new Date()){
  const day=today(now),clock=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
- const handled=new Set(logs.filter(l=>l.date===day).map(l=>String(l.medicationId)));
- return medications.filter(m=>m.reminderTime&&/^\d\d:\d\d$/.test(m.reminderTime)&&m.reminderTime<=clock&&!handled.has(String(m.id))).map(m=>({medicationId:m.id,name:m.name,time:m.reminderTime,date:day,key:m.id+"-"+day,late:m.reminderTime<clock}));
+ const todayLogs=(Array.isArray(logs)?logs:[]).filter(l=>l.date===day);
+ const result=[];
+ for(const m of (Array.isArray(medications)?medications:[])){
+  let times=[];try{times=medicationReminderTimes(m);}catch{continue;}
+  const handled=todayLogs.filter(l=>String(l.medicationId)===String(m.id));
+  for(const time of times){
+   // Legacy confirmation without a scheduled time covered the whole day.
+   if(time>clock||handled.some(l=>!l.scheduledTime||l.scheduledTime===time))continue;
+   result.push({medicationId:m.id,name:m.name,time,date:day,key:m.id+"-"+day+"-"+time,late:time<clock});
+  }
+ }
+ return result.sort((a,b)=>a.time.localeCompare(b.time)||String(a.medicationId).localeCompare(String(b.medicationId)));
 }
-export function reminderLog(medicationId,status,now=new Date()){if(!Number.isInteger(Number(medicationId))||!["taken","skipped"].includes(status))throw Error("Rappel invalide.");return{medicationId:Number(medicationId),status,date:today(now),time:new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit"}).format(now),loggedAt:now.toISOString()};}
+export function reminderLog(medicationId,status,now=new Date(),scheduledTime=""){
+ if(!Number.isInteger(Number(medicationId))||!["taken","skipped"].includes(status))throw Error("Rappel invalide.");
+ if(scheduledTime&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(scheduledTime))throw Error("Heure planifiée invalide.");
+ return{medicationId:Number(medicationId),status,date:today(now),time:String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0"),scheduledTime,loggedAt:now.toISOString()};
+}

@@ -1,4 +1,4 @@
-import {today,text,makeSymptom,makeTask,makeCondition,makeAppointment,makeMedication,energyGuide,rankTasks,reply,dueReminders,reminderLog} from "./core.mjs";
+import {today,text,makeSymptom,makeTask,makeCondition,makeAppointment,makeMedication,energyGuide,rankTasks,reply,dueReminders,reminderLog,medicationReminderTimes} from "./core.mjs";
 import {LIBRARY} from "./medical-library.mjs";
 import {openSecureDB,all,put,del,wipeDB,encryptedExport,eraseLegacy} from "./vault-ui.mjs";
 import {loadGemma,unloadGemma,cancelGemmaLoad,canPlanWithGemma,generateLifePlan,generateGeneralChat,summarizePublicSources,testLocalModel,cancelLocalGeneration,detectWebGPU,listLocalModels,status as llmStatus} from "./gemma-local.mjs";
@@ -27,12 +27,15 @@ import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
 import {companionReply} from "./companion-engine.mjs";
 import {parseSiteCommand,knownSite,parseStoryCommand,parseReadingCommand,originalStory} from "./life-actions.mjs";
 import {normalizeBookText,validateBookFile,readerPage,splitSpeech} from "./book-reader.mjs";
+import {parseLocalNavigation} from "./local-commands.mjs";
+import {medicationCalendarICS} from "./medication-calendar.mjs";
+import {READER_BOOKMARK_ID,readerBookmark,matchingReaderBookmark} from "./reader-bookmark.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
 const FORMS={tasks:"task-form",symptoms:"health-form",conditions:"condition-form",medications:"med-form",appointments:"appt-form"};
 let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSpeech="",busyChat=false,networkEnabled=false;
-let bookText="",bookIndex=0,speechToken=0,activeRecognition=null,dictationStarting=false,pendingInstall=null,pdfDocumentFile=null,lastActivityAt=Date.now();
+let bookText="",bookIndex=0,bookFile=null,speechToken=0,activeRecognition=null,dictationStarting=false,pendingInstall=null,pdfDocumentFile=null,lastActivityAt=Date.now();
 // Session-only chat context; never persisted and never taken from the health vault.
 const sessionTurns=[];
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
@@ -112,7 +115,21 @@ function renderHealthTrends(){
  table.append(caption,head,body);values.replaceChildren(table);
 }
 function renderConditions(){const out=$("conditions-list");out.replaceChildren();if(!DATA.conditions.length)blank(out,"Aucune maladie connue enregistrée.");else DATA.conditions.forEach(c=>record(out,c.name,"Information saisie par vous",c.notes,"conditions",c.id));}
-function renderMeds(){const out=$("med-list");out.replaceChildren();if(!DATA.medications.length)blank(out,"Aucun médicament ou traitement déclaré.");else DATA.medications.forEach(m=>record(out,m.name,[m.dose&&"Dose déclarée : "+m.dose,m.schedule&&"Fréquence : "+m.schedule,m.reminderTime&&"Rappel quotidien : "+m.reminderTime,m.prescriber&&"Prescripteur : "+m.prescriber].filter(Boolean).join(" · "),m.notes,"medications",m.id));renderReminders();}
+function renderMeds(){
+ const out=$("med-list");out.replaceChildren();
+ if(!DATA.medications.length)blank(out,"Aucun médicament ou traitement déclaré.");
+ else DATA.medications.forEach(m=>{
+  const times=medicationReminderTimes(m);
+  record(out,m.name,[m.dose&&"Dose déclarée : "+m.dose,m.schedule&&"Fréquence : "+m.schedule,times.length&&"Rappels déclarés : "+times.join(", "),m.prescriber&&"Prescripteur : "+m.prescriber].filter(Boolean).join(" · "),m.notes,"medications",m.id);
+  if(times.length){
+   const button=dom("button","Exporter les rappels vers l'agenda (.ics)","mini");
+   button.type="button";button.dataset.medicationCalendarId=String(m.id);
+   button.setAttribute("aria-label","Exporter des rappels anonymes vers l'agenda système");
+   out.lastElementChild?.append(button);
+  }
+ });
+ renderReminders();
+}
 function renderAppointments(){const out=$("appts-list");out.replaceChildren();if(!DATA.appointments.length)blank(out,"Aucun rendez-vous enregistré.");else [...DATA.appointments].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).forEach(a=>record(out,a.title,a.date+(a.time?" à "+a.time:"")+(a.place?" · "+a.place:""),a.questions&&"Questions : "+a.questions,"appointments",a.id));}
 function renderLibrary(){const out=$("library-list");out.replaceChildren();for(const d of LIBRARY){const c=dom("article");c.append(dom("h3",d.title),dom("p",d.answer),dom("small",d.source+" · "+d.date));const link=dom("a","Voir la source");link.href=d.url;link.target="_blank";link.rel="noopener noreferrer";c.append(link);out.append(c);}}
 function bubble(body,role,source,references=[],siteId=""){
@@ -203,9 +220,11 @@ function refreshComposer(){
  const count=$("prompt-count"),field=$("prompt");
  if(count&&field)count.textContent=field.value.length+" / "+field.maxLength;
 }
+function updateVoiceState(message,active=false){const node=$("voice-live-state");if(node)node.textContent=message;document.body.dataset.voiceState=active?"speaking":"idle";}
 function stopSpeaking(){
  speechToken++;
  if("speechSynthesis" in window)try{speechSynthesis.cancel();}catch{}
+ updateVoiceState("Lecture arrêtée.");
 }
 function speak(message,{requested=false}={}){
  if(!voice&&!requested)return false;
@@ -215,11 +234,13 @@ function speak(message,{requested=false}={}){
  if(!chunks.length)return false;
  voice=true;syncVoiceControls();stopSpeaking();const token=speechToken;let index=0;
  const next=()=>{
-  if(token!==speechToken||index>=chunks.length)return;
+  if(token!==speechToken)return;
+  if(index>=chunks.length){updateVoiceState("Lecture terminée.");return;}
   const utterance=new SpeechSynthesisUtterance(chunks[index++]);
   utterance.lang="fr-FR";utterance.voice=selected;utterance.rate=Number($("chat-voice-speed")?.value)||1;
+  utterance.onstart=()=>{if(token===speechToken)updateVoiceState("FibroBot parle : segment "+index+" sur "+chunks.length+".",true);};
   utterance.onend=next;
-  utterance.onerror=()=>{if(token===speechToken)notify("Lecture audio interrompue sur cet appareil.");};
+  utterance.onerror=()=>{if(token===speechToken){updateVoiceState("Lecture interrompue.");notify("Lecture audio interrompue sur cet appareil.");}};
   try{speechSynthesis.speak(utterance);}catch{notify("Lecture vocale indisponible.");}
  };
  next();return true;
@@ -263,6 +284,7 @@ async function handleDictation(){
  const browserService=Boolean($("dictation-browser-service")?.checked);
  if(browserService&&!confirm("La reconnaissance vocale du navigateur peut envoyer votre voix aux serveurs de son fournisseur. Ne dictez pas de données de santé ou d'informations privées. Démarrer cette dictée externe ?"))return;
  const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;
+  stopSpeaking();updateVoiceState("Microphone en cours d'écoute.");
  dictationStarting=true;updateDictationButton();
  try{
   activeRecognition=await startDictation({
@@ -272,13 +294,13 @@ async function handleDictation(){
     const field=$("prompt");
     field.value=((field.value.trim()?field.value.trim()+" ":"")+transcript).slice(0,field.maxLength);
     refreshComposer();field.focus();
-    notify("Dictée terminée. Vérifiez le texte avant de l'envoyer.");
+    if($("dictation-send-confirm")?.checked&&!busyChat&&confirm("Envoyer ce texte à FibroBot ?\n\n« "+field.value.trim()+" »\n\nTout envoi vers une IA distante demandera un second accord séparé.")){const verified=field.value.trim();field.value="";refreshComposer();void ask(verified);}else notify("Dictée terminée. Vérifiez le texte avant de l'envoyer.");
    },
    onError:code=>notify("Dictée interrompue ("+code+"). Vérifiez les autorisations du micro."),
-   onEnd:()=>{activeRecognition=null;updateDictationButton();}
+   onEnd:()=>{activeRecognition=null;updateDictationButton();updateVoiceState("Microphone arrêté.");}
   });
   notify(browserService?"Dictée du navigateur activée : l'audio peut être traité à distance.":"Dictée locale activée.");
- }catch(e){activeRecognition=null;notify(String(e?.message||e).slice(0,220));}
+ }catch(e){activeRecognition=null;updateVoiceState("Dictée indisponible.");notify(String(e?.message||e).slice(0,220));}
  finally{dictationStarting=false;updateDictationButton();}
 }
 function refreshBook(){
@@ -312,10 +334,12 @@ async function ask(q){
   let answer=response.message+(response.followup?"\n\n"+response.followup:""),sourceId=response.sources?.[0]?.id||"";
   let engine="Assistant documentaire local",references=[],onlineAttempted=false,mistralAttempted=false,mistralProblem="";
   // Les actions locales et l'écoute passent après les règles d'urgence du moteur médical.
-  let siteId="",direct=false,companionMode="";
+  let siteId="",direct=false,companionMode="",navigationTarget="";
   if(response.kind!=="urgent"){
-   const site=parseSiteCommand(input);
-   if(site){
+   const site=parseSiteCommand(input),navigation=parseLocalNavigation(input);
+   if(navigation&&response.kind!=="refusal"){
+    navigationTarget=navigation.tab;answer="J'ouvre "+navigation.label+" dans FibroBot. Les informations restent sur cet appareil.";engine="Navigation locale";direct=true;
+   }else if(site){
     siteId=site.siteId;answer="Je peux ouvrir "+site.label+" pour vous. Touchez le lien « Ouvrir "+site.label+" » dans ma réponse pour confirmer l'ouverture dans votre navigateur. Je ne peux pas piloter votre téléphone, vous connecter ou agir dans ce site à votre place.";
     engine="Raccourci navigateur approuvé";direct=true;
    }else if(parseStoryCommand(input)&&!(($("auto-mode").checked&&(agnesStatus().connected||mistralStatus().connected))||($("mistral-use").checked&&mistralStatus().connected))){
@@ -494,7 +518,7 @@ async function ask(q){
   // L'écran ne dépend jamais de la réussite d'une requête réseau ou d'IndexedDB.
   DATA.conversations.push(userRecord,b);
   pending.remove();
-  renderChat();tab("chat");speak(answer);lastSpeech=answer;
+  renderChat();tab(navigationTarget||"chat");speak(answer);lastSpeech=answer;
   let saved=true;
   try{
    await put(db,"conversations",userRecord);
@@ -525,7 +549,7 @@ function showLocalAnswer(answer){
  const out=$("messages");out.append(bubble(answer,"bot"));out.scrollTop=out.scrollHeight;
  tab("chat");speak(answer);
 }
-function renderReminders(){const out=$("due-reminders");out.replaceChildren();const due=dueReminders(DATA.medications,DATA.medicationLogs);if(!due.length){blank(out,"Aucune prise à confirmer maintenant.");return;}for(const x of due){const row=dom("div",undefined,"record"),left=dom("div"),buttons=dom("div",undefined,"actions");left.append(dom("strong",x.name),dom("small","Heure prévue : "+x.time+" (déclarée)"));buttons.append(action("Pris","reminder","taken",x.medicationId),action("Ignoré","reminder","skipped",x.medicationId));row.append(left,buttons);out.append(row);if(!seen.has(x.key)){seen.add(x.key);notify("Un rappel de traitement est à vérifier dans FibroBot.");if("Notification" in window&&Notification.permission==="granted"&&document.visibilityState==="visible"){try{new Notification("FibroBot • rappel",{body:"Consultez votre prise planifiée dans FibroBot.",tag:"fibrobot-"+x.key});}catch(e){/* Indisponible sur certaines PWA */}}}}}
+function renderReminders(){const out=$("due-reminders");out.replaceChildren();const due=dueReminders(DATA.medications,DATA.medicationLogs);if(!due.length){blank(out,"Aucune prise à confirmer maintenant.");return;}for(const x of due){const row=dom("div",undefined,"record"),left=dom("div"),buttons=dom("div",undefined,"actions");left.append(dom("strong",x.name),dom("small","Heure prévue : "+x.time+" (déclarée)"));for(const [label,status] of [["Pris","taken"],["Ignoré","skipped"]]){const button=action(label,"reminder",status,x.medicationId);button.dataset.scheduledTime=x.time;buttons.append(button);}row.append(left,buttons);out.append(row);if(!seen.has(x.key)){seen.add(x.key);notify("Un rappel de traitement est à vérifier dans FibroBot.");if("Notification" in window&&Notification.permission==="granted"&&document.visibilityState==="visible"){try{new Notification("FibroBot • rappel",{body:"Consultez votre prise planifiée dans FibroBot.",tag:"fibrobot-"+x.key});}catch(e){/* Indisponible sur certaines PWA */}}}}}
 function renderUpcomingAppointments(){
  const out=$("upcoming-appointments");if(!out||!db)return;
  const upcoming=upcomingAppointments(DATA.appointments,new Date(),7);
@@ -548,8 +572,8 @@ function renderUpcomingAppointments(){
  }
 }
 async function write(store,entity,form){const id=Number(form.dataset.edit||0);if(id){const old=DATA[store].find(x=>x.id===id);if(!old)throw Error("Enregistrement introuvable.");entity={...old,...entity,id};}await put(db,store,entity);form.reset();form.dataset.edit="";$("health-date").value=today();$("appt-date").value=today();await reload();notify(id?"Modifications conservées.":"Information enregistrée sur cet appareil.");}
-function edit(store,id){const x=DATA[store].find(x=>x.id===id);if(!x)return;tab(store==="symptoms"?"health":store==="medications"?"medications":store);const f=$(FORMS[store]);f.dataset.edit=id;const values=store==="tasks"?{"task-name":x.title,"task-effort":x.effort,"task-priority":x.priority,"task-due":x.due||""}:store==="symptoms"?{"health-name":x.name,"health-date":String(x.date).slice(0,10),"health-condition":x.condition||"","pain":x.intensity,"health-energy":x.energy??"","fatigue":x.fatigue??"","sleep":x.sleep??"","health-notes":x.notes||""}:store==="conditions"?{"condition-name":x.name,"condition-notes":x.notes||""}:store==="medications"?{"med-name":x.name,"med-dose":x.dose||"","med-schedule":x.schedule||"","med-prescriber":x.prescriber||"","med-reminder-time":x.reminderTime||"","med-notes":x.notes||""}:{"appt-name":x.title,"appt-date":x.date,"appt-time":x.time||"","appt-place":x.place||"","appt-questions":x.questions||""};for(const [id,value] of Object.entries(values))$(id).value=value;f.scrollIntoView({behavior:"smooth",block:"start"});f.querySelector("input")?.focus({preventScroll:true});notify("Mode modification : enregistrez pour conserver les changements.");}
-async function command(btn){const method=btn.dataset.action,store=btn.dataset.store,id=Number(btn.dataset.id);if(method==="reminder"){await put(db,"medicationLogs",reminderLog(id,store));await reload();notify(store==="taken"?"Prise déclarée enregistrée.":"Rappel ignoré.");return;}if(!DATA[store]||!Number.isInteger(id))return;if(method==="edit"){edit(store,id);return;}const item=DATA[store].find(x=>x.id===id);if(!item)return;if(method==="toggle"&&store==="tasks"){await put(db,"tasks",{...item,done:!item.done});await reload();return;}if(method==="delete"&&confirm("Supprimer définitivement cet enregistrement ?")){await del(db,store,id);if(store==="medications")for(const x of DATA.medicationLogs.filter(x=>x.medicationId===id))await del(db,"medicationLogs",x.id);await reload();notify("Enregistrement supprimé.");}}
+function edit(store,id){const x=DATA[store].find(x=>x.id===id);if(!x)return;tab(store==="symptoms"?"health":store==="medications"?"medications":store);const f=$(FORMS[store]);f.dataset.edit=id;const values=store==="tasks"?{"task-name":x.title,"task-effort":x.effort,"task-priority":x.priority,"task-due":x.due||""}:store==="symptoms"?{"health-name":x.name,"health-date":String(x.date).slice(0,10),"health-condition":x.condition||"","pain":x.intensity,"health-energy":x.energy??"","fatigue":x.fatigue??"","sleep":x.sleep??"","health-notes":x.notes||""}:store==="conditions"?{"condition-name":x.name,"condition-notes":x.notes||""}:store==="medications"?{"med-name":x.name,"med-dose":x.dose||"","med-schedule":x.schedule||"","med-prescriber":x.prescriber||"","med-reminder-time":x.reminderTimes||x.reminderTime||"","med-notes":x.notes||""}:{"appt-name":x.title,"appt-date":x.date,"appt-time":x.time||"","appt-place":x.place||"","appt-questions":x.questions||""};for(const [id,value] of Object.entries(values))$(id).value=value;f.scrollIntoView({behavior:"smooth",block:"start"});f.querySelector("input")?.focus({preventScroll:true});notify("Mode modification : enregistrez pour conserver les changements.");}
+async function command(btn){const method=btn.dataset.action,store=btn.dataset.store,id=Number(btn.dataset.id);if(method==="reminder"){await put(db,"medicationLogs",reminderLog(id,store,new Date(),btn.dataset.scheduledTime||""));await reload();notify(store==="taken"?"Prise déclarée enregistrée.":"Rappel ignoré.");return;}if(!DATA[store]||!Number.isInteger(id))return;if(method==="edit"){edit(store,id);return;}const item=DATA[store].find(x=>x.id===id);if(!item)return;if(method==="toggle"&&store==="tasks"){await put(db,"tasks",{...item,done:!item.done});await reload();return;}if(method==="delete"&&confirm("Supprimer définitivement cet enregistrement ?")){await del(db,store,id);if(store==="medications")for(const x of DATA.medicationLogs.filter(x=>x.medicationId===id))await del(db,"medicationLogs",x.id);await reload();notify("Enregistrement supprimé.");}}
 async function exportBackup(){
  const envelope=await encryptedExport(db);
  if(!envelope)throw Error("Aucun coffre disponible.");
@@ -565,7 +589,7 @@ function forms(){
  $("task-form").addEventListener("submit",async e=>{e.preventDefault();try{await write("tasks",makeTask({title:val("task-name"),effort:val("task-effort"),priority:val("task-priority"),due:val("task-due")}),e.currentTarget);}catch(err){notify(err.message);}});
  $("health-form").addEventListener("submit",async e=>{e.preventDefault();try{await write("symptoms",makeSymptom({name:val("health-name"),date:val("health-date"),condition:val("health-condition"),intensity:val("pain"),energy:val("health-energy"),fatigue:val("fatigue"),sleep:val("sleep"),notes:val("health-notes")}),e.currentTarget);}catch(err){notify(err.message);}});
  $("condition-form").addEventListener("submit",async e=>{e.preventDefault();try{await write("conditions",makeCondition({name:val("condition-name"),notes:val("condition-notes")}),e.currentTarget);}catch(err){notify(err.message);}});
- $("med-form").addEventListener("submit",async e=>{e.preventDefault();try{await write("medications",makeMedication({name:val("med-name"),dose:val("med-dose"),schedule:val("med-schedule"),reminderTime:val("med-reminder-time"),prescriber:val("med-prescriber"),notes:val("med-notes")}),e.currentTarget);}catch(err){notify(err.message);}});
+ $("med-form").addEventListener("submit",async e=>{e.preventDefault();try{await write("medications",makeMedication({name:val("med-name"),dose:val("med-dose"),schedule:val("med-schedule"),reminderTimes:val("med-reminder-time"),prescriber:val("med-prescriber"),notes:val("med-notes")}),e.currentTarget);}catch(err){notify(err.message);}});
  $("appt-form").addEventListener("submit",async e=>{e.preventDefault();try{await write("appointments",makeAppointment({title:val("appt-name"),date:val("appt-date"),time:val("appt-time"),place:val("appt-place"),questions:val("appt-questions")}),e.currentTarget);}catch(err){notify(err.message);}});
  $("chat-form").addEventListener("submit",async e=>{
   e.preventDefault();
@@ -677,7 +701,7 @@ function events(){
  $("book-file").addEventListener("change",async event=>{
   const file=event.currentTarget.files?.[0];
   if(!file)return;
-  stopSpeaking();bookText="";bookIndex=0;pdfDocumentFile=null;$("book-pdf-open").hidden=true;refreshBook();
+  stopSpeaking();bookText="";bookIndex=0;bookFile=null;pdfDocumentFile=null;$("book-pdf-open").hidden=true;refreshBook();
   try{
    const item=await openPrivateDocument(file);
    if(item.kind==="pdf"){
@@ -686,7 +710,9 @@ function events(){
     $("book-state").textContent="PDF prêt pour un aperçu dans le navigateur. Aucun texte extrait ou envoyé à un serveur.";
     notify("PDF chargé sur cet appareil. Touchez « Afficher mon PDF » pour l'ouvrir.");
    }else{
-    bookText=item.text;bookIndex=0;refreshBook();
+    bookText=item.text;bookFile=file;
+    const saved=DATA.settings.find(x=>x.id===READER_BOOKMARK_ID)?.value;
+    bookIndex=matchingReaderBookmark(file,saved);refreshBook();
     notify("Document "+item.format+" chargé et extrait localement. Aucun envoi à un serveur.");
    }
   }catch(error){$("book-state").textContent=String(error.message||error);notify("Lecture impossible : "+String(error.message||error).slice(0,130));}
@@ -706,6 +732,21 @@ function events(){
   speak(readerPage(bookText,bookIndex).text,{requested:true});
  });
  $("book-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
+ $("book-save-mark")?.addEventListener("click",async()=>{
+  if(!db||!bookFile||!bookText){notify("Chargez d'abord un livre texte.");return;}
+  try{
+   const value=readerBookmark(bookFile,bookIndex);
+   await put(db,"settings",{id:READER_BOOKMARK_ID,value});
+   const old=DATA.settings.findIndex(x=>x.id===READER_BOOKMARK_ID);
+   if(old>=0)DATA.settings[old]={id:READER_BOOKMARK_ID,value};else DATA.settings.push({id:READER_BOOKMARK_ID,value});
+   notify("Signet conservé dans votre coffre chiffré. Le livre n'est pas sauvegardé.");
+  }catch(err){notify("Signet impossible : "+String(err.message).slice(0,110));}
+ });
+ $("book-clear-mark")?.addEventListener("click",async()=>{
+  if(!db)return;
+  try{await del(db,"settings",READER_BOOKMARK_ID);DATA.settings=DATA.settings.filter(x=>x.id!==READER_BOOKMARK_ID);notify("Signet supprimé.");}
+  catch{notify("Suppression du signet impossible.");}
+ });
  $("assistant-diagnostics-run").addEventListener("click",()=>{
   const out=$("assistant-diagnostics-result");out.replaceChildren();
   const core=checkAssistantCore();
@@ -714,6 +755,8 @@ function events(){
   for(const detail of companionStatus({vaultOpen:Boolean(db),webGPU:llmStatus(),mistral:mistralStatus(),internet:networkEnabled})){
    out.append(dom("p",detail.name+" : "+detail.status+" — "+detail.detail));
   }
+  out.append(dom("p","Dictée : "+((window.SpeechRecognition||window.webkitSpeechRecognition)?"API exposée, fonctionnement réel à tester.":"API indisponible.")+" Voix française locale : "+(localVoice()?"détectée, à tester.":"non détectée.")));
+  out.append(dom("p","Rappels hors application : non garantis en PWA. Commandes natives Android/iOS : non disponibles. Audit clinique et tests matériels toujours nécessaires."));
   out.append(dom("p","Ce diagnostic n'appelle aucune API et ne teste pas la disponibilité réelle de Mistral ou WebGPU. Aucune donnée patient n'est envoyée."));
   $("assistant-diagnostics-state").textContent=core.ok?"Diagnostic local terminé. Vérifiez les états des moteurs ci-dessous.":"Diagnostic local incomplet : la bibliothèque pourrait être indisponible.";
  });
@@ -823,7 +866,21 @@ function events(){
   updateEngineNote();
  });
  document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
- if(b.dataset.calendarId){
+ if(b.dataset.medicationCalendarId){
+   if(!db){notify("Déverrouillez le coffre avant cet export.");return;}
+   const medication=DATA.medications.find(x=>String(x.id)===b.dataset.medicationCalendarId);
+   if(!medication){notify("Traitement introuvable.");return;}
+   if(!confirm("Créer un fichier calendrier avec des rappels quotidiens anonymes ?\n\nLe fichier ne contient aucun nom de médicament ni dose. Il comporte les heures déclarées. Votre calendrier doit ensuite l'importer : les alertes ne sont pas garanties."))return;
+   try{
+    const content=medicationCalendarICS(medication);
+    const url=URL.createObjectURL(new Blob([content],{type:"text/calendar;charset=utf-8"})),link=dom("a");
+    link.href=url;link.download="fibrobot-rappels-prives.ics";document.body.append(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    notify("Agenda anonyme exporté. Importez-le explicitement dans votre calendrier.");
+   }catch(err){notify("Export impossible : "+String(err.message||err).slice(0,110));}
+   return;
+  }
+  if(b.dataset.calendarId){
   if(!db){notify("Déverrouillez le coffre pour exporter le rendez-vous.");return;}
   const entry=DATA.appointments.find(x=>String(x.id)===b.dataset.calendarId);
   if(!entry){notify("Rendez-vous introuvable.");return;}
@@ -880,7 +937,7 @@ function events(){
   });
  $("mic").addEventListener("click",handleDictation);
  $("export").addEventListener("click",()=>exportBackup().catch(e=>notify("Export impossible : "+e.message)));
- $("print-report").addEventListener("click",printReport);
+ $("print-report").addEventListener("click",()=>{if(confirm("Le rapport imprimable contient vos données de santé EN CLAIR. Évitez un ordinateur partagé, une imprimante publique ou un PDF non protégé. Continuer ?"))printReport();});
  $("erase").addEventListener("click",async()=>{if(!confirm("Supprimer définitivement toutes les données FibroBot de ce navigateur ?"))return;try{disableMistralSession();db.close();await wipeDB();location.reload();}catch(e){notify("Effacement bloqué : "+e.message);}});
  $("notification-permission").addEventListener("click",async()=>{if(!("Notification" in window)||typeof Notification.requestPermission!=="function"){notify("Notifications non disponibles ici. Gardez une alarme système pour les prises essentielles.");return;}try{const state=await Notification.requestPermission();notify(state==="granted"?"Notifications autorisées tant que le navigateur le permet.":"Notifications non autorisées. Les rappels restent visibles dans FibroBot.");}catch(e){notify("Notifications non prises en charge.");}});
  $("llm-check").addEventListener("click",async()=>{
@@ -978,8 +1035,43 @@ function events(){
    speak(script);
  });
 }
+/* V27 progressive enhancements: attached only when the patient unlocks the existing PWA.
+ * No native OS automation, background microphone, network call or data migration.
+ */
+function setupV27Controls(){
+ const live=dom("p","Microphone et lecture vocale inactifs.","tiny voice-state");
+ live.id="voice-live-state";live.setAttribute("role","status");live.setAttribute("aria-live","polite");
+ $("messages")?.before(live);
+ const dictation=document.querySelector(".dictation-permission");
+ if(dictation&&!$("dictation-send-confirm")){
+  const label=dom("label",undefined,"consent");
+  label.htmlFor="dictation-send-confirm";
+  const checkbox=dom("input");checkbox.type="checkbox";checkbox.id="dictation-send-confirm";
+  label.append(checkbox,document.createTextNode(" Proposer l'envoi après la dictée (confirmation obligatoire)"));
+  document.querySelector(".dictation-permission")?.append(label);
+ }
+ const med=$("med-reminder-time");
+ if(med){
+  med.type="text";med.maxLength=55;med.placeholder="08:00, 13:00, 20:00";
+  const label=document.querySelector('label[for="med-reminder-time"]');
+  if(label)label.textContent="Heures de rappels quotidiens déclarés (8 maximum)";
+  med.after(dom("p","Séparez les horaires prescrits par des virgules. FibroBot ne déduit ni dose ni fréquence. Les alertes de la PWA ne sont pas garanties après fermeture.","tiny"));
+ }
+ const bookStop=$("book-stop");
+ if(bookStop){
+  const save=dom("button","Enregistrer ma page dans le coffre","btn light"),clear=dom("button","Oublier mon signet","btn light");
+  save.id="book-save-mark";clear.id="book-clear-mark";save.type=clear.type="button";
+  bookStop.after(save,clear);
+ }
+ const shortcuts=document.querySelector(".companion-shortcuts");
+ if(shortcuts){
+  for(const [label,query] of [["Google Maps","Ouvre Google Maps"],["Google Agenda","Ouvre Google Agenda"],["Mes rendez-vous","Affiche mes rendez-vous"]]){
+   const button=dom("button",label,"btn light");button.type="button";button.dataset.ask=query;shortcuts.append(button);
+  }
+ }
+}
 async function init(){
- renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
+ setupV27Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
