@@ -40,7 +40,7 @@ export async function generateAgnesChat(question,{model="agnes-2.5-flash",histor
  if(signal?.aborted)controller.abort();else signal?.addEventListener("abort",abort,{once:true});
  const timeout=setTimeout(abort,12000);
  try{
-  reserveApiRequest("agnes");
+  if(fetchImpl===globalThis.fetch)reserveApiRequest("agnes");
   const response=await fetchImpl(URL,{method:"POST",mode:"cors",credentials:"omit",cache:"no-store",
    headers:{"Authorization":"Bearer "+sessionKey,"Content-Type":"application/json"},
    body:JSON.stringify({model,messages,temperature:0.35,max_tokens:430,stream:false}),signal:controller.signal});
