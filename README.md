@@ -249,3 +249,15 @@ Le diagnostic hors ligne **ne valide pas l'accès à Mistral, sa facturation, le
 - En l'absence d'un indicateur d'énergie, FibroBot évite d'afficher une valeur non renseignée comme si le patient l'avait saisie. Le classement pratique des tâches conserve sa valeur par défaut, à ajuster.
 - La PWA passe au cache `fibrobot-shell-v18` pour distribuer les nouveaux modules. L'historique du patient reste séparé dans IndexedDB et ne doit pas être supprimé en actualisant la PWA.
 - Tests de régression : `node --test tests/patient-data-privacy.test.mjs`. **Aucune validation clinique ni sur téléphone physique n'est déduite de ces tests unitaires.**
+
+
+## Interface de l'assistant repensée — octobre 2026
+
+- La **conversation est désormais la première zone visible** dans l'onglet Assistant : les modèles optionnels et les diagnostics restent plus bas, accessibles sans gêner la discussion.
+- Entête FibroBot avec **indicateur du moteur** (documentaire local, modèle sur appareil, recherche Internet ou Mistral avec consentement) et commande de lecture vocale synchronisée avec celle de l'en-tête global.
+- Zone de saisie **multiligne** avec compteur de caractères, entrée pour envoyer, Maj + Entrée pour une nouvelle ligne, bouton de dictée locale *uniquement si le navigateur la prend en charge*.
+- Réponses identifiées par rôle, références conservées et actions **Copier** (presse-papiers après clic) et **Écouter** (voix locale activée). Rien n'est transmis à un service externe par ces actions.
+- Accès rapide à trois questions types, aux sept agents locaux, au mode secours et à la préparation des consultations.
+- Améliorations tactiles et d'accessibilité : contrastes, cibles de 44–46 px, focus visible, textes lisibles, adaptation aux petits écrans, mouvements réduits.
+- Le service worker passe à **v19**. Les données médicales restent dans le coffre existant. En cas de difficulté après déploiement, fermer/réouvrir la PWA, sans effacer les données du site.
+- La nouvelle interface ne valide ni l'exactitude clinique ni les performances des IA. Tester les plateformes physiques et les lecteurs d'écran avant tout usage patient généralisé.
