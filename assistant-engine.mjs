@@ -2,7 +2,7 @@
  * Pas de diagnostic, prescription, calcul de dose ou score de risque clinique.
  * Les observations restent des données déclarées, sans interprétation médicale.
  */
-import {rankTasks,energyGuide,today,text} from "./core.mjs";
+import {rankTasks,energyGuide,today,dateOK,text} from "./core.mjs";
 
 const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const RE_MEDICAL=/(\b(?:fibromyalgie|fibro)\b|maladi|medic|traitement|douleur|sympt|diagnos|ordonnance|allerg|dose|posolog|crise|suicid|sante|soin|therap|depress|migraine|diabet|asthme|cancer|rhumat|handicap|fatigue|sommeil|insomni|pression|fievre|infection|chirurg|effet secondaire|interact|enceint|prescri|hopital|pharmac|consultation|j.ai mal|mal a la tete|je me sens mal|je souffre|vertige|vomiss|nausee|anxiet|angoiss|paniques|stress|suicide|deprimer|mal etre|blessure|hematome|mal au ventre|mal au dos|saign|tension arterielle|difficulte a respirer)/;
@@ -10,6 +10,8 @@ const RE_DRUG=/(dose|dosage|posolog|combien de comprime|quel medicament|arreter|
 const RE_PHARMA_NAMES=/(paracetamol|doliprane|ibuprofene|advil|tramadol|morphine|insuline|metformine|sertraline|antidepresseur|anxiolytique|somnifere|antibiotique|cortisone|anticoagulant|opioide|oxycodone|vaccin|rivotril|lyrica|pregabaline)/;
 const RE_PRIVATE=/(?:[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|(?:\+33|0[1-9])(?:[ .-]?\d\d){4}|mot de passe|numero de securite sociale|numero de carte|mon adresse|j'habite au \d)/i;
 
+const RE_SENSITIVE_SELF_DISCLOSURE=/(?:\b(?:mon|ma|mes)\s+(?:nom|prenom|adresse|telephone|numero|mail|email|age|date de naissance|dossier|diagnostic|traitement|ordonnance|medicament|symptome|douleur|pathologie)\b|\b(?:je\s+|j[\u0027\u2019])(?:m.appelle|me nomme|habite|souffre|prends|suis sous|suis ne|ai\s+\d{1,3}\s+ans)\b|\b(?:ma mere|mon pere|mon enfant|ma fille|mon fils)\b)/i;
+const containsPrivateData=s=>RE_PRIVATE.test(s)||RE_SENSITIVE_SELF_DISCLOSURE.test(s);
 
 export const RESEARCH_TOPICS=Object.freeze([
  {id:"fibromyalgia",label:"Fibromyalgie — recherches générales",query:"TITLE_ABS:fibromyalgia"},
@@ -33,9 +35,9 @@ export function classifyIntent(input){
  if(/(organis|tache|planning|courses|menage|lessive|priorite|quotidien|journee|administrati|courrier|papier)/.test(q))return "planning";
  return "general";
 }
-const validRating=n=>Number.isInteger(Number(n))&&Number(n)>=0&&Number(n)<=10;
-const formattedDay=s=>/^\d{4}-\d{2}-\d{2}$/.test(String(s))?String(s):"date non renseignée";
-const lastRows=(ctx,limit)=>[...(ctx?.symptoms||[])].filter(x=>x&&validRating(x.intensity)).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,limit);
+const validRating=n=>(typeof n==="number"||typeof n==="string")&&String(n).trim()!==""&&Number.isInteger(Number(n))&&Number(n)>=0&&Number(n)<=10;
+const formattedDay=s=>dateOK(s)?String(s):"date non renseignée";
+const lastRows=(ctx,limit)=>(Array.isArray(ctx?.symptoms)?ctx.symptoms:[]).filter(x=>x&&dateOK(x.date)&&validRating(x.intensity)).sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,limit);
 const average=(rows,key)=>{const a=rows.map(r=>r[key]).filter(v=>v!==null&&v!==undefined&&v!==""&&validRating(v)).map(Number);return a.length?((a.reduce((p,c)=>p+c,0)/a.length).toFixed(1).replace(".",","))+"/10 ("+a.length+" notes)":"non renseigné";};
 export function summarizeObservations(context={}){
  const rows=lastRows(context,30);
@@ -50,9 +52,9 @@ export function summarizeObservations(context={}){
 }
 export function prepareVisit(context={}){
  const observations=lastRows(context,5);
- const conditions=(context.conditions||[]).slice(0,10).map(x=>text(x.name,100)).filter(Boolean);
- const medications=(context.medications||[]).slice(0,15).map(x=>text(x.name,100)).filter(Boolean);
- const appointments=(context.appointments||[]).filter(x=>x.date>=today()).sort((a,b)=>String(a.date+a.time).localeCompare(String(b.date+b.time)));
+ const conditions=(Array.isArray(context.conditions)?context.conditions:[]).filter(Boolean).slice(0,10).map(x=>text(x.name,100)).filter(Boolean);
+ const medications=(Array.isArray(context.medications)?context.medications:[]).filter(Boolean).slice(0,15).map(x=>text(x.name,100)).filter(Boolean);
+ const appointments=(Array.isArray(context.appointments)?context.appointments:[]).filter(x=>x&&dateOK(x.date)&&x.date>=today()).sort((a,b)=>String(a.date+(a.time||"")).localeCompare(String(b.date+(b.time||""))));
  const next=appointments[0], questions=appointments.slice(0,3).flatMap(a=>String(a.questions||"").split(/[\n;]/)).map(x=>text(x,180)).filter(Boolean).slice(0,6);
  return "Préparation de consultation (données déclarées, à vérifier avec le professionnel).\n"+
  "Prochain rendez-vous : "+(next?text(next.title,100)+" — "+next.date+(next.time?" à "+next.time:""):"aucun rendez-vous enregistré")+".\n"+
@@ -63,7 +65,7 @@ export function prepareVisit(context={}){
  "À demander si pertinent : quels symptômes faut-il surveiller, quelles adaptations pratiques prévoir et quand reconsulter ? Ce résumé ne constitue pas une évaluation médicale.";
 }
 export function planDaily(context={}){
- const n=Number(context.energy);
+ const n=context.energy===null||context.energy===undefined||context.energy===""?NaN:Number(context.energy);
  const energy=Number.isInteger(n)&&n>=0&&n<=10?n:5;
  const all=rankTasks(context.tasks||[],energy),suggested=all.filter(x=>x.adapted).slice(0,3);
  const later=all.filter(x=>!x.adapted).slice(0,3);
@@ -77,8 +79,8 @@ export function planDaily(context={}){
 }
 export function nonMedicalMessages(question,history=[]){
  if(classifyIntent(question)!=="general")throw Error("Question non admissible au dialogue général.");
- if(RE_PRIVATE.test(norm(question)))throw Error("Cette question contient des données privées : utilisez le mode documentaire local.");
- const context=Array.isArray(history)?history.filter(x=>x?.purpose==="general-local"&&["user","bot"].includes(x.role)&&classifyIntent(x.body)==="general"&&!RE_PRIVATE.test(norm(x.body))).slice(-6):[];
+ if(containsPrivateData(norm(question)))throw Error("Cette question contient des données privées : utilisez le mode documentaire local.");
+ const context=Array.isArray(history)?history.filter(x=>x?.purpose==="general-local"&&["user","bot"].includes(x.role)&&classifyIntent(x.body)==="general"&&!containsPrivateData(norm(x.body))).slice(-6):[];
  const system="Tu es FibroBot, compagnon de conversation générale de Studio Niko Design. Réponds en français, poliment, simplement et brièvement. Ne prétends pas connaître le dossier médical ou avoir consulté Internet. Tu n’as aucune information actualisée. Aucun diagnostic, conseil de traitement, dosage, interaction, posologie, modification de prescription ni évaluation de risque : pour les questions de santé, invite à utiliser les fiches sourcées et à consulter un professionnel. Ne génère aucune action automatique. Signale clairement toute incertitude factuelle.";
  return [{role:"system",content:system},...context.map(x=>({role:x.role==="bot"?"assistant":"user",content:text(x.body,450)})),{role:"user",content:text(question,1000)}];
 }
