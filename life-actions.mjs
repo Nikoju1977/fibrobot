@@ -20,9 +20,11 @@ export function parseSiteCommand(question){
  const q=nrm(clean(question));
  if(!/^(?:fibrobot[ ,:;.!]*)?(?:s'il te plait[ ,:;.!]*)?(?:ouvre(?:-moi)?|lance|va sur|affiche|accede a|emmene.moi sur)\b/.test(q))return null;
  const found=SITES.filter(s=>s.words.test(q));
+ // Google is a generic substring of Google Maps and Google Agenda.
+ const matches=found.length>1?found.filter(s=>s.id!=="google"):found;
  // Never resolve arbitrary URLs, extensions, system settings or conflicting sites.
- if(found.length!==1)return null;
- return {kind:"site",siteId:found[0].id,label:found[0].label};
+ if(matches.length!==1)return null;
+ return {kind:"site",siteId:matches[0].id,label:matches[0].label};
 }
 const stories=Object.freeze([
  {id:"forest",title:"La lumière au bout du sentier",text:"Au bord d'une forêt dormait une petite lanterne que personne n'avait allumée depuis longtemps. Un soir, une promeneuse s'arrêta près d'elle et lui confia : « Je ne sais plus très bien où aller. » La lanterne ne prétendit pas connaître le chemin. Elle éclaira simplement le premier pas. La promeneuse découvrit une pierre plate, puis un pont de bois, puis un jardin qui sentait le thym. Elle comprit que le sentier n'avait pas besoin d'être parcouru d'un seul élan. Au matin, elle revint près de la lanterne et posa une fleur à son pied. La forêt n'avait pas changé. Mais le premier pas lui semblait désormais possible."},
