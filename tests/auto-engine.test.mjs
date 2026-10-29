@@ -78,7 +78,7 @@ test("PWA: new modules cached, UI connected, no hardcoded keys",()=>{
  const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");
  const app=readFileSync(new URL("../app.mjs",import.meta.url),"utf8");
  assert.match(sw,/agnes-bridge\.mjs/);assert.match(sw,/auto-engine\.mjs/);
- assert.match(sw,/fibrobot-shell-v21/);
+ assert.match(sw,/fibrobot-shell-v22/);
  for(const id of ["auto-mode","auto-brain-status","agnes-key","agnes-connect","agnes-test","agnes-disconnect","agnes-status","agnes-model"])
   assert.equal(html.split('id="'+id+'"').length-1,1,id);
  assert.match(html,/https:\/\/apihub\.agnes-ai\.com/);
