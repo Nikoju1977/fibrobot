@@ -12,7 +12,7 @@ Cette version conserve la préférence **Agnes AI puis Mistral** pour les questi
 
 **Limites non résolues :** tests des fournisseurs avec des clés réellement actives, vérification sur les appareils physiques iOS/Android, intégration native d'actions système et de notifications en arrière-plan, supports PDF/EPUB non ajoutés dans cette version. Les API restent soumises aux restrictions CORS du navigateur et à une exposition plus importante des clés dans une PWA purement statique. Ne pas saisir une clé sans limite budgétaire.
 
-Le cache PWA utilise maintenant `fibrobot-shell-v24`. Fermer puis rouvrir la PWA permet normalement son actualisation ; **ne pas effacer les données du site**, qui hébergent le coffre de santé chiffré.
+Le cache PWA utilise maintenant `fibrobot-shell-v25`. Fermer puis rouvrir la PWA permet normalement son actualisation ; **ne pas effacer les données du site**, qui hébergent le coffre de santé chiffré.
 
 ---
 
@@ -335,3 +335,16 @@ Les fonctions documentaires et le coffre **restent intégrés** : c'est indispen
 Les histoires et demandes de conversation générales utilisent l'IA connectée si disponible, à la place de scripts répétitifs. Pour les questions médicales personnelles, les urgences, le diagnostic et les modifications de traitement, FibroBot maintient ses garde-fous et les réponses sourcées/encadrées. Les appels à Agnes et Mistral restent soumis au compte, aux quotas et à CORS ; aucun fournisseur ne peut répondre avec certitude à toute question.
 
 **Attention :** Agnes et Mistral sont des services distants. Leur clé API ne doit jamais apparaître dans un dépôt GitHub. Ce site statique utilise actuellement une clé Agnes saisie dans le navigateur, plus exposée qu'une clé conservée sur un serveur dédié. Ne configurez pas de clé à budget élevé. Le service worker utilise `fibrobot-shell-v23` ; fermer puis rouvrir la PWA suffit généralement à rafraîchir les ressources sans effacer les données médicales.
+
+
+## FibroBot V25 — voix, coordination et mobilité (29 octobre 2026)
+
+**Dictée mobile :** la dictée utilise toujours d'abord le mode entièrement local si le navigateur sait attester que le modèle français est installé, avec SpeechRecognition.available et processLocally=true. Si cette API n'est pas disponible, elle n'essaie **pas** un service externe à l'insu du patient. L'utilisateur peut cocher « Autoriser la dictée du navigateur » : une confirmation spécifique précisant que la voix peut être transmise au fournisseur du navigateur est demandée **à chaque démarrage**. La transcription remplit seulement la zone de composition, jamais envoyée automatiquement. La PWA ne pilote pas les autorisations système du microphone et ne garantit pas la compatibilité Samsung/iOS.
+
+**Agents coordonnés :** un bouton « Bilan coordonné des agents » assemble uniquement sur l'appareil un résumé descriptif des symptômes enregistrés, des priorités d'activité, du prochain rendez-vous et du nombre de traitements/maladies déclarés. Aucune IA distante, aucun diagnostic ni ajustement thérapeutique.
+
+**Rappels de rendez-vous :** l'accueil affiche les rendez-vous déclarés des 7 prochains jours. Quand l'application est ouverte et que le coffre est déverrouillé, elle peut afficher des avis de rendez-vous imminents (aujourd'hui ou demain). Les notifications du système sont génériques et ne révèlent ni motif, ni nom de traitement. Elles dépendent des permissions du navigateur, et **ne sont pas garanties lorsque l'app est fermée**. Pour une alarme persistante en arrière-plan, utiliser le calendrier ou une alarme native du téléphone.
+
+**Réseau et accessibilité :** un indicateur hors-ligne annonce quand le suivi et la bibliothèque restent consultables mais que les fournisseurs IA distants ne le sont pas. Les contrôles de dictée ont une taille tactile accrue et un état accessible. Aucun mode IA local génératif n'est rétabli dans l'interface.
+
+Tests des nouveaux modules : tests/v25-companion.test.mjs. Les tests d'intégration Chromium et smoke mobile restent nécessaires avant toute fusion. Les API réelles Agnes/Mistral et les périphériques iOS/Android physiques ne sont pas couverts par les tests simulés.
