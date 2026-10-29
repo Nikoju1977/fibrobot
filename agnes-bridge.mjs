@@ -4,6 +4,7 @@
  * The public browser endpoint may block requests (CORS).
  */
 import {nonMedicalMessages,cleanConversationalReply} from "./assistant-engine.mjs";
+import {reserveApiRequest} from "./request-budget.mjs";
 const URL="https://apihub.agnes-ai.com/v1/chat/completions";
 const MODELS=Object.freeze(["agnes-2.5-flash","agnes-2.0-flash","agnes-3.0-flash"]);
 const active=new Set();
@@ -39,6 +40,7 @@ export async function generateAgnesChat(question,{model="agnes-2.5-flash",histor
  if(signal?.aborted)controller.abort();else signal?.addEventListener("abort",abort,{once:true});
  const timeout=setTimeout(abort,12000);
  try{
+  if(fetchImpl===globalThis.fetch)reserveApiRequest("agnes");
   const response=await fetchImpl(URL,{method:"POST",mode:"cors",credentials:"omit",cache:"no-store",
    headers:{"Authorization":"Bearer "+sessionKey,"Content-Type":"application/json"},
    body:JSON.stringify({model,messages,temperature:0.35,max_tokens:430,stream:false}),signal:controller.signal});
