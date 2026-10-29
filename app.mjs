@@ -376,6 +376,28 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
+ $("companion-mode").addEventListener("change",()=>{
+  const label=$("companion-mode").selectedOptions[0]?.textContent||"Automatique";
+  notify("Mode d'écoute : "+label+". Les règles de sécurité restent prioritaires.");
+ });
+ $("book-file").addEventListener("change",async event=>{
+  const file=event.currentTarget.files?.[0];
+  if(!file)return;
+  stopSpeaking();bookText="";bookIndex=0;refreshBook();
+  try{
+   validateBookFile(file);
+   bookText=normalizeBookText(await file.text());
+   bookIndex=0;refreshBook();
+   notify("Texte chargé localement : "+file.name+". Aucun envoi réseau.");
+  }catch(error){$("book-state").textContent=String(error.message||error);notify("Lecture du fichier impossible.");}
+ });
+ $("book-prev").addEventListener("click",()=>{if(bookText){stopSpeaking();bookIndex=Math.max(0,bookIndex-1);refreshBook();}});
+ $("book-next").addEventListener("click",()=>{if(bookText){stopSpeaking();bookIndex++;refreshBook();}});
+ $("book-read").addEventListener("click",()=>{
+  if(!bookText){notify("Ouvrez d'abord un livre .txt ou .md.");return;}
+  speak(readerPage(bookText,bookIndex).text,{requested:true});
+ });
+ $("book-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
  $("assistant-diagnostics-run").addEventListener("click",()=>{
   const out=$("assistant-diagnostics-result");out.replaceChildren();
   const core=checkAssistantCore();
@@ -509,7 +531,7 @@ function events(){
  }else if(b.dataset.action)command(b).catch(err=>notify(err.message));});
  $("daily-energy").addEventListener("input",e=>{energy=Number(e.target.value);$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();});
  $("daily-energy").addEventListener("change",async()=>{try{await put(db,"settings",{id:"energy",value:energy});}catch(e){notify("Énergie non sauvegardée.");}});
-  $("voice-toggle").addEventListener("click",()=>{if(!voice&&!localVoice()){notify("Aucune voix française garantie locale sur cet appareil. Aucune voix en ligne n'est activée.");return;}voice=!voice;syncVoiceControls();if(!voice&&"speechSynthesis" in window)speechSynthesis.cancel();});
+  $("voice-toggle").addEventListener("click",()=>{if(!voice&&!localVoice()){notify("Aucune voix française garantie locale sur cet appareil. Aucune voix en ligne n'est activée.");return;}voice=!voice;syncVoiceControls();if(!voice)stopSpeaking();});
   $("chat-voice-toggle").addEventListener("click",()=>$("voice-toggle").click());
   $("prompt").addEventListener("input",refreshComposer);
   $("prompt").addEventListener("keydown",event=>{
