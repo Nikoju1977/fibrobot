@@ -11,7 +11,8 @@ import {checkAssistantCore,companionStatus,documentedAnswer} from "./assistant-d
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
 import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,generateMistralMedicalExplanation,generateMistralPlanningAdvice,testMistralConnection} from "./mistral-bridge.mjs";
 import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgnesChat,testAgnesConnection} from "./agnes-bridge.mjs";
-import {autoGeneralAllowed,answerWithAuto} from "./auto-engine.mjs";
+import {autoGeneralAllowed,answerWithAuto,shouldPreferSources} from "./auto-engine.mjs";
+import {sessionPreview,appendSessionTurn} from "./conversation-context.mjs";
 import {mistralRoute,mistralConsentDescription} from "./mistral-routing.mjs";
 import {CREDENTIAL_ID,validStoredMistralCredential,saveMistralCredential,loadMistralCredential,deleteMistralCredential} from "./mistral-credential-vault.mjs";
 import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
@@ -24,6 +25,8 @@ const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],me
 const FORMS={tasks:"task-form",symptoms:"health-form",conditions:"condition-form",medications:"med-form",appointments:"appt-form"};
 let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSpeech="",busyChat=false,networkEnabled=false;
 let bookText="",bookIndex=0,speechToken=0;
+// Session-only chat context; never persisted and never taken from the health vault.
+const sessionTurns=[];
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
 const val=id=>$(id).value;
 function notify(message){$("toast").textContent=message;$("toast").hidden=false;clearTimeout(notify.timeout);notify.timeout=setTimeout(()=>$("toast").hidden=true,5500);}
@@ -140,7 +143,7 @@ function speak(message,{requested=false}={}){
  const next=()=>{
   if(token!==speechToken||index>=chunks.length)return;
   const utterance=new SpeechSynthesisUtterance(chunks[index++]);
-  utterance.lang="fr-FR";utterance.voice=selected;utterance.rate=.93;
+  utterance.lang="fr-FR";utterance.voice=selected;utterance.rate=Number($("chat-voice-speed")?.value)||1;
   utterance.onend=next;
   utterance.onerror=()=>{if(token===speechToken)notify("Lecture audio interrompue sur cet appareil.");};
   try{speechSynthesis.speak(utterance);}catch{notify("Lecture vocale indisponible.");}
@@ -195,11 +198,26 @@ async function ask(q){
   }
   if(!direct){
   const autoEligible=$("auto-mode").checked&&autoGeneralAllowed(input,intent,response);
-  let autoAnswered=false;
+  let autoAnswered=false,sourceFirstAnswered=false;
   // Consentement au réseau valable pour cette session, puis validation de chaque
   // question exacte. Pas de synchronisation du coffre ni de recherche médicale libre.
   // When active, Mistral answers general questions first. Source search
   // remains available when it is disabled or temporarily rate-limited.
+  // Source-first path: explicit consent for the exact public question.
+  if(autoEligible&&networkEnabled&&$("sources-first")?.checked&&shouldPreferSources(input,intent,response)&&isOnlineEligible(input)){
+   const providers=selectPublicProviders(input).map(id=>PUBLIC_PROVIDERS.find(p=>p.id===id)?.name).filter(Boolean).join(" et ");
+   if(confirm("Chercher des sources publiques sur "+providers+" avant de consulter une IA ?\n\nQuestion :\n« "+input+" »\n\nAucune note médicale ni donnée du coffre n'est transmise.")){
+    setEngineNote("Recherche de références publiques en cours…");
+    try{
+     const found=await searchPublicQuestion(input);
+     const citations=found.results.map(r=>({provider:r.provider,title:r.title,url:r.url,date:r.date}));
+     if(citations.length){
+      answer=formatPublicAnswer(found);references=citations;sourceId="";
+      engine="Recherche publique sourcée";sourceFirstAnswered=true;onlineAttempted=true;
+     }
+    }catch(err){setEngineNote("Recherche publique indisponible : essai du modèle conversationnel.");}
+   }
+  }
   if(!autoEligible&&intent==="general"&&networkEnabled&&isOnlineEligible(input)&&["refusal","followup"].includes(response.kind)&&
    (!($("mistral-use").checked&&mistralStatus().connected)||mistralStatus().cooldownSeconds>0)){
    const servers=selectPublicProviders(input).map(id=>PUBLIC_PROVIDERS.find(p=>p.id===id)?.name).filter(Boolean).join(" et ");
@@ -301,15 +319,20 @@ async function ask(q){
     }
    }
   }
-  if(autoEligible){
+  if(autoEligible&&!sourceFirstAnswered){
    const agnes=agnesStatus(),mistral=mistralStatus();
    const candidate=await answerWithAuto({
     question:input,intent,response,
-    state:{agnesConnected:agnes.connected,agnesCooldown:agnes.cooldownSeconds,
-     mistralConnected:mistral.connected,mistralCooldown:mistral.cooldownSeconds},
-    agnes:async q=>generateAgnesChat(q,{model:$("agnes-model").value}),
-    mistral:async q=>generateMistralChat(q,[],{model:$("mistral-model").value}),
-    authorize:(provider,q)=>confirm("Mode Auto : "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" est un fournisseur distant.\n\nEnvoyer cette question générale ?\n« "+q+" »\n\nAucun dossier, médicament ou historique de santé ne sera transmis. L'API peut être facturée. Annuler pour ne pas envoyer cette question."),
+    state:{agnesConnected:agnes.connected,agnesCooldown:agnes.cooldownSeconds,agnesBlocked:agnes.authorizationBlocked,
+     mistralConnected:mistral.connected,mistralCooldown:mistral.cooldownSeconds,mistralBlocked:mistral.authorizationBlocked},
+    agnes:async q=>generateAgnesChat(q,{model:$("agnes-model").value,history:$("chat-memory-optin").checked?sessionTurns:[]}),
+    mistral:async q=>generateMistralChat(q,$("chat-memory-optin").checked?sessionTurns:[],{model:$("mistral-model").value}),
+    authorize:(provider,q)=>{
+     const shared=sessionPreview(q,sessionTurns,$("chat-memory-optin").checked);
+     return confirm("Envoyer à "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" ?\n\nQuestion : « "+q+" »"+
+      (shared?"\n\nContexte de conversation également transmis :\n"+shared:"\n\nAucun historique envoyé.")+
+      "\n\nAucune donnée du dossier médical n'est transmise. Cet appel peut être facturé.");
+    },
     onAttempt:provider=>setEngineNote("IA : génération "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" après votre accord…")
    });
    if(candidate.provider){
@@ -322,13 +345,17 @@ async function ask(q){
    }
    updateEngineNote();
   }
-  if(intent==="general"&&!autoAnswered&&!onlineAttempted&&!mistralAttempted&&response.kind==="refusal"){
+  if(intent==="general"&&!autoAnswered&&!sourceFirstAnswered&&!onlineAttempted&&!mistralAttempted&&response.kind==="refusal"){
    answer="Aucune IA conversationnelle n’a pu répondre. Connectez Agnes ou Mistral dans les options, puis réessayez. Les informations sourcées et les fonctions de sécurité restent disponibles. Je préfère ne pas inventer de réponse.";
    engine="Assistant documentaire de secours";
   }
   if(mistralProblem&&!mistralAttempted){setEngineNote("Mistral en pause. FibroBot répond localement.");}
   }
   const purpose=companionMode?"companion-local":intent==="general"?"general-local":intent;
+  if($("chat-memory-optin").checked&&engine.startsWith("IA ·")&&intent==="general"){
+   appendSessionTurn(sessionTurns,input,answer);
+   $("chat-memory-state").textContent="Mémoire de cette session : "+Math.floor(sessionTurns.length/2)+" échange(s) généraux filtrés.";
+  }
   const userRecord={role:"user",body:input,time:Date.now(),purpose};
   const b={role:"bot",body:answer,time:Date.now(),sourceId,references,purpose,siteId,companionMode};
   // L'écran ne dépend jamais de la réussite d'une requête réseau ou d'IndexedDB.
@@ -398,6 +425,17 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
+ $("chat-memory-optin").addEventListener("change",e=>{
+  sessionTurns.length=0;
+  $("chat-memory-state").textContent=e.target.checked?
+   "Mémoire activée : seuls les prochains échanges généraux admissibles sont retenus dans cette session.":
+   "Mémoire désactivée et effacée de la session.";
+ });
+ $("chat-memory-clear").addEventListener("click",()=>{
+  sessionTurns.length=0;$("chat-memory-state").textContent="Mémoire de la session effacée.";
+  notify("Contexte IA effacé. L'historique chiffré du coffre n'est pas modifié.");
+ });
+ $("chat-voice-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
  $("auto-mode").addEventListener("change",()=>{updateEngineNote();notify($("auto-mode").checked?"IA activée : Agnes puis Mistral selon disponibilité.":"IA conversationnelle désactivée.");});
  $("agnes-connect").addEventListener("click",()=>{
   const key=$("agnes-key").value.trim();$("agnes-key").value="";
@@ -687,7 +725,7 @@ function events(){
   speak(lastSpeech);
  });
  $("erase-legacy").addEventListener("click",async()=>{if(!confirm("Supprimer l'ancienne base FibrobotDB non chiffrée de CE navigateur ? Vérifiez d'abord que vos données ont bien été migrées dans le coffre."))return;try{await eraseLegacy();notify("Ancienne base non chiffrée supprimée.");}catch(e){notify(e.message);}});
- $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
+ $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
  $("breath-start")?.addEventListener("click",breathing);
  $("relax-script")?.addEventListener("click",()=>{
    const script="Vous pouvez arrêter à tout moment. Installez-vous si possible dans une position confortable. Prenez conscience des points de contact de votre corps avec le support. Laissez votre respiration trouver son rythme naturel, sans la forcer. Observez les sons autour de vous. Si vous ressentez de l'inconfort, ouvrez les yeux et arrêtez. Vous n'avez rien à réussir. Quel petit geste pourrait rendre cet instant plus confortable ?";
@@ -698,7 +736,7 @@ function events(){
 async function init(){
  renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();
  window.addEventListener("pagehide",()=>{
-  disconnectMistral();disconnectAgnes();
+  disconnectMistral();disconnectAgnes();sessionTurns.length=0;
   $("agnes-key").value="";
   const field=$("mistral-key");if(field)field.value="";
  });
