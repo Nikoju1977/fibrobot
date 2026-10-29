@@ -422,3 +422,13 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @media(max-width:650px){#chat .assistant-hero{min-height:0;padding:22px 19px;border-radius:20px}#chat .assistant-hero-symbol{display:none}#chat .assistant-hero h2{font-size:1.9rem}#chat .assistant-hero p{font-size:.83rem}#chat .chat-card{padding:12px;min-height:0;border-radius:18px}#chat .chat-window-top{padding:4px 3px 12px}#chat .assistant-avatar{width:39px;height:39px;flex-basis:39px;border-radius:13px}#chat .chat-window-heading strong{font-size:.89rem}#chat .chat-window-heading small{font-size:.7rem}#chat .chat-header-actions{gap:5px}#chat .assistant-mode-badge,#chat .chat-voice-toggle{font-size:.65rem;padding:7px 9px}#chat .messages{height:42dvh;min-height:290px;max-height:470px;padding:13px 9px;gap:12px}#chat .bubble{max-width:93%;padding:12px}#chat .bubble-body{font-size:.86rem}#chat .chat-starters{padding:10px 1px}#chat .chat-starters>span{display:none}#chat .chat-composer-field{padding:5px 6px 5px 10px}#chat .chat-input textarea{font-size:16px;min-height:49px}#chat .composer-actions{gap:4px}#chat .composer-actions #chat-send{padding:9px 11px}#chat .composer-bottom{font-size:.65rem;align-items:flex-start}#chat .suggestions{padding:17px 15px;border-radius:17px}#chat .assistant-advanced-heading{margin-top:20px}}
 @media(max-width:365px){#chat .chat-window-top{align-items:flex-start}#chat .chat-header-actions{width:100%;justify-content:space-between}#chat .composer-actions #chat-send{padding:8px 9px}#chat .composer-bottom #prompt-help{max-width:205px}}
 @media(prefers-reduced-motion:reduce){#chat .specialist-choice,#chat .chat-composer-field{transition:none}}
+
+
+/* À 320–450 px, la saisie utilise toute la largeur au lieu d'être écrasée par les boutons. */
+@media(max-width:450px){
+ #chat .chat-composer-field{flex-direction:column;align-items:stretch;gap:3px;padding:7px 9px}
+ #chat .chat-input textarea{width:100%;min-height:66px;padding:8px 3px}
+ #chat .composer-actions{width:100%;justify-content:flex-end}
+ #chat .composer-actions #chat-send{min-width:112px}
+ #chat .chat-starters{margin-right:-4px}
+}
