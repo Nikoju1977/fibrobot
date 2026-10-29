@@ -86,7 +86,7 @@
       </div>
       <div class="two chat-layout"><div class="card chat-card">
         <div class="companion-mode-bar"><label for="companion-mode">Mode d'écoute</label><select id="companion-mode" aria-describedby="companion-mode-note"><option value="auto">Automatique</option><option value="friend">Compagnon</option><option value="pain">Douleur • soutien algologique</option><option value="care">Soins • organisation infirmière</option><option value="emotion">Soutien moral • écoute</option></select><span id="companion-mode-note">Un compagnon numérique, jamais un médecin, infirmier ou psychologue réel.</span></div>
-      <div class="chat-window-top"><div class="chat-window-heading"><span class="assistant-avatar" aria-hidden="true">✳</span><div><strong>FibroBot</strong><small>Votre compagnon de soutien</small></div></div><div class="chat-header-actions"><span id="assistant-mode-badge" class="assistant-mode-badge">IA conversationnelle</span><button type="button" id="chat-voice-toggle" class="chat-voice-toggle" aria-pressed="false" aria-label="Activer la lecture vocale locale">Voix désactivée</button></div></div>
+      <div class="chat-window-top"><div class="chat-window-heading"><span class="assistant-avatar" aria-hidden="true">✳</span><div><strong>FibroBot</strong><small>Votre compagnon de soutien</small></div></div><div class="chat-header-actions"><span id="assistant-mode-badge" class="assistant-mode-badge">IA conversationnelle</span><button type="button" id="chat-voice-toggle" class="chat-voice-toggle" aria-pressed="false" aria-label="Activer la lecture vocale locale">Voix désactivée</button><button type="button" id="chat-voice-stop" class="chat-voice-toggle" aria-label="Arrêter immédiatement la lecture vocale">Arrêter la voix</button></div></div>
         <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversation avec FibroBot"></div><div class="chat-starters" role="group" aria-label="Questions fréquentes"><span>Pour commencer</span><button type="button" class="starter-chip" data-ask="Comment organiser mes tâches ?">Organiser ma journée</button><button type="button" class="starter-chip" data-ask="Quels sont les symptômes de la fibromyalgie ?">Comprendre la fibromyalgie</button><button type="button" class="starter-chip" data-ask="Comment préparer un rendez-vous médical ?">Préparer une consultation</button></div>
         <form id="chat-form" class="chat-input">
           <label class="sr" for="prompt">Votre message à FibroBot</label>
@@ -127,6 +127,16 @@
        <p class="tiny">Choisissez un agent pour obtenir un résumé local fondé sur vos notes et les fiches documentaires. Ces assistants n'ont pas de qualification médicale et ne modifient jamais vos traitements.</p>
        <div id="specialist-list" class="specialists-grid" aria-label="Choisir un agent FibroBot"></div>
       </section>
+      <section class="card conversation-controls" aria-label="Mémoire, sources et lecture des réponses">
+  <h3>Conversation intelligente</h3>
+  <label class="consent"><input type="checkbox" id="chat-memory-optin"> Mémoriser temporairement le contexte des échanges généraux (cette session uniquement)</label>
+  <p class="tiny">Désactivé par défaut. Seuls les échanges généraux admissibles peuvent être réutilisés ; aucun dossier médical n’est envoyé. Le contexte transmis est affiché avant ton accord.</p>
+  <button type="button" id="chat-memory-clear" class="btn light">Effacer la mémoire de la session</button>
+  <p class="tiny" id="chat-memory-state" role="status">Mémoire IA désactivée · rien à partager.</p>
+  <label class="consent"><input type="checkbox" id="sources-first"> Chercher d’abord des sources pour les questions factuelles (avec autorisation Internet et confirmation)</label>
+  <label for="chat-voice-speed" class="tiny">Vitesse de lecture des réponses</label>
+  <select id="chat-voice-speed"><option value="0.85">Douce (0,85×)</option><option value="1" selected>Normale (1×)</option><option value="1.15">Rapide (1,15×)</option></select>
+</section>
       <section class="card auto-brain-card" aria-labelledby="auto-brain-title">
   <div class="auto-brain-header"><div><span class="section-kicker">MOTEUR CONVERSATIONNEL</span><h3 id="auto-brain-title">Assistant IA</h3><p>Agnes AI → Mistral : questions générales, histoires, création et discussion. Les informations de santé personnelles restent protégées.</p></div><label class="auto-switch"><input type="checkbox" id="auto-mode" checked aria-describedby="auto-brain-desc"><span>IA activée</span></label></div>
   <p id="auto-brain-desc" class="tiny">Connecte au moins une IA. Une clé valide, des quotas disponibles et ton accord pour chaque question sont nécessaires. Aucun envoi du dossier patient.</p>
@@ -221,7 +231,7 @@
       </details>
       <section class="card network-card" aria-labelledby="network-title">
        <div class="network-heading"><div><span class="section-kicker">BIBLIOTHÈQUES INTERNET GRATUITES</span><h3 id="network-title">Recherche Internet avec sources</h3></div><span class="network-badge">Sans clé API</span></div>
-       <p>FibroBot peut consulter Wikipédia, Wikidata, Wiktionnaire, OpenAlex, Crossref, Open Library et GitHub pour les questions publiques de culture générale. Lorsque Mistral est activé, il a priorité sur ces recherches pour les questions générales ; désactivez Mistral pour obtenir directement les résultats des bibliothèques. Les recherches médicales passent par les fiches sourcées et la bibliothèque Europe PMC, pas par une réponse improvisée.</p>
+       <p>FibroBot peut consulter Wikipédia, Wikidata, Wiktionnaire, OpenAlex, Crossref, Open Library et GitHub pour les questions publiques de culture générale. Active la recherche Internet puis « Chercher d’abord des sources » dans les options de conversation pour privilégier des réponses avec références avant la génération IA. Les recherches médicales passent par les fiches sourcées et la bibliothèque Europe PMC, pas par une réponse improvisée.</p>
        <label class="network-consent" for="network-mode"><input type="checkbox" id="network-mode">
          <span><strong>Autoriser la recherche Internet pour cette session</strong><small>Par défaut, aucun accès Internet pour vos questions. Avant chaque recherche, FibroBot affiche la question exacte et vous demande de confirmer son envoi aux sites indiqués. Le dossier médical, les traitements et les symptômes ne sont jamais utilisés pour ces recherches.</small></span>
        </label>
