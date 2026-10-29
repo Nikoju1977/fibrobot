@@ -53,7 +53,7 @@ test("Agnes: never persist key or send user history, reject health data",async()
  };
  const result=await generateAgnesChat("Quelle est la capitale de la France ?",{fetchImpl});
  assert.equal(result.text,"Paris.");
- assert.equal(sent.model,"agnes-3.0-flash");
+ assert.equal(sent.model,"agnes-2.5-flash");
  assert.deepEqual(sent.messages.map(x=>x.role),["system","user"]);
  assert.equal(sent.messages.some(x=>JSON.stringify(x).includes("traitement patient")),false);
  await assert.rejects(generateAgnesChat("Ma mère prend des médicaments",{fetchImpl}),/privées|incompatible|non admissible|données/i);
