@@ -34,6 +34,8 @@ try{
  assert.equal(await page.getByText("Studio Niko Design").first().count(),1,"Designer credit must be visible");
  await page.locator("#dismiss-guide").click();
  await page.locator("#first-steps").waitFor({state:"hidden",timeout:10000});
+ await page.locator("#install-app").click();
+ assert.match(await page.locator("#install-status").textContent(),/Android|installer|installée|accueil/i);
  // V25: appointment reminder visible in the encrypted home dashboard.
  const tomorrow=await page.evaluate(()=>{
   const d=new Date();d.setDate(d.getDate()+1);
