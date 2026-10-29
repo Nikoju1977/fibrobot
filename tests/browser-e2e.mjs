@@ -45,6 +45,12 @@ try{
  await page.locator("#appt-form button[type=submit]").click();
  await page.locator('#nav [data-tab="today"]').click();
  await page.locator("#upcoming-appointments").getByText("Consultation V25 privée").waitFor({timeout:10000});
+ const [ics]=await Promise.all([
+  page.waitForEvent("download"),
+  page.locator('#upcoming-appointments button[data-calendar-id]').first().click()
+ ]);
+ assert.match(ics.suggestedFilename(),/^fibrobot-rendez-vous-\d{4}-\d{2}-\d{2}\.ics$/);
+ assert.ok(!ics.suggestedFilename().includes("Consultation"),"Calendar export filename must not leak a medical topic");
  // Internet : jamais d'appel sans double consentement explicite,
  // requête seule (pas de note patient), citations vérifiables et mode local intact.
  await page.locator('#nav [data-tab="chat"]').click();
