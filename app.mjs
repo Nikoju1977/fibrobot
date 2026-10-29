@@ -96,7 +96,7 @@ function updateEngineNote(){
  " · Mistral "+(mi.connected?(mi.cooldownSeconds?"en pause":"connecté"):"non connecté")+
  " · Envoi seulement après votre accord.");
  const badge=$("assistant-mode-badge");
- if(badge)badge.textContent=$("auto-mode")?.checked?"IA conversationnelle":mistralStatus().connected&&$("mistral-use")?.checked?"Mistral sur accord":networkEnabled?"Recherche sur accord":state.ready&&enabled?"IA locale active":"Documentaire local";
+ if(badge)badge.textContent=$("auto-mode")?.checked?"IA conversationnelle":networkEnabled?"Recherche sur accord":"IA désactivée";
  const auto=$("auto-brain-status");
  if(auto){
   const ag=agnesStatus(),mi=mistralStatus();
