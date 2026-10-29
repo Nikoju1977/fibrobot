@@ -200,7 +200,7 @@ try{
  assert.equal(await page.locator("#chat-local-mode").count(),0,"No visible local-mode button");
  assert.equal(await page.locator("#network-mode").isChecked(),false);
  assert.equal(await page.locator("#mistral-use").isChecked(),false);
- assert.match(await page.locator("#chat-engine-state").textContent(),/Mode secours local activé/);
+ assert.equal(await page.locator("#auto-mode").isChecked(),false,"AI setting unchanged by 429");
  await page.locator("#prompt").fill("Quels sont les symptômes de la fibromyalgie ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/fibromyalgie/i).last().waitFor({timeout:10000});
