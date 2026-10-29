@@ -220,9 +220,11 @@ function refreshComposer(){
  const count=$("prompt-count"),field=$("prompt");
  if(count&&field)count.textContent=field.value.length+" / "+field.maxLength;
 }
+function updateVoiceState(message,active=false){const node=$("voice-live-state");if(node)node.textContent=message;document.body.dataset.voiceState=active?"speaking":"idle";}
 function stopSpeaking(){
  speechToken++;
  if("speechSynthesis" in window)try{speechSynthesis.cancel();}catch{}
+ updateVoiceState("Lecture arrêtée.");
 }
 function speak(message,{requested=false}={}){
  if(!voice&&!requested)return false;
@@ -232,11 +234,13 @@ function speak(message,{requested=false}={}){
  if(!chunks.length)return false;
  voice=true;syncVoiceControls();stopSpeaking();const token=speechToken;let index=0;
  const next=()=>{
-  if(token!==speechToken||index>=chunks.length)return;
+  if(token!==speechToken)return;
+  if(index>=chunks.length){updateVoiceState("Lecture terminée.");return;}
   const utterance=new SpeechSynthesisUtterance(chunks[index++]);
   utterance.lang="fr-FR";utterance.voice=selected;utterance.rate=Number($("chat-voice-speed")?.value)||1;
+  utterance.onstart=()=>{if(token===speechToken)updateVoiceState("FibroBot parle : segment "+index+" sur "+chunks.length+".",true);};
   utterance.onend=next;
-  utterance.onerror=()=>{if(token===speechToken)notify("Lecture audio interrompue sur cet appareil.");};
+  utterance.onerror=()=>{if(token===speechToken){updateVoiceState("Lecture interrompue.");notify("Lecture audio interrompue sur cet appareil.");}};
   try{speechSynthesis.speak(utterance);}catch{notify("Lecture vocale indisponible.");}
  };
  next();return true;
@@ -280,6 +284,7 @@ async function handleDictation(){
  const browserService=Boolean($("dictation-browser-service")?.checked);
  if(browserService&&!confirm("La reconnaissance vocale du navigateur peut envoyer votre voix aux serveurs de son fournisseur. Ne dictez pas de données de santé ou d'informations privées. Démarrer cette dictée externe ?"))return;
  const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;
+  stopSpeaking();updateVoiceState("Microphone en cours d'écoute.");
  dictationStarting=true;updateDictationButton();
  try{
   activeRecognition=await startDictation({
@@ -289,13 +294,13 @@ async function handleDictation(){
     const field=$("prompt");
     field.value=((field.value.trim()?field.value.trim()+" ":"")+transcript).slice(0,field.maxLength);
     refreshComposer();field.focus();
-    notify("Dictée terminée. Vérifiez le texte avant de l'envoyer.");
+    if($("dictation-send-confirm")?.checked&&!busyChat&&confirm("Envoyer ce texte à FibroBot ?\n\n« "+field.value.trim()+" »\n\nTout envoi vers une IA distante demandera un second accord séparé.")){const verified=field.value.trim();field.value="";refreshComposer();void ask(verified);}else notify("Dictée terminée. Vérifiez le texte avant de l'envoyer.");
    },
    onError:code=>notify("Dictée interrompue ("+code+"). Vérifiez les autorisations du micro."),
-   onEnd:()=>{activeRecognition=null;updateDictationButton();}
+   onEnd:()=>{activeRecognition=null;updateDictationButton();updateVoiceState("Microphone arrêté.");}
   });
   notify(browserService?"Dictée du navigateur activée : l'audio peut être traité à distance.":"Dictée locale activée.");
- }catch(e){activeRecognition=null;notify(String(e?.message||e).slice(0,220));}
+ }catch(e){activeRecognition=null;updateVoiceState("Dictée indisponible.");notify(String(e?.message||e).slice(0,220));}
  finally{dictationStarting=false;updateDictationButton();}
 }
 function refreshBook(){
@@ -329,10 +334,12 @@ async function ask(q){
   let answer=response.message+(response.followup?"\n\n"+response.followup:""),sourceId=response.sources?.[0]?.id||"";
   let engine="Assistant documentaire local",references=[],onlineAttempted=false,mistralAttempted=false,mistralProblem="";
   // Les actions locales et l'écoute passent après les règles d'urgence du moteur médical.
-  let siteId="",direct=false,companionMode="";
+  let siteId="",direct=false,companionMode="",navigationTarget="";
   if(response.kind!=="urgent"){
-   const site=parseSiteCommand(input);
-   if(site){
+   const site=parseSiteCommand(input),navigation=parseLocalNavigation(input);
+   if(navigation&&response.kind!=="refusal"){
+    navigationTarget=navigation.tab;answer="J'ouvre "+navigation.label+" dans FibroBot. Les informations restent sur cet appareil.";engine="Navigation locale";direct=true;
+   }else if(site){
     siteId=site.siteId;answer="Je peux ouvrir "+site.label+" pour vous. Touchez le lien « Ouvrir "+site.label+" » dans ma réponse pour confirmer l'ouverture dans votre navigateur. Je ne peux pas piloter votre téléphone, vous connecter ou agir dans ce site à votre place.";
     engine="Raccourci navigateur approuvé";direct=true;
    }else if(parseStoryCommand(input)&&!(($("auto-mode").checked&&(agnesStatus().connected||mistralStatus().connected))||($("mistral-use").checked&&mistralStatus().connected))){
@@ -511,7 +518,7 @@ async function ask(q){
   // L'écran ne dépend jamais de la réussite d'une requête réseau ou d'IndexedDB.
   DATA.conversations.push(userRecord,b);
   pending.remove();
-  renderChat();tab("chat");speak(answer);lastSpeech=answer;
+  renderChat();tab(navigationTarget||"chat");speak(answer);lastSpeech=answer;
   let saved=true;
   try{
    await put(db,"conversations",userRecord);
@@ -694,7 +701,7 @@ function events(){
  $("book-file").addEventListener("change",async event=>{
   const file=event.currentTarget.files?.[0];
   if(!file)return;
-  stopSpeaking();bookText="";bookIndex=0;pdfDocumentFile=null;$("book-pdf-open").hidden=true;refreshBook();
+  stopSpeaking();bookText="";bookIndex=0;bookFile=null;pdfDocumentFile=null;$("book-pdf-open").hidden=true;refreshBook();
   try{
    const item=await openPrivateDocument(file);
    if(item.kind==="pdf"){
@@ -703,7 +710,9 @@ function events(){
     $("book-state").textContent="PDF prêt pour un aperçu dans le navigateur. Aucun texte extrait ou envoyé à un serveur.";
     notify("PDF chargé sur cet appareil. Touchez « Afficher mon PDF » pour l'ouvrir.");
    }else{
-    bookText=item.text;bookIndex=0;refreshBook();
+    bookText=item.text;bookFile=file;
+    const saved=DATA.settings.find(x=>x.id===READER_BOOKMARK_ID)?.value;
+    bookIndex=matchingReaderBookmark(file,saved);refreshBook();
     notify("Document "+item.format+" chargé et extrait localement. Aucun envoi à un serveur.");
    }
   }catch(error){$("book-state").textContent=String(error.message||error);notify("Lecture impossible : "+String(error.message||error).slice(0,130));}
@@ -723,6 +732,21 @@ function events(){
   speak(readerPage(bookText,bookIndex).text,{requested:true});
  });
  $("book-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
+ $("book-save-mark")?.addEventListener("click",async()=>{
+  if(!db||!bookFile||!bookText){notify("Chargez d'abord un livre texte.");return;}
+  try{
+   const value=readerBookmark(bookFile,bookIndex);
+   await put(db,"settings",{id:READER_BOOKMARK_ID,value});
+   const old=DATA.settings.findIndex(x=>x.id===READER_BOOKMARK_ID);
+   if(old>=0)DATA.settings[old]={id:READER_BOOKMARK_ID,value};else DATA.settings.push({id:READER_BOOKMARK_ID,value});
+   notify("Signet conservé dans votre coffre chiffré. Le livre n'est pas sauvegardé.");
+  }catch(err){notify("Signet impossible : "+String(err.message).slice(0,110));}
+ });
+ $("book-clear-mark")?.addEventListener("click",async()=>{
+  if(!db)return;
+  try{await del(db,"settings",READER_BOOKMARK_ID);DATA.settings=DATA.settings.filter(x=>x.id!==READER_BOOKMARK_ID);notify("Signet supprimé.");}
+  catch{notify("Suppression du signet impossible.");}
+ });
  $("assistant-diagnostics-run").addEventListener("click",()=>{
   const out=$("assistant-diagnostics-result");out.replaceChildren();
   const core=checkAssistantCore();
@@ -731,6 +755,8 @@ function events(){
   for(const detail of companionStatus({vaultOpen:Boolean(db),webGPU:llmStatus(),mistral:mistralStatus(),internet:networkEnabled})){
    out.append(dom("p",detail.name+" : "+detail.status+" — "+detail.detail));
   }
+  out.append(dom("p","Dictée : "+((window.SpeechRecognition||window.webkitSpeechRecognition)?"API exposée, fonctionnement réel à tester.":"API indisponible.")+" Voix française locale : "+(localVoice()?"détectée, à tester.":"non détectée.")));
+  out.append(dom("p","Rappels hors application : non garantis en PWA. Commandes natives Android/iOS : non disponibles. Audit clinique et tests matériels toujours nécessaires."));
   out.append(dom("p","Ce diagnostic n'appelle aucune API et ne teste pas la disponibilité réelle de Mistral ou WebGPU. Aucune donnée patient n'est envoyée."));
   $("assistant-diagnostics-state").textContent=core.ok?"Diagnostic local terminé. Vérifiez les états des moteurs ci-dessous.":"Diagnostic local incomplet : la bibliothèque pourrait être indisponible.";
  });
@@ -1009,8 +1035,43 @@ function events(){
    speak(script);
  });
 }
+/* V27 progressive enhancements: attached only when the patient unlocks the existing PWA.
+ * No native OS automation, background microphone, network call or data migration.
+ */
+function setupV27Controls(){
+ const live=dom("p","Microphone et lecture vocale inactifs.","tiny voice-state");
+ live.id="voice-live-state";live.setAttribute("role","status");live.setAttribute("aria-live","polite");
+ $("messages")?.before(live);
+ const dictation=document.querySelector(".dictation-permission");
+ if(dictation&&!$("dictation-send-confirm")){
+  const label=dom("label",undefined,"consent");
+  label.htmlFor="dictation-send-confirm";
+  const checkbox=dom("input");checkbox.type="checkbox";checkbox.id="dictation-send-confirm";
+  label.append(checkbox,document.createTextNode(" Proposer l'envoi après la dictée (confirmation obligatoire)"));
+  document.querySelector(".dictation-permission")?.append(label);
+ }
+ const med=$("med-reminder-time");
+ if(med){
+  med.type="text";med.maxLength=55;med.placeholder="08:00, 13:00, 20:00";
+  const label=document.querySelector('label[for="med-reminder-time"]');
+  if(label)label.textContent="Heures de rappels quotidiens déclarés (8 maximum)";
+  med.after(dom("p","Séparez les horaires prescrits par des virgules. FibroBot ne déduit ni dose ni fréquence. Les alertes de la PWA ne sont pas garanties après fermeture.","tiny"));
+ }
+ const bookStop=$("book-stop");
+ if(bookStop){
+  const save=dom("button","Enregistrer ma page dans le coffre","btn light"),clear=dom("button","Oublier mon signet","btn light");
+  save.id="book-save-mark";clear.id="book-clear-mark";save.type=clear.type="button";
+  bookStop.after(save,clear);
+ }
+ const shortcuts=document.querySelector(".companion-shortcuts");
+ if(shortcuts){
+  for(const [label,query] of [["Google Maps","Ouvre Google Maps"],["Google Agenda","Ouvre Google Agenda"],["Mes rendez-vous","Affiche mes rendez-vous"]]){
+   const button=dom("button",label,"btn light");button.type="button";button.dataset.ask=query;shortcuts.append(button);
+  }
+ }
+}
 async function init(){
- renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
+ setupV27Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
