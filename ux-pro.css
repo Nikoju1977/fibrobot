@@ -543,3 +543,9 @@ body[data-reading-size="extra"] #chat .bubble-body{font-size:1.26rem;line-height
  #health .trend-options{display:grid;grid-template-columns:auto 1fr;gap:9px}
  #chat .chat-header-actions{flex-wrap:wrap;gap:6px}
 }
+
+/* FibroBot V26.1 encrypted session timeout controls */
+#privacy .auto-lock-panel{display:grid;gap:10px;margin:16px 0}
+#privacy .auto-lock-panel h3,#privacy .auto-lock-panel p{margin:0}
+#privacy #auto-lock-minutes{max-width:360px;width:100%;min-height:44px;border-radius:10px;padding:10px;border:1px solid #b8d2c5}
+#privacy #auto-lock-status{font-weight:700;color:#275b4a}

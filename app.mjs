@@ -17,6 +17,7 @@ import {PREFERENCE_SETTING_ID,validateGeneralPreference,savedGeneralPreference,p
 import {TREND_METRICS,dailyTrend,trendDescription} from "./health-trends.mjs";
 import {apiBudgetStatus,configureApiBudget} from "./request-budget.mjs";
 import {openPrivateDocument} from "./document-reader.mjs";
+import {AUTO_LOCK_SETTING,storedAutoLockMinutes,sanitizeAutoLockMinutes,shouldLockForInactivity} from "./session-lock.mjs";
 import {startDictation} from "./voice-input.mjs";
 import {upcomingAppointments,appointmentAlertKeys,appointmentCalendarICS} from "./appointment-reminders.mjs";
 import {coordinatedCareBriefing} from "./care-briefing.mjs";
@@ -31,7 +32,7 @@ const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"S
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
 const FORMS={tasks:"task-form",symptoms:"health-form",conditions:"condition-form",medications:"med-form",appointments:"appt-form"};
 let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSpeech="",busyChat=false,networkEnabled=false;
-let bookText="",bookIndex=0,speechToken=0,activeRecognition=null,dictationStarting=false,pendingInstall=null,pdfDocumentFile=null;
+let bookText="",bookIndex=0,speechToken=0,activeRecognition=null,dictationStarting=false,pendingInstall=null,pdfDocumentFile=null,lastActivityAt=Date.now();
 // Session-only chat context; never persisted and never taken from the health vault.
 const sessionTurns=[];
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
@@ -42,9 +43,25 @@ function blank(target,message){target.replaceChildren(dom("div",message,"empty")
 function action(label,method,store,id){const b=dom("button",label,"mini");b.type="button";b.dataset.action=method;b.dataset.store=store;b.dataset.id=String(id);return b;}
 function record(target,title,subtitle,notes,store,id,extra={}){const row=dom("div",undefined,"record"),copy=dom("div"),buttons=dom("div",undefined,"actions");copy.append(dom("strong",title,extra.done?"done":""));if(subtitle)copy.append(dom("small",subtitle));if(notes)copy.append(dom("p",notes));if(extra.tag)copy.append(dom("span",extra.tag,extra.tag==="À reporter"?"tag later":"tag"));if(store==="tasks")buttons.append(action(extra.done?"Réouvrir":"Terminer","toggle",store,id));if(FORMS[store])buttons.append(action("Modifier","edit",store,id));if(store)buttons.append(action("Supprimer","delete",store,id));row.append(copy,buttons);target.append(row);}
 async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;refreshMistralVaultControls();render();}
-function render(){ $("count-tasks").textContent=DATA.tasks.filter(x=>!x.done).length;$("count-health").textContent=DATA.symptoms.length;$("count-conditions").textContent=DATA.conditions.length;$("daily-energy").value=energy;$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();renderHealth();renderHealthTrends();renderConditions();renderMeds();renderAppointments();renderUpcomingAppointments();renderLibrary();renderChat();renderGeneralPreference();patientUX?.refreshGuide(); }
+function render(){ $("count-tasks").textContent=DATA.tasks.filter(x=>!x.done).length;$("count-health").textContent=DATA.symptoms.length;$("count-conditions").textContent=DATA.conditions.length;$("daily-energy").value=energy;$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();renderHealth();renderHealthTrends();renderConditions();renderMeds();renderAppointments();renderUpcomingAppointments();renderLibrary();renderChat();renderGeneralPreference();refreshAutoLockSettings();patientUX?.refreshGuide(); }
 function renderTasks(){const tasks=rankTasks(DATA.tasks,energy),out=$("tasks-list"),home=$("today-tasks");out.replaceChildren();home.replaceChildren();if(!tasks.length)blank(home,"Aucune tâche urgente. Vous pouvez vous reposer.");else tasks.slice(0,5).forEach(t=>record(home,t.title,"Effort "+t.effort+"/3",null,null,t.id,{tag:t.adapted?"Effort compatible":"À reporter"}));if(!DATA.tasks.length)blank(out,"Vous pouvez ajouter vos tâches ici.");else [...tasks,...DATA.tasks.filter(x=>x.done)].forEach(t=>record(out,t.title,(t.priority==="important"?"Essentielle":t.priority==="delegable"?"Délégable":"Flexible")+" · effort "+t.effort+"/3"+(t.due?" · "+t.due:""),null,"tasks",t.id,{done:t.done,tag:t.done?"Terminée":t.adapted?"Effort compatible":"À reporter"}));}
 function renderHealth(){const out=$("health-list");out.replaceChildren();if(!DATA.symptoms.length)blank(out,"Aucune observation enregistrée.");else [...DATA.symptoms].sort((a,b)=>String(b.date).localeCompare(String(a.date))).forEach(s=>{const notes=[s.energy!=null?"Énergie "+s.energy+"/10":"",s.fatigue!=null?"Fatigue "+s.fatigue+"/10":"",s.sleep!=null?"Sommeil "+s.sleep+"/10":"",s.notes].filter(Boolean).join(" · ");record(out,s.name,String(s.date).slice(0,10)+" · Intensité "+s.intensity+"/10"+(s.condition?" · "+s.condition:""),notes,"symptoms",s.id);});const select=$("health-condition"),old=select.value;select.replaceChildren();let option=dom("option","Non précisée");option.value="";select.append(option);for(const c of DATA.conditions){option=dom("option",c.name);option.value=c.name;select.append(option);}select.value=old;}
+function refreshAutoLockSettings(){
+ const control=$("auto-lock-minutes"),status=$("auto-lock-status");if(!control||!status)return;
+ const minutes=storedAutoLockMinutes(DATA.settings);
+ control.value=String(minutes);
+ status.textContent=minutes?"Coffre verrouillé après "+minutes+" minutes sans activité. Vos modifications non enregistrées peuvent être perdues.":"Verrouillage automatique désactivé pour ce coffre. Verrouillez manuellement après usage.";
+}
+function lockInactiveVault(){
+ if(!db)return;
+ const minutes=storedAutoLockMinutes(DATA.settings);
+ if(!shouldLockForInactivity(lastActivityAt,Date.now(),minutes))return;
+ try{
+  stopSpeaking();try{activeRecognition?.abort();}catch{}
+  sessionTurns.length=0;bookText="";pdfDocumentFile=null;
+  disconnectMistral();disconnectAgnes();db.close();db=null;
+ }finally{location.reload();}
+}
 function renderGeneralPreference(){
  const input=$("general-preference"),status=$("preference-status");if(!input||!status)return;
  const value=savedGeneralPreference(DATA.settings);input.value=value;
@@ -562,6 +579,22 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
+ document.addEventListener("pointerdown",()=>{lastActivityAt=Date.now();},{passive:true});
+ document.addEventListener("keydown",()=>{lastActivityAt=Date.now();});
+ window.addEventListener("focus",lockInactiveVault);
+ $("auto-lock-minutes").addEventListener("change",async e=>{
+  if(!db){e.target.value=String(storedAutoLockMinutes(DATA.settings));notify("Déverrouillez le coffre pour modifier la sécurité.");return;}
+  try{
+   const minutes=sanitizeAutoLockMinutes(e.target.value);
+   await put(db,"settings",{id:AUTO_LOCK_SETTING,value:minutes});
+   DATA.settings=await all(db,"settings");lastActivityAt=Date.now();
+   refreshAutoLockSettings();notify(minutes?"Verrouillage automatique réglé à "+minutes+" minutes.":"Verrouillage automatique désactivé : protégez le téléphone.");
+  }catch(error){
+   e.target.value=String(storedAutoLockMinutes(DATA.settings));
+   notify("Impossible d'enregistrer le verrouillage : "+String(error?.message||error).slice(0,120));
+  }
+ });
+
  $("preference-save").addEventListener("click",async()=>{
   if(!db){notify("Ouvrez le coffre pour mémoriser votre préférence.");return;}
   try{
@@ -977,7 +1010,7 @@ async function init(){
    const i=DATA.settings.findIndex(s=>s.id===id);
    if(i<0)DATA.settings.push({id,value});else DATA.settings[i]={id,value};
  },notify});
- try{db=await openSecureDB();await reload();setInterval(()=>{if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}});}
+ try{db=await openSecureDB();await reload();setInterval(()=>{lockInactiveVault();if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){lockInactiveVault();if(db){renderReminders();renderUpcomingAppointments();}}});}
  catch(e){console.error(e);notify("Stockage local indisponible : l'application ne peut pas enregistrer vos données. Autorisez le stockage pour ce site.");}
  if("serviceWorker" in navigator&&window.isSecureContext){navigator.serviceWorker.register("./sw.js").catch(()=>{/* hors ligne facultatif */});}
 }

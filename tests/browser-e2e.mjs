@@ -36,6 +36,11 @@ try{
  await page.locator("#vault-single-patient").check();
  await page.locator("#vault-submit").click();
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
+ await page.locator('#nav [data-tab="privacy"]').click();
+ assert.equal(await page.locator("#auto-lock-minutes").inputValue(),"15","Secure default inactivity timeout");
+ await page.locator("#auto-lock-minutes").selectOption("30");
+ await page.locator("#auto-lock-status").getByText(/30 minutes/).waitFor({timeout:15000});
+ await page.locator('#nav [data-tab="today"]').click();
  await rival.locator("#vault-password").fill("une autre phrase secrète longue");
  await rival.locator("#vault-confirm-password").fill("une autre phrase secrète longue");
  await rival.locator("#vault-ack").check();
@@ -344,6 +349,9 @@ try{
  await page.locator("#vault-password").fill(secret);
  await page.locator("#vault-submit").click();
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:15000});
+ await page.locator('#nav [data-tab="privacy"]').click();
+ assert.equal(await page.locator("#auto-lock-minutes").inputValue(),"30","Encrypted inactivity setting should survive lock and reopen");
+ await page.locator('#nav [data-tab="today"]').click();
  await page.locator("#first-steps").waitFor({state:"hidden",timeout:10000});
  await page.locator('#nav [data-tab="chat"]').click();
  assert.equal(await page.locator("#general-preference").inputValue(),"Je préfère des réponses claires et des exemples.","Encrypted preference must survive vault lock/unlock");

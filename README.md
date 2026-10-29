@@ -12,7 +12,7 @@ Cette version conserve la préférence **Agnes AI puis Mistral** pour les questi
 
 **Limites non résolues :** tests des fournisseurs avec des clés réellement actives, vérification sur les appareils physiques iOS/Android, intégration native d'actions système et de notifications en arrière-plan, supports PDF/EPUB non ajoutés dans cette version. Les API restent soumises aux restrictions CORS du navigateur et à une exposition plus importante des clés dans une PWA purement statique. Ne pas saisir une clé sans limite budgétaire.
 
-Le cache PWA utilise maintenant `fibrobot-shell-v26`. Fermer puis rouvrir la PWA permet normalement son actualisation ; **ne pas effacer les données du site**, qui hébergent le coffre de santé chiffré.
+Le cache PWA utilise maintenant `fibrobot-shell-v26-1`. Fermer puis rouvrir la PWA permet normalement son actualisation ; **ne pas effacer les données du site**, qui hébergent le coffre de santé chiffré.
 
 ---
 
@@ -366,3 +366,9 @@ Tests des nouveaux modules : tests/v25-companion.test.mjs. Les tests d'intégrat
 **Non implémenté comme fonctionnalité complète dans une PWA statique :** écoute permanente type assistant système Android/iOS, accès libre aux applications et réglages du téléphone, notifications de médicaments garanties en arrière-plan, stockage des clés API totalement inaccessible à JavaScript, validation médicale professionnelle. Une application native et/ou une passerelle de confiance seraient nécessaires pour ces capacités. Les tests automatisés ne remplacent pas des tests physiques Android/iOS ou des appels réels avec vos clés API.
 
 Les mises à jour normales se font en fermant puis rouvrant la PWA, **sans vider les données du site** qui contient le coffre chiffré.
+
+## V26.1 — protection supplémentaire du coffre
+
+Le coffre se verrouille automatiquement après **15 minutes d'inactivité par défaut**, par intervalle de vérification et lors du retour sur une page précédemment masquée. Paramètre chiffré dans la section Mes données : 5, 15 ou 30 minutes, ou désactivation explicite. Le verrouillage arrête la voix et la dictée, supprime le contexte temporaire, déconnecte Agnes/Mistral, ferme la session de déchiffrement et recharge l'écran demandant la phrase secrète. Les données déjà enregistrées sont conservées ; les champs non enregistrés peuvent être perdus.
+
+Limites techniques : un navigateur mobile peut suspendre ses minuteries en arrière-plan. La vérification reprend à la réouverture du site et au retour de focus, **sans promesse de verrouillage exact à la seconde**. Utilisez également le verrouillage système du téléphone, en particulier sur un appareil partagé. Aucun modèle IA local génératif n'est réintroduit dans l'interface.
