@@ -17,5 +17,46 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Parler à FibroBot",
+      "short_name": "Assistant",
+      "description": "Ouvrir le compagnon conversationnel",
+      "url": "./?open=chat",
+      "icons": [
+        {
+          "src": "./icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Mode crise",
+      "short_name": "Crise",
+      "description": "Accéder aux conseils de sécurité et de confort",
+      "url": "./?open=crisis",
+      "icons": [
+        {
+          "src": "./icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Mon suivi santé",
+      "short_name": "Suivi",
+      "description": "Retrouver mes observations privées",
+      "url": "./?open=health",
+      "icons": [
+        {
+          "src": "./icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
   ]
 }
