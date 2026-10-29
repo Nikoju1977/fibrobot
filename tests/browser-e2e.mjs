@@ -40,7 +40,7 @@ try{
  // Nouvelle expérience : la discussion est la première section visible.
  assert.equal(await page.locator("#chat-form textarea#prompt").count(),1,"Multiline composer");
  assert.ok((await page.locator("#chat .chat-card").boundingBox()).y <
-  (await page.locator("#gemma-options").boundingBox()).y,"Conversation visible before IA settings");
+  (await page.locator("#agnes-options").boundingBox()).y,"Conversation visible before IA settings");
  assert.equal(await page.locator("#chat-voice-toggle").getAttribute("aria-pressed"),"false");
  await page.locator("#prompt").fill("Une question");
  assert.match(await page.locator("#prompt-count").textContent(),/12 \/ 2000/);
@@ -92,7 +92,7 @@ try{
  });
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Je ne dispose pas encore d.une réponse vérifiée/).waitFor();
+ await page.locator("#messages").getByText(/Aucune IA conversationnelle n.a pu répondre/).waitFor();
  assert.equal(wikipediaQueries,0,"Network forbidden until enabled");
  await page.locator("#network-mode").check();
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Qui était Marie Curie/);dialog.dismiss();});
@@ -197,7 +197,7 @@ try{
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/Bonjour !/).last().waitFor({timeout:10000});
  assert.equal(mistralCalls,4,"Local chat still works, no extra Mistral calls");
- await page.locator("#chat-local-mode").click();
+ assert.equal(await page.locator("#chat-local-mode").count(),0,"No visible local-mode button");
  assert.equal(await page.locator("#network-mode").isChecked(),false);
  assert.equal(await page.locator("#mistral-use").isChecked(),false);
  assert.match(await page.locator("#chat-engine-state").textContent(),/Mode secours local activé/);
@@ -264,12 +264,8 @@ try{
  await page.locator("#prompt").fill("Organise mes tâches");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/tâche enregistrée|Proposition d’organisation/).last().waitFor({timeout:10000});
- await page.locator("#gemma-options").evaluate(x=>x.open=true);
- assert.equal(await page.locator("#llm-check").isVisible(),true);
- assert.equal(await page.locator("#local-model-select").inputValue(),"auto");
- assert.equal(await page.locator("#gemma-cancel").isVisible(),false,"Cancel appears only during an active model load");
- await page.locator("#llm-check").click();
- await page.locator("#llm-device").getByText(/WebGPU|GPU|catalogue/i).waitFor({timeout:10000});
+ assert.equal(await page.locator("#gemma-options").isVisible(),false,"Local LLM setup not exposed");
+ assert.equal(await page.locator("#agnes-options").isVisible(),true,"Remote AI configuration visible");
  await page.locator('#nav [data-tab="library"]').click();
  assert.equal(await page.locator("#research-search").isVisible(),true);
  assert.equal(await page.locator("#research-topic").inputValue(),"fibromyalgia");
