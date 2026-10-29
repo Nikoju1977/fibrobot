@@ -48,10 +48,10 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
   await page.locator("#messages .bubble").last().getByText(/Bonjour/).waitFor({timeout:10000});
   await page.locator('#chat-form button[type="submit"]').click({trial:true,timeout:12000}); // attend que la sauvegarde du coffre libère le formulaire
   assert.match(await page.locator("#chat-engine-state").textContent(),/Dernière réponse/);
-  assert.equal(await page.locator("#gemma-options").isVisible(),true);
-  assert.equal(await page.locator("#gemma-load").isVisible(),false,"Gemma should be opt-in, not an obstacle for first-time users");
-  await page.locator('#gemma-options summary').click();
-  assert.equal(await page.locator("#gemma-load").isVisible(),true);
+  assert.equal(await page.locator("#gemma-options").isVisible(),false,"Local LLM panel hidden");
+  assert.equal(await page.locator("#agnes-options").isVisible(),true,"Agnes settings visible");
+  assert.equal(await page.locator("#mistral-options").isVisible(),true,"Mistral settings visible");
+  assert.equal(await page.locator("#chat-local-mode").count(),0,"No local-mode button");
   console.log(label+": UI, coffre, formulaire, XSS, responsive OK (émulation, pas de matériel réel)");
  }finally{await browser.close();}
 }
