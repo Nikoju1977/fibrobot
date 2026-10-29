@@ -174,7 +174,7 @@ async function ask(q){
    if(site){
     siteId=site.siteId;answer="Je peux ouvrir "+site.label+" pour vous. Touchez le lien « Ouvrir "+site.label+" » dans ma réponse pour confirmer l'ouverture dans votre navigateur. Je ne peux pas piloter votre téléphone, vous connecter ou agir dans ce site à votre place.";
     engine="Raccourci navigateur approuvé";direct=true;
-   }else if(parseStoryCommand(input)){
+   }else if(parseStoryCommand(input)&&!($("mistral-use").checked&&mistralStatus().connected)&&!($("gemma-use").checked&&llmStatus().ready)){
     const story=originalStory(input);answer=story.text;engine="Histoire originale écrite localement";direct=true;
    }else if(parseReadingCommand(input)){
     $("book-panel").open=true;answer="Avec plaisir. Ouvrez le panneau « Ma bibliothèque de lecture locale » ci-dessous puis choisissez un fichier .txt ou .md que vous avez le droit de lire. Je peux afficher ses pages et les lire avec une voix française locale disponible. Le fichier ne quitte pas votre appareil.";engine="Lecteur de textes privé";direct=true;
