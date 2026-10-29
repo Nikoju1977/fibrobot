@@ -1,6 +1,6 @@
 # FibroBot — compagnon IA conversationnel et suivi personnel
 
-## Version actuelle V24 — améliorations vérifiables
+## Version actuelle V26 — améliorations vérifiables
 
 Cette version conserve la préférence **Agnes AI puis Mistral** pour les questions générales. Aucun téléchargement de LLM local n'est présenté dans l'interface conversationnelle. Un compte, une clé API et un quota disponible restent nécessaires pour chaque fournisseur.
 
@@ -12,7 +12,7 @@ Cette version conserve la préférence **Agnes AI puis Mistral** pour les questi
 
 **Limites non résolues :** tests des fournisseurs avec des clés réellement actives, vérification sur les appareils physiques iOS/Android, intégration native d'actions système et de notifications en arrière-plan, supports PDF/EPUB non ajoutés dans cette version. Les API restent soumises aux restrictions CORS du navigateur et à une exposition plus importante des clés dans une PWA purement statique. Ne pas saisir une clé sans limite budgétaire.
 
-Le cache PWA utilise maintenant `fibrobot-shell-v25`. Fermer puis rouvrir la PWA permet normalement son actualisation ; **ne pas effacer les données du site**, qui hébergent le coffre de santé chiffré.
+Le cache PWA utilise maintenant `fibrobot-shell-v26`. Fermer puis rouvrir la PWA permet normalement son actualisation ; **ne pas effacer les données du site**, qui hébergent le coffre de santé chiffré.
 
 ---
 
@@ -352,3 +352,17 @@ Tests des nouveaux modules : tests/v25-companion.test.mjs. Les tests d'intégrat
 **Export calendrier privé (.ics) :** chaque rendez-vous à venir dispose d'un bouton « Agenda (.ics) » qui télécharge un événement générique, sans nom, spécialité médicale, lieu ni données du coffre. Les événements avec heure comportent un rappel suggéré d'une heure ; ceux sans heure un rappel suggéré d'un jour. C'est le calendrier du téléphone qui accepte, importe ou ignore l'événement et ses alertes. Cet export ne déclenche aucune modification du calendrier sans action explicite de l'utilisateur.
 
 **Installation PWA assistée :** un bouton « Installer FibroBot » utilise uniquement l'événement standard beforeinstallprompt lorsque le navigateur l'autorise. Sur iOS/iPadOS, l'écran explique le parcours Safari via « Partager → Sur l'écran d'accueil » ; sur Android, le menu Installer/Ajouter à l'écran d'accueil reste un recours. Aucune installation n'est déclenchée automatiquement, et aucune promesse d'alarme permanente en arrière-plan n'est faite.
+
+
+## FibroBot V26 — fonctions réellement implémentées (30 octobre 2026)
+
+- **Mémoire de préférences explicite** : une seule préférence de style ou de loisir général, filtrée par les règles existantes contre les contenus sensibles et stockée dans le coffre AES-GCM de l'application. Le partage avec Agnes/Mistral est désactivé par défaut et exige une case de consentement distincte, puis la confirmation du contenu exact transmis avant chaque question. Les anciennes sauvegardes chiffrées ne sont pas modifiées par une suppression ultérieure. Ne pas saisir de données de santé dans cette préférence.
+- **Plafond d'appels IA** : 5, 10 ou 20 requêtes maximum par session (10 par défaut), en comptant les appels sortants Agnes et Mistral avant leur lancement. Ce compteur **ne constitue pas une garantie de coût maximal ou nul** et ne couvre pas d'autres sites/services tiers, ni plusieurs sessions de navigateur.
+- **Courbes de suivi** : douleur/intensité, énergie, fatigue et sommeil sur 7/14/30/90 jours ; uniquement valeurs déclarées, moyenne par jour et tableau accessible. Les journées sans note restent sans valeur (pas d'interpolation ni d'interprétation clinique). Aucune donnée de suivi n'est envoyée à un service distant.
+- **Accessibilité** : tailles de texte de discussion plus grandes, affichage calme et commandes vocales pause/reprise lorsqu'une voix de synthèse compatible est disponible.
+- **Lecteur de documents** : TXT/MD et extraction de texte EPUB/DOCX privés jusqu'à 12 Mo d'archive, 1 Mo de texte et limites ZIP anti-décompression excessive. Implémentation native sans CDN ni import de scripts externes. Un PDF peut être prévisualisé dans le lecteur du navigateur ; il n'y a **pas** d'extraction de texte du PDF ni de lecture vocale PDF intégrée. EPUB/DOCX dépendent de la prise en charge du format de compression par le navigateur et peuvent refuser certaines archives complexes.
+- **Sécurité documentaire** : aucune archive ouverte n'est envoyée au LLM ou conservée automatiquement dans le coffre. La PWA conserve les protections médicales et les confirmations avant les envois externes.
+
+**Non implémenté comme fonctionnalité complète dans une PWA statique :** écoute permanente type assistant système Android/iOS, accès libre aux applications et réglages du téléphone, notifications de médicaments garanties en arrière-plan, stockage des clés API totalement inaccessible à JavaScript, validation médicale professionnelle. Une application native et/ou une passerelle de confiance seraient nécessaires pour ces capacités. Les tests automatisés ne remplacent pas des tests physiques Android/iOS ou des appels réels avec vos clés API.
+
+Les mises à jour normales se font en fermant puis rouvrant la PWA, **sans vider les données du site** qui contient le coffre chiffré.
