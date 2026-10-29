@@ -432,3 +432,28 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
  #chat .composer-actions #chat-send{min-width:112px}
  #chat .chat-starters{margin-right:-4px}
 }
+
+
+/* Compagnon FibroBot — sélecteur accessible et bibliothèque locale. */
+#chat .companion-mode-bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 13px;padding:12px 14px;border:1px solid #d2e8db;border-radius:15px;background:#f1faf5}
+#chat .companion-mode-bar label{font-size:.81rem;font-weight:800;color:#245c45}
+#chat .companion-mode-bar select{max-width:100%;min-height:42px;padding:8px 12px;border:1px solid #a8d3ba;border-radius:10px;background:#fff;color:#184734;font-size:.82rem}
+#chat #companion-mode-note{flex:1 1 100%;font-size:.75rem;color:#4e7061;line-height:1.5}
+#chat .approved-site-link{display:inline-flex;margin-top:12px;padding:10px 14px;border:1px solid #b8d7c8;border-radius:10px;color:#145940;background:#eaf9f0;font-size:.84rem;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+#chat .companion-tools{margin:14px 0 18px;background:#fbfefa;border:1px solid #d5e9de;border-radius:19px}
+#chat .companion-tools-intro h3{color:#1f5842;margin:5px 0}
+#chat .companion-tools-intro p{font-size:.83rem;margin:0 0 14px}
+#chat .companion-shortcuts{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 12px}
+#chat .companion-shortcuts .btn{font-size:.82rem;min-height:43px}
+#chat .book-panel{border-top:1px solid #d7e7dc;padding:12px 0 0}
+#chat .book-panel summary{font-weight:800;cursor:pointer;color:#205c47;font-size:.88rem;padding:8px 1px;min-height:42px}
+#chat .book-panel>p{font-size:.81rem;line-height:1.6;margin:8px 0 12px}
+#chat .book-panel label{display:block;font-weight:700;margin:10px 0 8px;color:#265641}
+#chat .book-panel input[type=file]{display:block;width:100%;max-width:100%;font-size:.8rem;padding:10px;border:1px solid #d1e5d9;border-radius:10px;background:#fff}
+#chat .book-page{white-space:pre-wrap;overflow-wrap:anywhere;max-height:330px;overflow-y:auto;padding:18px;margin:12px 0;border-radius:13px;border:1px solid #e0ece4;background:#fffdf8;line-height:1.8;font-size:.92rem;color:#283e35}
+#chat .book-page:empty{display:none}
+#chat .book-controls{display:flex;flex-wrap:wrap;gap:9px;margin-top:9px}
+#chat .book-controls .btn{font-size:.8rem;min-height:44px}
+#chat .book-controls .btn:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:650px){#chat .companion-mode-bar{align-items:stretch}#chat .companion-mode-bar label{align-self:center}#chat .companion-mode-bar select{flex:1 1 100%}#chat .companion-tools{padding:16px 14px}#chat .companion-shortcuts .btn{flex:1 1 calc(50% - 9px);min-width:0;padding:10px 9px}#chat .book-controls .btn{flex:1 1 140px}#chat .book-page{font-size:.88rem;padding:13px}}
+@media(prefers-reduced-motion:reduce){#chat .approved-site-link{transition:none}}

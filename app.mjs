@@ -13,11 +13,15 @@ import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,gen
 import {mistralRoute,mistralConsentDescription} from "./mistral-routing.mjs";
 import {CREDENTIAL_ID,validStoredMistralCredential,saveMistralCredential,loadMistralCredential,deleteMistralCredential} from "./mistral-credential-vault.mjs";
 import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
+import {companionReply} from "./companion-engine.mjs";
+import {parseSiteCommand,knownSite,parseStoryCommand,parseReadingCommand,originalStory} from "./life-actions.mjs";
+import {normalizeBookText,validateBookFile,readerPage,splitSpeech} from "./book-reader.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
 const FORMS={tasks:"task-form",symptoms:"health-form",conditions:"condition-form",medications:"med-form",appointments:"appt-form"};
 let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSpeech="",busyChat=false,networkEnabled=false;
+let bookText="",bookIndex=0,speechToken=0;
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
 const val=id=>$(id).value;
 function notify(message){$("toast").textContent=message;$("toast").hidden=false;clearTimeout(notify.timeout);notify.timeout=setTimeout(()=>$("toast").hidden=true,5500);}
@@ -33,7 +37,7 @@ function renderConditions(){const out=$("conditions-list");out.replaceChildren()
 function renderMeds(){const out=$("med-list");out.replaceChildren();if(!DATA.medications.length)blank(out,"Aucun médicament ou traitement déclaré.");else DATA.medications.forEach(m=>record(out,m.name,[m.dose&&"Dose déclarée : "+m.dose,m.schedule&&"Fréquence : "+m.schedule,m.reminderTime&&"Rappel quotidien : "+m.reminderTime,m.prescriber&&"Prescripteur : "+m.prescriber].filter(Boolean).join(" · "),m.notes,"medications",m.id));renderReminders();}
 function renderAppointments(){const out=$("appts-list");out.replaceChildren();if(!DATA.appointments.length)blank(out,"Aucun rendez-vous enregistré.");else [...DATA.appointments].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).forEach(a=>record(out,a.title,a.date+(a.time?" à "+a.time:"")+(a.place?" · "+a.place:""),a.questions&&"Questions : "+a.questions,"appointments",a.id));}
 function renderLibrary(){const out=$("library-list");out.replaceChildren();for(const d of LIBRARY){const c=dom("article");c.append(dom("h3",d.title),dom("p",d.answer),dom("small",d.source+" · "+d.date));const link=dom("a","Voir la source");link.href=d.url;link.target="_blank";link.rel="noopener noreferrer";c.append(link);out.append(c);}}
-function bubble(body,role,source,references=[]){
+function bubble(body,role,source,references=[],siteId=""){
  const b=dom("div",undefined,"bubble"+(role==="user"?" user":""));
  b.append(dom("div",role==="user"?"Vous":"FibroBot","bubble-sender"),dom("div",body,"bubble-body"));
  const doc=LIBRARY.find(d=>d.id===source);
@@ -47,6 +51,10 @@ function bubble(body,role,source,references=[]){
    a.href=safe;a.target="_blank";a.rel="noopener noreferrer";links.append(a);
   }
   if(links.childNodes.length)b.append(links);
+ }
+ if(role!=="user"&&siteId){
+  const site=knownSite(siteId);
+  if(site){const link=dom("a","Ouvrir "+site.label+" dans le navigateur","approved-site-link");link.href=site.url;link.target="_blank";link.rel="noopener noreferrer";b.append(link);}
  }
  if(role!=="user"){
   const tools=dom("div",undefined,"bubble-tools");
@@ -97,7 +105,7 @@ function renderSpecialists(){
   out.append(b);
  }
 }
-function renderChat(){const out=$("messages");out.replaceChildren();if(!DATA.conversations.length)out.append(bubble("Bonjour. Je peux vous aider à organiser vos tâches et consulter des informations médicales sourcées. Qu'aimeriez-vous faire aujourd'hui ?","bot"));else DATA.conversations.slice(-100).forEach(m=>out.append(bubble(m.body,m.role,m.sourceId,m.references)));out.scrollTop=out.scrollHeight;}
+function renderChat(){const out=$("messages");out.replaceChildren();if(!DATA.conversations.length)out.append(bubble("Bonjour. Je peux vous aider à organiser vos tâches et consulter des informations médicales sourcées. Qu'aimeriez-vous faire aujourd'hui ?","bot"));else DATA.conversations.slice(-100).forEach(m=>out.append(bubble(m.body,m.role,m.sourceId,m.references,m.siteId)));out.scrollTop=out.scrollHeight;}
 function localVoice(){return "speechSynthesis" in window?speechSynthesis.getVoices().find(v=>v.localService===true&&v.lang.toLowerCase().startsWith("fr")):null;}
 function syncVoiceControls(){
  const global=$("voice-toggle"),local=$("chat-voice-toggle");
@@ -108,7 +116,35 @@ function refreshComposer(){
  const count=$("prompt-count"),field=$("prompt");
  if(count&&field)count.textContent=field.value.length+" / "+field.maxLength;
 }
-function speak(message){if(!voice)return;const selected=localVoice();if(!selected){notify("Aucune voix française explicitement locale n'est disponible. La lecture a été désactivée.");voice=false;syncVoiceControls();return;}try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(message);u.lang="fr-FR";u.voice=selected;u.rate=.92;speechSynthesis.speak(u);}catch(e){notify("Synthèse vocale indisponible.");}}
+function stopSpeaking(){
+ speechToken++;
+ if("speechSynthesis" in window)try{speechSynthesis.cancel();}catch{}
+}
+function speak(message,{requested=false}={}){
+ if(!voice&&!requested)return false;
+ const selected=localVoice();
+ if(!selected){notify("Aucune voix française garantie locale sur cet appareil. La lecture audio n'est pas disponible.");voice=false;syncVoiceControls();return false;}
+ const chunks=splitSpeech(String(message||"").slice(0,14000));
+ if(!chunks.length)return false;
+ voice=true;syncVoiceControls();stopSpeaking();const token=speechToken;let index=0;
+ const next=()=>{
+  if(token!==speechToken||index>=chunks.length)return;
+  const utterance=new SpeechSynthesisUtterance(chunks[index++]);
+  utterance.lang="fr-FR";utterance.voice=selected;utterance.rate=.93;
+  utterance.onend=next;
+  utterance.onerror=()=>{if(token===speechToken)notify("Lecture audio interrompue sur cet appareil.");};
+  try{speechSynthesis.speak(utterance);}catch{notify("Lecture vocale indisponible.");}
+ };
+ next();return true;
+}
+function refreshBook(){
+ const page=$("book-page"),status=$("book-state"),prev=$("book-prev"),next=$("book-next"),read=$("book-read");
+ if(!bookText){page.textContent="";status.textContent="Aucun livre ouvert.";prev.disabled=next.disabled=read.disabled=true;return;}
+ const view=readerPage(bookText,bookIndex);bookIndex=view.page;
+ page.textContent=view.text;status.textContent="Page "+(bookIndex+1)+" sur "+view.count+" · lecture privée sur cet appareil.";
+ prev.disabled=bookIndex===0;next.disabled=bookIndex>=view.count-1;read.disabled=false;
+}
+
 async function ask(q){
  const input=text(q,2000);if(!input||busyChat)return;
  if(!db){
@@ -131,6 +167,23 @@ async function ask(q){
   const intent=classifyIntent(input),response=reply(input,LIBRARY,{...DATA,energy});
   let answer=response.message+(response.followup?"\n\n"+response.followup:""),sourceId=response.sources?.[0]?.id||"";
   let engine="Assistant documentaire local",references=[],onlineAttempted=false,mistralAttempted=false,mistralProblem="";
+  // Les actions locales et l'écoute passent après les règles d'urgence du moteur médical.
+  let siteId="",direct=false,companionMode="";
+  if(response.kind!=="urgent"){
+   const site=parseSiteCommand(input);
+   if(site){
+    siteId=site.siteId;answer="Je peux ouvrir "+site.label+" pour vous. Touchez le lien « Ouvrir "+site.label+" » dans ma réponse pour confirmer l'ouverture dans votre navigateur. Je ne peux pas piloter votre téléphone, vous connecter ou agir dans ce site à votre place.";
+    engine="Raccourci navigateur approuvé";direct=true;
+   }else if(parseStoryCommand(input)&&!($("mistral-use").checked&&mistralStatus().connected)&&!($("gemma-use").checked&&llmStatus().ready)){
+    const story=originalStory(input);answer=story.text;engine="Histoire originale écrite localement";direct=true;
+   }else if(parseReadingCommand(input)){
+    $("book-panel").open=true;answer="Avec plaisir. Ouvrez le panneau « Ma bibliothèque de lecture locale » ci-dessous puis choisissez un fichier .txt ou .md que vous avez le droit de lire. Je peux afficher ses pages et les lire avec une voix française locale disponible. Le fichier ne quitte pas votre appareil.";engine="Lecteur de textes privé";direct=true;
+   }else{
+    const companion=companionReply(input,{requested:$("companion-mode").value,safety:response,history:DATA.conversations});
+    if(companion){answer=companion.message;engine=companion.label+" (local, non médical)";companionMode=companion.mode;direct=true;}
+   }
+  }
+  if(!direct){
   // Consentement au réseau valable pour cette session, puis validation de chaque
   // question exacte. Pas de synchronisation du coffre ni de recherche médicale libre.
   // When active, Mistral answers general questions first. Source search
@@ -252,9 +305,10 @@ async function ask(q){
   if(mistralProblem&&!mistralAttempted){
    answer+="\n\n[Mode secours : Mistral temporairement indisponible. FibroBot répond avec ses ressources locales.]";
   }
-  const purpose=intent==="general"?"general-local":intent;
+  }
+  const purpose=companionMode?"companion-local":intent==="general"?"general-local":intent;
   const userRecord={role:"user",body:input,time:Date.now(),purpose};
-  const b={role:"bot",body:answer,time:Date.now(),sourceId,references,purpose};
+  const b={role:"bot",body:answer,time:Date.now(),sourceId,references,purpose,siteId,companionMode};
   // L'écran ne dépend jamais de la réussite d'une requête réseau ou d'IndexedDB.
   DATA.conversations.push(userRecord,b);
   pending.remove();
@@ -322,6 +376,28 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
+ $("companion-mode").addEventListener("change",()=>{
+  const label=$("companion-mode").selectedOptions[0]?.textContent||"Automatique";
+  notify("Mode d'écoute : "+label+". Les règles de sécurité restent prioritaires.");
+ });
+ $("book-file").addEventListener("change",async event=>{
+  const file=event.currentTarget.files?.[0];
+  if(!file)return;
+  stopSpeaking();bookText="";bookIndex=0;refreshBook();
+  try{
+   validateBookFile(file);
+   bookText=normalizeBookText(await file.text());
+   bookIndex=0;refreshBook();
+   notify("Texte chargé localement : "+file.name+". Aucun envoi réseau.");
+  }catch(error){$("book-state").textContent=String(error.message||error);notify("Lecture du fichier impossible.");}
+ });
+ $("book-prev").addEventListener("click",()=>{if(bookText){stopSpeaking();bookIndex=Math.max(0,bookIndex-1);refreshBook();}});
+ $("book-next").addEventListener("click",()=>{if(bookText){stopSpeaking();bookIndex++;refreshBook();}});
+ $("book-read").addEventListener("click",()=>{
+  if(!bookText){notify("Ouvrez d'abord un livre .txt ou .md.");return;}
+  speak(readerPage(bookText,bookIndex).text,{requested:true});
+ });
+ $("book-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
  $("assistant-diagnostics-run").addEventListener("click",()=>{
   const out=$("assistant-diagnostics-result");out.replaceChildren();
   const core=checkAssistantCore();
@@ -455,7 +531,7 @@ function events(){
  }else if(b.dataset.action)command(b).catch(err=>notify(err.message));});
  $("daily-energy").addEventListener("input",e=>{energy=Number(e.target.value);$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();});
  $("daily-energy").addEventListener("change",async()=>{try{await put(db,"settings",{id:"energy",value:energy});}catch(e){notify("Énergie non sauvegardée.");}});
-  $("voice-toggle").addEventListener("click",()=>{if(!voice&&!localVoice()){notify("Aucune voix française garantie locale sur cet appareil. Aucune voix en ligne n'est activée.");return;}voice=!voice;syncVoiceControls();if(!voice&&"speechSynthesis" in window)speechSynthesis.cancel();});
+  $("voice-toggle").addEventListener("click",()=>{if(!voice&&!localVoice()){notify("Aucune voix française garantie locale sur cet appareil. Aucune voix en ligne n'est activée.");return;}voice=!voice;syncVoiceControls();if(!voice)stopSpeaking();});
   $("chat-voice-toggle").addEventListener("click",()=>$("voice-toggle").click());
   $("prompt").addEventListener("input",refreshComposer);
   $("prompt").addEventListener("keydown",event=>{
