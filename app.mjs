@@ -45,6 +45,55 @@ async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all
 function render(){ $("count-tasks").textContent=DATA.tasks.filter(x=>!x.done).length;$("count-health").textContent=DATA.symptoms.length;$("count-conditions").textContent=DATA.conditions.length;$("daily-energy").value=energy;$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();renderHealth();renderHealthTrends();renderConditions();renderMeds();renderAppointments();renderUpcomingAppointments();renderLibrary();renderChat();renderGeneralPreference();patientUX?.refreshGuide(); }
 function renderTasks(){const tasks=rankTasks(DATA.tasks,energy),out=$("tasks-list"),home=$("today-tasks");out.replaceChildren();home.replaceChildren();if(!tasks.length)blank(home,"Aucune tâche urgente. Vous pouvez vous reposer.");else tasks.slice(0,5).forEach(t=>record(home,t.title,"Effort "+t.effort+"/3",null,null,t.id,{tag:t.adapted?"Effort compatible":"À reporter"}));if(!DATA.tasks.length)blank(out,"Vous pouvez ajouter vos tâches ici.");else [...tasks,...DATA.tasks.filter(x=>x.done)].forEach(t=>record(out,t.title,(t.priority==="important"?"Essentielle":t.priority==="delegable"?"Délégable":"Flexible")+" · effort "+t.effort+"/3"+(t.due?" · "+t.due:""),null,"tasks",t.id,{done:t.done,tag:t.done?"Terminée":t.adapted?"Effort compatible":"À reporter"}));}
 function renderHealth(){const out=$("health-list");out.replaceChildren();if(!DATA.symptoms.length)blank(out,"Aucune observation enregistrée.");else [...DATA.symptoms].sort((a,b)=>String(b.date).localeCompare(String(a.date))).forEach(s=>{const notes=[s.energy!=null?"Énergie "+s.energy+"/10":"",s.fatigue!=null?"Fatigue "+s.fatigue+"/10":"",s.sleep!=null?"Sommeil "+s.sleep+"/10":"",s.notes].filter(Boolean).join(" · ");record(out,s.name,String(s.date).slice(0,10)+" · Intensité "+s.intensity+"/10"+(s.condition?" · "+s.condition:""),notes,"symptoms",s.id);});const select=$("health-condition"),old=select.value;select.replaceChildren();let option=dom("option","Non précisée");option.value="";select.append(option);for(const c of DATA.conditions){option=dom("option",c.name);option.value=c.name;select.append(option);}select.value=old;}
+function renderGeneralPreference(){
+ const input=$("general-preference"),status=$("preference-status");if(!input||!status)return;
+ const value=savedGeneralPreference(DATA.settings);input.value=value;
+ status.textContent=value?"Préférence enregistrée dans le coffre chiffré. Le partage avec les IA est désactivé par défaut.":"Aucune préférence générale enregistrée.";
+}
+function updateApiBudgetUI(){
+ const x=apiBudgetStatus(),node=$("api-budget-status");
+ if(node)node.textContent=x.used+" appel(s) distant(s) autorisé(s) · "+x.remaining+" restant(s). Ces limites ne garantissent pas un plafond financier.";
+}
+function renderHealthTrends(){
+ const chart=$("trend-chart"),summary=$("trend-summary"),values=$("trend-values");
+ if(!chart||!summary||!values||!db)return;
+ const metric=$("trend-metric").value;
+ let trend;try{trend=dailyTrend(DATA.symptoms,{metric,days:Number($("trend-days").value)});}
+ catch(err){summary.textContent=String(err.message||err);return;}
+ const label=TREND_METRICS.find(x=>x.key===metric)?.label||"Mesure";
+ summary.textContent=trendDescription(trend);chart.setAttribute("aria-label",label+" · "+summary.textContent);
+ chart.replaceChildren();
+ const ns="http://www.w3.org/2000/svg",make=(tag,attrs={})=>{
+  const el=document.createElementNS(ns,tag);
+  for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));
+  return el;
+ };
+ const svg=make("svg",{viewBox:"0 0 600 185","aria-hidden":"true"});
+ const left=45,right=570,top=18,bottom=152,points=trend.points;
+ const x=i=>left+i*(right-left)/Math.max(1,points.length-1);
+ const y=v=>bottom-v/10*(bottom-top);
+ for(const tick of [0,2,4,6,8,10]){
+  const v=y(tick);svg.append(make("line",{x1:left,y1:v,x2:right,y2:v,class:"trend-grid"}));
+  const t=make("text",{x:30,y:v+4,"text-anchor":"end",class:"trend-tick"});t.textContent=String(tick);svg.append(t);
+ }
+ for(let i=0;i<points.length;i++){
+  const current=points[i];if(current.value===null)continue;
+  if(i>0&&points[i-1].value!==null)svg.append(make("line",{x1:x(i-1),y1:y(points[i-1].value),x2:x(i),y2:y(current.value),class:"trend-line"}));
+  const dot=make("circle",{cx:x(i),cy:y(current.value),r:4,class:"trend-point"});
+  dot.append(make("title"));dot.firstChild.textContent=current.date+" · "+current.value+"/10 · "+current.count+" note(s)";
+  svg.append(dot);
+ }
+ const t1=make("text",{x:left,y:176,class:"trend-tick"});t1.textContent=points[0]?.date||"";
+ const t2=make("text",{x:right,y:176,"text-anchor":"end",class:"trend-tick"});t2.textContent=points.at(-1)?.date||"";
+ svg.append(t1,t2);chart.append(svg);
+ const table=dom("table"),head=dom("thead"),heading=dom("tr"),body=dom("tbody"),caption=dom("caption",label+" · valeurs réellement notées");
+ for(const name of ["Date","Moyenne /10","Nombre de notes"]){const th=dom("th",name);th.scope="col";heading.append(th);}
+ head.append(heading);
+ const measured=points.filter(p=>p.count);
+ for(const item of measured){const row=dom("tr");for(const t of [item.date,item.value+"/10",String(item.count)])row.append(dom("td",t));body.append(row);}
+ if(!measured.length){const row=dom("tr"),cell=dom("td","Aucune mesure pour cette période.");cell.colSpan=3;row.append(cell);body.append(row);}
+ table.append(caption,head,body);values.replaceChildren(table);
+}
 function renderConditions(){const out=$("conditions-list");out.replaceChildren();if(!DATA.conditions.length)blank(out,"Aucune maladie connue enregistrée.");else DATA.conditions.forEach(c=>record(out,c.name,"Information saisie par vous",c.notes,"conditions",c.id));}
 function renderMeds(){const out=$("med-list");out.replaceChildren();if(!DATA.medications.length)blank(out,"Aucun médicament ou traitement déclaré.");else DATA.medications.forEach(m=>record(out,m.name,[m.dose&&"Dose déclarée : "+m.dose,m.schedule&&"Fréquence : "+m.schedule,m.reminderTime&&"Rappel quotidien : "+m.reminderTime,m.prescriber&&"Prescripteur : "+m.prescriber].filter(Boolean).join(" · "),m.notes,"medications",m.id));renderReminders();}
 function renderAppointments(){const out=$("appts-list");out.replaceChildren();if(!DATA.appointments.length)blank(out,"Aucun rendez-vous enregistré.");else [...DATA.appointments].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).forEach(a=>record(out,a.title,a.date+(a.time?" à "+a.time:"")+(a.place?" · "+a.place:""),a.questions&&"Questions : "+a.questions,"appointments",a.id));}
