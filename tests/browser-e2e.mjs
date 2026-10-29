@@ -204,6 +204,7 @@ try{
  assert.equal(mistralCalls,4,"One request only on 429");
  await page.waitForFunction(()=>/pause|quota/i.test(document.getElementById("mistral-status")?.textContent||""),{timeout:12000});
  assert.equal(await page.locator("#mistral-use").isChecked(),false,"Disable Mistral automatically when rate-limited");
+ await page.waitForFunction(()=>!document.querySelector('#chat-form button[type="submit"]')?.disabled,{timeout:12000});
  assert.equal(await page.locator('#chat-form button[type="submit"]').isDisabled(),false,"Chat form must be re-enabled");
  await page.locator("#prompt").fill("Bonjour");
  await page.locator('#chat-form button[type="submit"]').click();
