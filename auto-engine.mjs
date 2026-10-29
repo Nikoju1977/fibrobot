@@ -7,10 +7,10 @@ export function autoGeneralAllowed(question,intent,response){
  if(intent!=="general"||!["refusal","followup"].includes(response?.kind))return false;
  try{nonMedicalMessages(question,[]);return true;}catch{return false;}
 }
-export function autoProviderOrder({agnesConnected=false,agnesCooldown=0,mistralConnected=false,mistralCooldown=0}={}){
+export function autoProviderOrder({agnesConnected=false,agnesCooldown=0,mistralConnected=false,mistralCooldown=0,agnesBlocked=false,mistralBlocked=false}={}){
  const result=[];
- if(agnesConnected&&agnesCooldown<=0)result.push("agnes");
- if(mistralConnected&&mistralCooldown<=0)result.push("mistral");
+ if(agnesConnected&&!agnesBlocked&&agnesCooldown<=0)result.push("agnes");
+ if(mistralConnected&&!mistralBlocked&&mistralCooldown<=0)result.push("mistral");
  return result;
 }
 export async function answerWithAuto({question,intent,response,state={},agnes,mistral,authorize=()=>false,onAttempt=()=>{}}){
