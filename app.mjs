@@ -313,7 +313,7 @@ function forms(){
  $("chat-form").addEventListener("submit",async e=>{
   e.preventDefault();
   if(busyChat){notify("Une réponse est déjà en cours.");return;}
-  const q=val("prompt");
+  const q=val("prompt").trim();
   if(!q)return;
   if(!db){setEngineNote("Coffre verrouillé : ouvrez-le pour discuter.");notify("Déverrouillez le coffre avant de discuter.");return;}
   $("prompt").value="";refreshComposer();
@@ -461,7 +461,7 @@ function events(){
   $("prompt").addEventListener("keydown",event=>{
    if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){
     event.preventDefault();
-    if(!busyChat)$("chat-form").requestSubmit();
+    if(!busyChat){const form=$("chat-form");if(typeof form.requestSubmit==="function")form.requestSubmit();else $("chat-send").click();}
    }
   });
   $("messages").addEventListener("click",async event=>{
