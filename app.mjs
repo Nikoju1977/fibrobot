@@ -34,7 +34,8 @@ function renderMeds(){const out=$("med-list");out.replaceChildren();if(!DATA.med
 function renderAppointments(){const out=$("appts-list");out.replaceChildren();if(!DATA.appointments.length)blank(out,"Aucun rendez-vous enregistré.");else [...DATA.appointments].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).forEach(a=>record(out,a.title,a.date+(a.time?" à "+a.time:"")+(a.place?" · "+a.place:""),a.questions&&"Questions : "+a.questions,"appointments",a.id));}
 function renderLibrary(){const out=$("library-list");out.replaceChildren();for(const d of LIBRARY){const c=dom("article");c.append(dom("h3",d.title),dom("p",d.answer),dom("small",d.source+" · "+d.date));const link=dom("a","Voir la source");link.href=d.url;link.target="_blank";link.rel="noopener noreferrer";c.append(link);out.append(c);}}
 function bubble(body,role,source,references=[]){
- const b=dom("div",body,"bubble"+(role==="user"?" user":""));
+ const b=dom("div",undefined,"bubble"+(role==="user"?" user":""));
+ b.append(dom("div",role==="user"?"Vous":"FibroBot","bubble-sender"),dom("div",body,"bubble-body"));
  const doc=LIBRARY.find(d=>d.id===source);
  if(doc){const a=dom("a","Source : "+doc.source,"source");a.href=doc.url;a.target="_blank";a.rel="noopener noreferrer";b.append(a);}
  if(role!=="user"&&Array.isArray(references)){
@@ -46,6 +47,12 @@ function bubble(body,role,source,references=[]){
    a.href=safe;a.target="_blank";a.rel="noopener noreferrer";links.append(a);
   }
   if(links.childNodes.length)b.append(links);
+ }
+ if(role!=="user"){
+  const tools=dom("div",undefined,"bubble-tools");
+  const copy=dom("button","Copier la réponse");copy.type="button";copy.dataset.chatCopy="1";copy.setAttribute("aria-label","Copier cette réponse de FibroBot");
+  const read=dom("button","Écouter");read.type="button";read.dataset.chatRead="1";read.setAttribute("aria-label","Lire cette réponse avec la voix locale");
+  tools.append(copy,read);b.append(tools);
  }
  return b;
 }
@@ -77,6 +84,8 @@ function updateEngineNote(){
  const state=llmStatus(),enabled=$("gemma-use")?.checked;
  setEngineNote((state.ready?(enabled?"IA locale active : "+state.modelId:"IA chargée mais désactivée : activez-la dans les options."):"Assistant documentaire actif · IA générative non chargée dans cette session.")+
  (networkEnabled?" · Internet : activé avec confirmation":" · Internet : désactivé")+(mistralStatus().connected?" · Mistral : connecté":""));
+ const badge=$("assistant-mode-badge");
+ if(badge)badge.textContent=mistralStatus().connected&&$("mistral-use")?.checked?"Mistral sur accord":networkEnabled?"Recherche sur accord":state.ready&&enabled?"IA locale active":"Documentaire local";
 }
 function renderSpecialists(){
  const out=$("specialist-list");if(!out)return;
@@ -90,7 +99,16 @@ function renderSpecialists(){
 }
 function renderChat(){const out=$("messages");out.replaceChildren();if(!DATA.conversations.length)out.append(bubble("Bonjour. Je peux vous aider à organiser vos tâches et consulter des informations médicales sourcées. Qu'aimeriez-vous faire aujourd'hui ?","bot"));else DATA.conversations.slice(-100).forEach(m=>out.append(bubble(m.body,m.role,m.sourceId,m.references)));out.scrollTop=out.scrollHeight;}
 function localVoice(){return "speechSynthesis" in window?speechSynthesis.getVoices().find(v=>v.localService===true&&v.lang.toLowerCase().startsWith("fr")):null;}
-function speak(message){if(!voice)return;const selected=localVoice();if(!selected){notify("Aucune voix française explicitement locale n'est disponible. La lecture a été désactivée.");voice=false;$("voice-toggle").textContent="Voix : off";return;}try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(message);u.lang="fr-FR";u.voice=selected;u.rate=.92;speechSynthesis.speak(u);}catch(e){notify("Synthèse vocale indisponible.");}}
+function syncVoiceControls(){
+ const global=$("voice-toggle"),local=$("chat-voice-toggle");
+ if(global){global.textContent="Voix : "+(voice?"activée":"off");global.setAttribute("aria-pressed",String(voice));}
+ if(local){local.textContent=voice?"Voix activée":"Voix désactivée";local.setAttribute("aria-pressed",String(voice));local.setAttribute("aria-label",voice?"Désactiver la lecture vocale locale":"Activer la lecture vocale locale");}
+}
+function refreshComposer(){
+ const count=$("prompt-count"),field=$("prompt");
+ if(count&&field)count.textContent=field.value.length+" / "+field.maxLength;
+}
+function speak(message){if(!voice)return;const selected=localVoice();if(!selected){notify("Aucune voix française explicitement locale n'est disponible. La lecture a été désactivée.");voice=false;syncVoiceControls();return;}try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(message);u.lang="fr-FR";u.voice=selected;u.rate=.92;speechSynthesis.speak(u);}catch(e){notify("Synthèse vocale indisponible.");}}
 async function ask(q){
  const input=text(q,2000);if(!input||busyChat)return;
  if(!db){
@@ -298,7 +316,7 @@ function forms(){
   const q=val("prompt");
   if(!q)return;
   if(!db){setEngineNote("Coffre verrouillé : ouvrez-le pour discuter.");notify("Déverrouillez le coffre avant de discuter.");return;}
-  $("prompt").value="";
+  $("prompt").value="";refreshComposer();
   await ask(q);
  });
 }
@@ -437,7 +455,32 @@ function events(){
  }else if(b.dataset.action)command(b).catch(err=>notify(err.message));});
  $("daily-energy").addEventListener("input",e=>{energy=Number(e.target.value);$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();});
  $("daily-energy").addEventListener("change",async()=>{try{await put(db,"settings",{id:"energy",value:energy});}catch(e){notify("Énergie non sauvegardée.");}});
- $("voice-toggle").addEventListener("click",()=>{if(!voice&&!localVoice()){notify("Aucune voix française garantie locale sur cet appareil. Aucune voix en ligne n'est activée.");return;}voice=!voice;$("voice-toggle").textContent="Voix : "+(voice?"activée":"off");$("voice-toggle").setAttribute("aria-pressed",String(voice));if(!voice&&"speechSynthesis" in window)speechSynthesis.cancel();});
+  $("voice-toggle").addEventListener("click",()=>{if(!voice&&!localVoice()){notify("Aucune voix française garantie locale sur cet appareil. Aucune voix en ligne n'est activée.");return;}voice=!voice;syncVoiceControls();if(!voice&&"speechSynthesis" in window)speechSynthesis.cancel();});
+  $("chat-voice-toggle").addEventListener("click",()=>$("voice-toggle").click());
+  $("prompt").addEventListener("input",refreshComposer);
+  $("prompt").addEventListener("keydown",event=>{
+   if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){
+    event.preventDefault();
+    if(!busyChat)$("chat-form").requestSubmit();
+   }
+  });
+  $("messages").addEventListener("click",async event=>{
+   const target=event.target.closest("button[data-chat-copy],button[data-chat-read]");
+   if(!target)return;
+   const answer=target.closest(".bubble")?.querySelector(".bubble-body")?.textContent||"";
+   if(!answer)return;
+   if(target.dataset.chatRead){
+    if(!voice){notify("Activez d'abord la voix locale pour écouter cette réponse.");return;}
+    speak(answer);return;
+   }
+   if(target.dataset.chatCopy){
+    try{
+     if(!navigator.clipboard?.writeText)throw Error("Presse-papiers indisponible");
+     await navigator.clipboard.writeText(answer);
+     notify("Réponse copiée. Pensez à la confidentialité de vos informations.");
+    }catch{notify("Copie impossible sur ce navigateur. Sélectionnez le texte manuellement.");}
+   }
+  });
  $("mic").addEventListener("click",async()=>{const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Speech||typeof Speech.available!=="function"){notify("Reconnaissance vocale strictement locale non vérifiable ici. Utilisez le clavier de l'appareil ; sa dictée suit les règles du fabricant.");return;}try{const availability=await Speech.available({langs:["fr-FR"],processLocally:true});if(availability!=="available"){notify("Modèle de dictée locale non installé ou indisponible.");return;}const recognition=new Speech();recognition.processLocally=true;recognition.lang="fr-FR";recognition.onresult=e=>{$("prompt").value=e.results[0][0].transcript;notify("Texte dicté localement. Vérifiez-le avant d'envoyer.");};recognition.onerror=()=>notify("La dictée locale n'a pas abouti.");recognition.start();}catch(e){notify("Dictée locale indisponible sur ce navigateur.");}});
  $("export").addEventListener("click",()=>exportBackup().catch(e=>notify("Export impossible : "+e.message)));
  $("print-report").addEventListener("click",printReport);
@@ -539,7 +582,7 @@ function events(){
  });
 }
 async function init(){
- renderSpecialists();updateEngineNote();
+ renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();
  window.addEventListener("pagehide",()=>{
   disconnectMistral();
   const field=$("mistral-key");if(field)field.value="";
