@@ -308,3 +308,14 @@ Les **urgences, conseils médicamenteux, symptômes individuels, résumés de sa
 **Contraintes réelles :** le chargement d'un modèle local WebGPU dépend du GPU, de la RAM et du navigateur. Les appels API Agnes/Mistral nécessitent une connexion, une clé valide, des quotas disponibles et le support CORS côté fournisseur. Les tests GitHub Actions simulent les API ; ils ne prouvent ni la disponibilité du service live avec votre compte ni la compatibilité réelle sur tous les téléphones. La PWA reste sans serveur administré par FibroBot.
 
 Pour mettre à jour la PWA sans supprimer vos données, **fermez puis rouvrez-la** ; le service worker utilise `fibrobot-shell-v22`. Ne videz pas les données du site car elles contiennent le coffre local chiffré.
+
+
+## Discussion IA par défaut (29 octobre 2026)
+
+Le mode conversationnel **ne propose plus de modèle IA local dans l'interface de discussion**. Le routeur de questions générales utilise désormais Agnes AI en premier, puis Mistral si Agnes ne répond pas, si son quota est atteint, ou si l'utilisateur choisit d'essayer Mistral. Chaque envoi à un fournisseur externe requiert la confirmation du texte de la question. Le bouton de secours « Mode local immédiat » et l'écran de téléchargement WebGPU ne sont plus proposés dans l'interface Assistant.
+
+Les fonctions documentaires et le coffre **restent intégrés** : c'est indispensable à la confidentialité du suivi, aux réponses urgentes et au fonctionnement hors ligne d'une PWA. En l'absence de clé Agnes ou Mistral opérationnelle, aucune réponse IA libre n'est garantie ; FibroBot affiche un message explicite et conserve les fonctions documentaires.
+
+Les histoires et demandes de conversation générales utilisent l'IA connectée si disponible, à la place de scripts répétitifs. Pour les questions médicales personnelles, les urgences, le diagnostic et les modifications de traitement, FibroBot maintient ses garde-fous et les réponses sourcées/encadrées. Les appels à Agnes et Mistral restent soumis au compte, aux quotas et à CORS ; aucun fournisseur ne peut répondre avec certitude à toute question.
+
+**Attention :** Agnes et Mistral sont des services distants. Leur clé API ne doit jamais apparaître dans un dépôt GitHub. Ce site statique utilise actuellement une clé Agnes saisie dans le navigateur, plus exposée qu'une clé conservée sur un serveur dédié. Ne configurez pas de clé à budget élevé. Le service worker utilise `fibrobot-shell-v23` ; fermer puis rouvrir la PWA suffit généralement à rafraîchir les ressources sans effacer les données médicales.
