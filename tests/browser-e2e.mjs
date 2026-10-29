@@ -42,6 +42,18 @@ try{
  assert.ok((await page.locator("#chat .chat-card").boundingBox()).y <
   (await page.locator("#agnes-options").boundingBox()).y,"Conversation visible before IA settings");
  assert.equal(await page.locator("#chat-voice-toggle").getAttribute("aria-pressed"),"false");
+ assert.equal(await page.locator("#chat-memory-optin").isChecked(),false,"Session memory must be opt-in");
+ assert.equal(await page.locator("#sources-first").isChecked(),false,"Sourced search must be opt-in");
+ await page.locator("#chat-memory-optin").check();
+ assert.match(await page.locator("#chat-memory-state").textContent(),/prochains échanges/i);
+ await page.locator("#chat-memory-clear").click();
+ assert.match(await page.locator("#chat-memory-state").textContent(),/effacée/i);
+ await page.locator("#chat-memory-optin").uncheck();
+ assert.equal(await page.locator("#chat-memory-optin").isChecked(),false);
+ await page.locator("#chat-voice-speed").selectOption("1.15");
+ assert.equal(await page.locator("#chat-voice-speed").inputValue(),"1.15");
+ await page.locator("#chat-voice-stop").click();
+
  await page.locator("#prompt").fill("Une question");
  assert.match(await page.locator("#prompt-count").textContent(),/12 \/ 2000/);
  await page.locator("#prompt").press("Shift+Enter");
