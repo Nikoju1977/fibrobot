@@ -10,7 +10,7 @@ export const COMPANION_MODES=Object.freeze([
  {id:"emotion",label:"Soutien moral",description:"Être écouté et trouver des mots, sans remplacer un psychologue."}
 ]);
 const norm=s=>String(s??"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/’/g,"'");
-const FEEL=/(je me sens (?:seul|isole|triste|angoiss|anxieu|deprim|mal|vide|perdu)|j'ai (?:peur|besoin de parler|besoin d'etre ecoute|le moral|envie de pleurer)|je suis (?:seul|triste|angoiss|anxieu|inquiet|deprim|stress|perdu)|je n'en peux plus|je craque|personne ne m'ecoute|tu peux m'ecouter|besoin de soutien|mal moralement|j'ai besoin de parler)/;
+const FEEL=/(je me sens (?:seul|isole|triste|angoiss|anxieu|deprim|mal|vide|perdu)|j'ai (?:peur|besoin de parler|besoin d'etre ecoute|le moral|envie de pleurer)|je suis (?:tres |vraiment |tellement )?(?:seul|triste|angoiss|anxieu|inquiet|deprim|stress|perdu)|je n'en peux plus|je craque|personne ne m'ecoute|tu peux m'ecouter|besoin de soutien|mal moralement|j'ai besoin de parler)/;
 const PAIN=/(j'ai mal|je souffre|mes douleurs|ma douleur|crise de douleur|poussee de fibromyalgie|douleur (?:forte|intense|insupportable|partout)|la douleur m'empeche|je vis avec la douleur|la fibro m'empeche|j'ai une crise)/;
 const CARE=/(je voudrais noter (?:mes|un) sympt|comment suivre mes sympt|j'ai besoin d'une infirmiere|comment preparer (?:mes|ma) soins|mon pansement|ma temperature|suivi de mes traitements|je souhaite expliquer mes symptomes)/;
 const FRIEND=/(comment tu t'appelles|qui es.tu|tu es qui|que peux.tu faire|qu'est.ce que tu sais faire|parle.moi|discutons|j'ai besoin de compagnie|comment vas.tu|tu es la|tu m'entends|tu peux m'ecouter|je veux parler)/;
