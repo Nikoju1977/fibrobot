@@ -10,6 +10,8 @@ import {setupPatientUX} from "./ux-pro.mjs";
 import {checkAssistantCore,companionStatus,documentedAnswer} from "./assistant-diagnostics.mjs";
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
 import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,generateMistralMedicalExplanation,generateMistralPlanningAdvice,testMistralConnection} from "./mistral-bridge.mjs";
+import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgnesChat,testAgnesConnection} from "./agnes-bridge.mjs";
+import {autoGeneralAllowed,answerWithAuto} from "./auto-engine.mjs";
 import {mistralRoute,mistralConsentDescription} from "./mistral-routing.mjs";
 import {CREDENTIAL_ID,validStoredMistralCredential,saveMistralCredential,loadMistralCredential,deleteMistralCredential} from "./mistral-credential-vault.mjs";
 import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
@@ -93,7 +95,14 @@ function updateEngineNote(){
  setEngineNote((state.ready?(enabled?"IA locale active : "+state.modelId:"IA chargée mais désactivée : activez-la dans les options."):"Assistant documentaire actif · IA générative non chargée dans cette session.")+
  (networkEnabled?" · Internet : activé avec confirmation":" · Internet : désactivé")+(mistralStatus().connected?" · Mistral : connecté":""));
  const badge=$("assistant-mode-badge");
- if(badge)badge.textContent=mistralStatus().connected&&$("mistral-use")?.checked?"Mistral sur accord":networkEnabled?"Recherche sur accord":state.ready&&enabled?"IA locale active":"Documentaire local";
+ if(badge)badge.textContent=$("auto-mode")?.checked?"Auto · local prioritaire":mistralStatus().connected&&$("mistral-use")?.checked?"Mistral sur accord":networkEnabled?"Recherche sur accord":state.ready&&enabled?"IA locale active":"Documentaire local";
+ const auto=$("auto-brain-status");
+ if(auto){
+  const ag=agnesStatus(),mi=mistralStatus();
+  auto.textContent=$("auto-mode")?.checked?
+   "Auto activé · "+(state.ready&&enabled?"IA locale chargée":"assistant documentaire local")+" · Agnes "+(ag.connected?(ag.cooldownSeconds>0?"en pause":"connecté"):"non connecté")+" · Mistral "+(mi.connected?(mi.cooldownSeconds>0?"en pause":"connecté"):"non connecté"):
+   "Auto désactivé · commandes et réponses locales toujours disponibles.";
+ }
 }
 function renderSpecialists(){
  const out=$("specialist-list");if(!out)return;
