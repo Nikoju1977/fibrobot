@@ -661,8 +661,9 @@ function events(){
  $("book-pdf-open").addEventListener("click",()=>{
   if(!pdfDocumentFile){notify("Aucun fichier PDF sélectionné.");return;}
   const url=URL.createObjectURL(pdfDocumentFile);
-  const opened=window.open(url,"_blank","noopener,noreferrer");
-  if(!opened)notify("Si le PDF ne s'ouvre pas, autorisez les fenêtres du navigateur pour ce site.");
+  const link=dom("a");link.href=url;link.target="_blank";link.rel="noopener noreferrer";
+  document.body.append(link);link.click();link.remove();
+  notify("Aperçu PDF demandé au lecteur du navigateur ; aucun transfert vers FibroBot.");
   setTimeout(()=>URL.revokeObjectURL(url),120000);
  });
  $("book-prev").addEventListener("click",()=>{if(bookText){stopSpeaking();bookIndex=Math.max(0,bookIndex-1);refreshBook();}});
@@ -968,6 +969,8 @@ async function init(){
  $("today-date").textContent=new Intl.DateTimeFormat("fr-FR",{dateStyle:"long"}).format(new Date());
  $("health-date").value=today();$("appt-date").value=today();
  forms();events();
+  const shortcut=new URLSearchParams(location.search).get("open");
+  if(["chat","crisis","tasks","health","appointments","library"].includes(shortcut))tab(shortcut);
  patientUX=setupPatientUX({navigate:tab,getSettings:()=>DATA.settings,saveSetting:async(id,value)=>{
    if(!db)throw Error("Déverrouillez d'abord le coffre.");
    await put(db,"settings",{id,value});
