@@ -95,8 +95,8 @@ function setEngineNote(message){
 }
 function updateEngineNote(){
  const ag=agnesStatus(),mi=mistralStatus();
- setEngineNote("Conversation IA : Agnes "+(ag.connected?(ag.cooldownSeconds?"en pause":"connecté"):"non connecté")+
- " · Mistral "+(mi.connected?(mi.cooldownSeconds?"en pause":"connecté"):"non connecté")+
+ setEngineNote("Conversation IA : Agnes "+(ag.connected?(ag.authorizationBlocked?"clé à vérifier":ag.cooldownSeconds?"en pause":"connecté"):"non connecté")+
+ " · Mistral "+(mi.connected?(mi.authorizationBlocked?"clé à vérifier":mi.cooldownSeconds?"en pause":"connecté"):"non connecté")+
  " · Envoi seulement après votre accord.");
  const badge=$("assistant-mode-badge");
  if(badge)badge.textContent=$("auto-mode")?.checked?"IA conversationnelle":networkEnabled?"Recherche sur accord":"IA désactivée";
@@ -104,7 +104,7 @@ function updateEngineNote(){
  if(auto){
   const ag=agnesStatus(),mi=mistralStatus();
   auto.textContent=$("auto-mode")?.checked?
-   "IA conversationnelle · Agnes "+(ag.connected?(ag.cooldownSeconds>0?"en pause":"connecté"):"à connecter")+" · Mistral "+(mi.connected?(mi.cooldownSeconds>0?"en pause":"connecté"):"à connecter"):
+   "IA conversationnelle · Agnes "+(ag.connected?(ag.authorizationBlocked?"clé à remplacer":ag.cooldownSeconds>0?"en pause":"connecté"):"à connecter")+" · Mistral "+(mi.connected?(mi.authorizationBlocked?"clé à remplacer":mi.cooldownSeconds>0?"en pause":"connecté"):"à connecter"):
    "IA désactivée : les informations sourcées et la sécurité restent disponibles.";
  }
 }
