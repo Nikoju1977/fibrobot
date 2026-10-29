@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {dictationSupport,startDictation} from "../voice-input.mjs";
-import {upcomingAppointments,appointmentAlertKeys} from "../appointment-reminders.mjs";
+import {upcomingAppointments,appointmentAlertKeys,appointmentCalendarICS} from "../appointment-reminders.mjs";
 import {coordinatedCareBriefing} from "../care-briefing.mjs";
 const at=new Date(2026,9,29,12,0,0);
 
@@ -60,4 +60,16 @@ test("agents: coordinated briefing is descriptive, not a prescription or a diagn
  assert.match(text,/Nombre de traitements déclarés : 1/);
  assert.doesNotMatch(text,/Traitement SECRET|100|Condition privée/);
  assert.match(text,/non vérifiées cliniquement|Aucune relation de cause/);
+});
+
+test("calendar export: generic event and reminder, no medical identifying fields",()=>{
+ const timed=appointmentCalendarICS({id:123,date:"2026-10-30",time:"14:15",title:"Algologue SECRET",place:"Maison médicale privée"},at);
+ assert.match(timed,/BEGIN:VCALENDAR/);
+ assert.match(timed,/DTSTART:20261030T141500/);
+ assert.match(timed,/TRIGGER:-PT1H/);
+ assert.doesNotMatch(timed,/SECRET|Algologue|Maison médicale/);
+ const allDay=appointmentCalendarICS({id:1,date:"2026-10-31"},at);
+ assert.match(allDay,/DTSTART;VALUE=DATE:20261031/);
+ assert.match(allDay,/DTEND;VALUE=DATE:20261101/);
+ assert.throws(()=>appointmentCalendarICS({date:"2026-02-30"}),/non valide/);
 });
