@@ -485,3 +485,21 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 #chat #chat-voice-stop{min-height:44px}
 #chat #chat-memory-clear{min-height:44px}
 @media(max-width:650px){#chat .conversation-controls{padding:14px}#chat .chat-header-actions{flex-wrap:wrap}#chat #chat-voice-stop{font-size:.8rem}}
+
+/* FibroBot V25 — mobile accessibility and consented speech */
+#chat .dictation-permission{padding:10px 12px;margin:8px 0 4px;background:#f4faf6;border:1px solid #d6e8df;border-radius:12px}
+#chat .dictation-permission .consent{display:flex;gap:10px;align-items:flex-start;line-height:1.5;min-height:44px}
+#chat .dictation-permission input{flex:none;width:20px;height:20px;margin:2px 0 0}
+#chat .dictation-permission p{margin:3px 0 0}
+#chat .composer-actions #mic{display:flex;align-items:center;justify-content:center;gap:6px;min-width:86px;width:auto;min-height:44px;padding:0 9px;font-size:.83rem;line-height:1.1;white-space:normal}
+#chat .composer-actions #mic[aria-pressed="true"]{background:#d9f3e7;color:#12573d;border:1px solid #73bd95}
+#chat .composer-actions #mic:focus-visible{outline:3px solid #256f52;outline-offset:2px}
+.connection-state{display:inline-flex;align-items:center;min-height:32px;padding:5px 9px;border:1px solid #c9e6d7;border-radius:999px;font-size:.72rem;font-weight:700;color:#2c6e52;background:#eef9f1}
+.connection-state[data-online="false"]{background:#fff4df;border-color:#e9c67b;color:#855d0e}
+#upcoming-appointments .record{border-bottom:1px solid #e3ede7;padding:10px 0}
+#upcoming-appointments .record:last-child{border-bottom:0}
+@media(max-width:650px){
+ #chat .composer-actions #mic{min-width:76px;font-size:.78rem;padding:0 6px}
+ .connection-state{font-size:.68rem;padding:3px 6px}
+ #upcoming-appointments .record{min-width:0}
+}
