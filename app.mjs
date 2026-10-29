@@ -193,11 +193,13 @@ async function ask(q){
    }
   }
   if(!direct){
+  const autoEligible=$("auto-mode").checked&&autoGeneralAllowed(input,intent,response);
+  let autoAnswered=false;
   // Consentement au réseau valable pour cette session, puis validation de chaque
   // question exacte. Pas de synchronisation du coffre ni de recherche médicale libre.
   // When active, Mistral answers general questions first. Source search
   // remains available when it is disabled or temporarily rate-limited.
-  if(intent==="general"&&networkEnabled&&isOnlineEligible(input)&&["refusal","followup"].includes(response.kind)&&
+  if(!autoEligible&&intent==="general"&&networkEnabled&&isOnlineEligible(input)&&["refusal","followup"].includes(response.kind)&&
    (!($("mistral-use").checked&&mistralStatus().connected)||mistralStatus().cooldownSeconds>0)){
    const servers=selectPublicProviders(input).map(id=>PUBLIC_PROVIDERS.find(p=>p.id===id)?.name).filter(Boolean).join(" et ");
    if(confirm("Recherche Internet facultative sur "+servers+" ?\n\nQuestion envoyée telle quelle aux services publics :\n« "+input+" »\n\nNe poursuivez pas si votre question contient une information personnelle ou médicale.")){
@@ -257,7 +259,7 @@ async function ask(q){
    if(id){const specialist=runSpecialist(id,{...DATA,energy},input);answer=specialist.answer;sourceId=specialist.sourceId;engine="Agent "+specialist.name;}
   }
   const route=mistralRoute(input,intent,response);
-  if(route&&!onlineAttempted&&$("mistral-use").checked&&mistralStatus().connected){
+  if(route&&!autoEligible&&!onlineAttempted&&$("mistral-use").checked&&mistralStatus().connected){
    const state=mistralStatus();
    if(state.cooldownSeconds>0){
     mistralProblem="Mistral temporairement limité (429), réponse locale conservée.";
@@ -298,7 +300,31 @@ async function ask(q){
     }
    }
   }
-  if(intent==="general"&&!onlineAttempted&&!mistralAttempted&&["refusal","followup"].includes(response.kind)&&$("gemma-use").checked&&llmStatus().ready){
+  if(autoEligible){
+   const status=llmStatus(),agnes=agnesStatus(),mistral=mistralStatus();
+   const candidate=await answerWithAuto({
+    question:input,intent,response,
+    state:{localReady:status.ready&&$("gemma-use").checked,
+     agnesConnected:agnes.connected,agnesCooldown:agnes.cooldownSeconds,
+     mistralConnected:mistral.connected,mistralCooldown:mistral.cooldownSeconds},
+    local:async q=>({text:await generateGeneralChat(q,DATA.conversations),model:llmStatus().modelId}),
+    agnes:async q=>generateAgnesChat(q,{model:$("agnes-model").value}),
+    mistral:async q=>generateMistralChat(q,[],{model:$("mistral-model").value}),
+    authorize:(provider,q)=>confirm("Mode Auto : "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" est un fournisseur distant.\n\nEnvoyer cette question générale ?\n« "+q+" »\n\nAucun dossier, médicament ou historique de santé ne sera transmis. L'API peut être facturée. Appuyez sur Annuler pour rester sur les moteurs locaux."),
+    onAttempt:provider=>setEngineNote(provider==="local"?"Auto : génération locale en cours…":"Auto : tentative "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" après votre accord…")
+   });
+   if(candidate.provider){
+    answer=candidate.text;sourceId="";references=[];autoAnswered=true;
+    engine=candidate.provider==="local"?"Mode Auto · IA locale : "+candidate.model:
+     "Mode Auto · "+(candidate.provider==="agnes"?"Agnes AI":"Mistral AI")+" : "+candidate.model;
+    if(candidate.provider==="agnes")$("agnes-status").textContent="Agnes disponible · réponse fournie par ce moteur.";
+    if(candidate.provider==="mistral")$("mistral-status").textContent="Mistral disponible · réponse fournie par ce moteur.";
+   }else if(candidate.errors.length){
+    setEngineNote("Auto : moteurs indisponibles. Les fonctions locales restent accessibles.");
+   }
+   updateEngineNote();
+  }
+  if(!autoEligible&&intent==="general"&&!onlineAttempted&&!mistralAttempted&&["refusal","followup"].includes(response.kind)&&$("gemma-use").checked&&llmStatus().ready){
    setEngineNote("IA locale : génération de la réponse en français…");
    try{answer=await generateGeneralChat(input,DATA.conversations);sourceId="";engine="IA locale : "+llmStatus().modelId;}
    catch(error){
@@ -307,7 +333,7 @@ async function ask(q){
     notify("Impossible de générer avec le modèle local. Utilisez « Tester l’IA » dans les options.");
    }
   }
-  if(intent==="general"&&!onlineAttempted&&!mistralAttempted&&response.kind==="refusal"&&engine!=="IA locale : "+llmStatus().modelId){
+  if(intent==="general"&&!autoAnswered&&!onlineAttempted&&!mistralAttempted&&response.kind==="refusal"&&engine!=="IA locale : "+llmStatus().modelId){
    answer="Je ne dispose pas encore d'une réponse vérifiée pour cette question. Les fiches de fibromyalgie, les agents de soutien, la bibliothèque et les tâches restent disponibles sans Mistral. Si vous le souhaitez, activez les sources Internet pour une question publique. Je préfère ne pas inventer une réponse.";
    engine="Assistant documentaire de secours";
   }
