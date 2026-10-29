@@ -81,7 +81,7 @@ try{
  assert.equal(await page.locator("#preference-share").isChecked(),false);
  await page.locator("#general-preference").fill("Je préfère des réponses claires et des exemples.");
  await page.locator("#preference-save").click();
- assert.match(await page.locator("#preference-status").textContent(),/coffre chiffré/i);
+ await page.locator("#preference-status").getByText(/coffre chiffré/i).waitFor({timeout:15000});
  await page.locator("#preference-share").check();
  await page.locator("#api-budget-select").selectOption("5");
  assert.match(await page.locator("#api-budget-status").textContent(),/5 restant/);
