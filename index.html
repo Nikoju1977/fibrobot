@@ -172,7 +172,7 @@
 </div>
 </details>
       <details class="card ai-card" id="agnes-options">
- <summary><span class="ai-summary-icon" aria-hidden="true">◈</span><span><strong>Agnes AI · secours conversationnel optionnel</strong><small>Questions générales uniquement, avec confirmation avant l'envoi</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
+ <summary><span class="ai-summary-icon" aria-hidden="true">◈</span><span><strong>Agnes AI · moteur principal de discussion</strong><small>Questions générales uniquement, avec confirmation avant l'envoi</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
  <div class="ai-details">
   <p>Agnes est un fournisseur distant distinct de FibroBot. Il nécessite une clé API et une connexion compatibles. La clé est conservée uniquement en mémoire pendant la session ; aucun enregistrement dans le coffre ni sur GitHub. Les appels directs peuvent être bloqués par CORS. Les quotas, tarifs et promotions peuvent évoluer.</p>
   <div class="form model-form">
@@ -235,7 +235,7 @@
        <label class="network-consent" for="network-mode"><input type="checkbox" id="network-mode">
          <span><strong>Autoriser la recherche Internet pour cette session</strong><small>Par défaut, aucun accès Internet pour vos questions. Avant chaque recherche, FibroBot affiche la question exacte et vous demande de confirmer son envoi aux sites indiqués. Le dossier médical, les traitements et les symptômes ne sont jamais utilisés pour ces recherches.</small></span>
        </label>
-       <p class="tiny" id="network-state" role="status">Mode privé local : aucune recherche Internet libre ne sera lancée.</p><label class="consent"><input type="checkbox" id="source-synthesis">Synthétiser les extraits publics avec le LLM local chargé et afficher les sources originales</label>
+       <p class="tiny" id="network-state" role="status">Mode privé local : aucune recherche Internet libre ne sera lancée.</p><label class="consent"><input type="checkbox" id="source-synthesis">Synthèse facultative des sources (si un moteur IA compatible est réellement chargé)</label>
        <div class="network-examples">
         <button type="button" class="chip" data-ask="Qui était Marie Curie ?">Encyclopédie</button>
         <button type="button" class="chip" data-ask="Cherche un livre sur l'astronomie">Livres</button>
