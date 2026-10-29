@@ -14,7 +14,7 @@ import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgn
 import {autoGeneralAllowed,answerWithAuto,shouldPreferSources} from "./auto-engine.mjs";
 import {sessionPreview,appendSessionTurn} from "./conversation-context.mjs";
 import {startDictation} from "./voice-input.mjs";
-import {upcomingAppointments,appointmentAlertKeys} from "./appointment-reminders.mjs";
+import {upcomingAppointments,appointmentAlertKeys,appointmentCalendarICS} from "./appointment-reminders.mjs";
 import {coordinatedCareBriefing} from "./care-briefing.mjs";
 import {mistralRoute,mistralConsentDescription} from "./mistral-routing.mjs";
 import {CREDENTIAL_ID,validStoredMistralCredential,saveMistralCredential,loadMistralCredential,deleteMistralCredential} from "./mistral-credential-vault.mjs";
@@ -444,7 +444,8 @@ function renderUpcomingAppointments(){
   const row=dom("div",undefined,"record"),details=dom("div");
   details.append(dom("strong",appointment.title),dom("small",appointment.inDays===0?"Aujourd'hui":appointment.inDays===1?"Demain":"Dans "+appointment.inDays+" jours"));
   details.append(dom("small",appointment.date+(appointment.time?" · "+appointment.time:" · heure non renseignée")));
-  row.append(details);out.append(row);
+  const calendarButton=dom("button","Agenda (.ics)","btn light");calendarButton.type="button";calendarButton.dataset.calendarId=String(appointment.id);calendarButton.setAttribute("aria-label","Exporter ce rendez-vous dans le calendrier");
+  row.append(details,calendarButton);out.append(row);
  }
  for(const key of new Set(appointmentAlertKeys(DATA.appointments,new Date()))){
   if(seen.has(key))continue;
@@ -653,6 +654,19 @@ function events(){
   updateEngineNote();
  });
  document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+ if(b.dataset.calendarId){
+  if(!db){notify("Déverrouillez le coffre pour exporter le rendez-vous.");return;}
+  const entry=DATA.appointments.find(x=>String(x.id)===b.dataset.calendarId);
+  if(!entry){notify("Rendez-vous introuvable.");return;}
+  try{
+   const content=appointmentCalendarICS(entry);
+   const file=new Blob([content],{type:"text/calendar;charset=utf-8"}),url=URL.createObjectURL(file),link=dom("a");
+   link.href=url;link.download="fibrobot-rendez-vous-"+entry.date+".ics";document.body.append(link);link.click();link.remove();
+   setTimeout(()=>URL.revokeObjectURL(url),3000);
+   notify("Fichier calendrier créé sans nom ni détail médical. Importez-le volontairement dans votre agenda.");
+  }catch(err){notify("Export agenda impossible : "+String(err.message||err).slice(0,110));}
+  return;
+ }
  if(b.dataset.specialist){
   if(!db){notify("Déverrouillez le coffre personnel.");return;}
   try{
