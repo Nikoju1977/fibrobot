@@ -5,7 +5,7 @@
  */
 import {nonMedicalMessages,cleanGeneratedReply} from "./assistant-engine.mjs";
 const URL="https://apihub.agnes-ai.com/v1/chat/completions";
-const MODELS=Object.freeze(["agnes-3.0-flash","agnes-2.5-flash"]);
+const MODELS=Object.freeze(["agnes-2.5-flash","agnes-2.0-flash","agnes-3.0-flash"]);
 const active=new Set();
 let sessionKey="",cooldownUntil=0,lastFailure="";
 export function agnesStatus(){
@@ -27,7 +27,7 @@ export function secondsToRetryAgnes(value,now=Date.now()){
  }
  return Math.max(15,Math.min(900,Math.ceil(seconds)||15));
 }
-export async function generateAgnesChat(question,{model="agnes-3.0-flash",fetchImpl=globalThis.fetch,signal}={}){
+export async function generateAgnesChat(question,{model="agnes-2.5-flash",fetchImpl=globalThis.fetch,signal}={}){
  if(!sessionKey)throw Error("Agnes non connecté : ajoutez votre clé dans les réglages.");
  if(agnesStatus().cooldownSeconds>0)throw Error("Agnes en pause : quota temporairement atteint.");
  if(!MODELS.includes(model))throw Error("Modèle Agnes non autorisé.");
