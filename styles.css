@@ -17,3 +17,9 @@
 
 #vault-confirm-ack[hidden]{display:none!important}
 .vault-panel input[type=file]{max-width:100%;padding:8px;border:1px solid #dbe6eb;border-radius:8px}
+
+/* V27 — Voice status remains readable without animation. */
+.voice-state{padding:.45rem .65rem;margin:.35rem 0;border:1px solid currentColor;border-radius:.6rem;font-size:.88rem;opacity:.85}
+body[data-voice-state="speaking"] .voice-state{font-weight:700;opacity:1}
+body[data-voice-state="speaking"] .assistant-avatar{outline:3px solid currentColor;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){body[data-voice-state="speaking"] .assistant-avatar{animation:none!important;transition:none!important}}
