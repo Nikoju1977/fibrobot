@@ -30,9 +30,9 @@ test("synthèse clinique descriptive : ne pas inventer de zéro pour une note ab
   {date:"2026-10-25",name:"Zéro réellement saisi",intensity:0,energy:" "},
   {date:"2026-10-26",name:"Saisie valide",intensity:"10",energy:4,fatigue:null}
  ]});
- assert.match(out,/2 observation\\(s\\)/);
- assert.match(out,/intensité 5,0\\/10 \\(2 notes\\)/);
- assert.match(out,/énergie 4,0\\/10 \\(1 notes\\)/);
+ assert.match(out,/2 observation\(s\)/);
+ assert.match(out,/intensité 5,0\/10 \(2 notes\)/);
+ assert.match(out,/énergie 4,0\/10 \(1 notes\)/);
  assert.match(out,/fatigue non renseigné/);
  assert.doesNotMatch(out,/Sans intensité|Date invalide|Blanc/);
 });
@@ -52,9 +52,9 @@ test("préparation consultation tolère les éléments corrompus et ignore les d
 test("absence de niveau d'énergie : pas de déclaration inventée",()=>{
  const response=reply("Bonjour",LIBRARY);
  assert.match(response.message,/renseigner votre énergie/);
- assert.doesNotMatch(response.message,/undefined\\/10/);
+ assert.doesNotMatch(response.message,/undefined\/10/);
  const plan=planDaily({tasks:[{title:"Préparer un thé",effort:1,done:false}]});
- assert.match(plan,/5\\/10/);
+ assert.match(plan,/5\/10/);
 });
 
 test("vie privée : noms, données familiales et traitement déclaré restent locaux",()=>{
