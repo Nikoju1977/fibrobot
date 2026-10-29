@@ -18,9 +18,9 @@ export async function answerWithAuto({question,intent,response,state={},agnes,mi
  const order=autoProviderOrder(state),errors=[];
  for(const provider of order){
   // Every external request requires explicit informed consent; no medical records/history transmitted.
-  if(!await authorize(provider,question))continue;
+  if(!await authorize(provider,question))return {provider:null,text:null,skipped:"consent-denied",errors};
   try{
-   onAttempt(provider);
+   await onAttempt(provider);
    const answer=await ({agnes,mistral})[provider]?.(question);
    if(!answer||typeof answer.text!=="string"||!answer.text.trim())throw Error("Réponse vide");
    return {provider,text:answer.text,model:answer.model||"",errors};
