@@ -167,6 +167,23 @@ async function ask(q){
   const intent=classifyIntent(input),response=reply(input,LIBRARY,{...DATA,energy});
   let answer=response.message+(response.followup?"\n\n"+response.followup:""),sourceId=response.sources?.[0]?.id||"";
   let engine="Assistant documentaire local",references=[],onlineAttempted=false,mistralAttempted=false,mistralProblem="";
+  // Les actions locales et l'écoute passent après les règles d'urgence du moteur médical.
+  let siteId="",direct=false;
+  if(response.kind!=="urgent"){
+   const site=parseSiteCommand(input);
+   if(site){
+    siteId=site.siteId;answer="Je peux ouvrir "+site.label+" pour vous. Touchez le lien « Ouvrir "+site.label+" » dans ma réponse pour confirmer l'ouverture dans votre navigateur. Je ne peux pas piloter votre téléphone, vous connecter ou agir dans ce site à votre place.";
+    engine="Raccourci navigateur approuvé";direct=true;
+   }else if(parseStoryCommand(input)){
+    const story=originalStory(input);answer=story.text;engine="Histoire originale écrite localement";direct=true;
+   }else if(parseReadingCommand(input)){
+    $("book-panel").open=true;answer="Avec plaisir. Ouvrez le panneau « Ma bibliothèque de lecture locale » ci-dessous puis choisissez un fichier .txt ou .md que vous avez le droit de lire. Je peux afficher ses pages et les lire avec une voix française locale disponible. Le fichier ne quitte pas votre appareil.";engine="Lecteur de textes privé";direct=true;
+   }else{
+    const companion=companionReply(input,{requested:$("companion-mode").value,safety:response});
+    if(companion){answer=companion.message;engine=companion.label+" (local, non médical)";direct=true;}
+   }
+  }
+  if(!direct){
   // Consentement au réseau valable pour cette session, puis validation de chaque
   // question exacte. Pas de synchronisation du coffre ni de recherche médicale libre.
   // When active, Mistral answers general questions first. Source search
@@ -288,9 +305,10 @@ async function ask(q){
   if(mistralProblem&&!mistralAttempted){
    answer+="\n\n[Mode secours : Mistral temporairement indisponible. FibroBot répond avec ses ressources locales.]";
   }
+  }
   const purpose=intent==="general"?"general-local":intent;
   const userRecord={role:"user",body:input,time:Date.now(),purpose};
-  const b={role:"bot",body:answer,time:Date.now(),sourceId,references,purpose};
+  const b={role:"bot",body:answer,time:Date.now(),sourceId,references,purpose,siteId};
   // L'écran ne dépend jamais de la réussite d'une requête réseau ou d'IndexedDB.
   DATA.conversations.push(userRecord,b);
   pending.remove();
