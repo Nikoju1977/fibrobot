@@ -50,7 +50,7 @@
   <header class="top">
   <div class="top-heading"><p class="eyebrow">MON ESPACE FIBROBOT</p><h1 id="page-heading">Aujourd'hui</h1><p class="date-line" id="today-date"></p></div>
   <div class="top-right">
-    <span class="privacy-state" aria-label="Coffre local déverrouillé"><span aria-hidden="true">●</span> Coffre local</span>
+    <span class="privacy-state" aria-label="Coffre local déverrouillé"><span aria-hidden="true">●</span> Coffre local</span><span id="connection-state" class="connection-state" role="status" aria-live="polite">Connexion disponible</span>
     <button class="btn light" id="open-guide" type="button" aria-controls="first-steps">Mode d'emploi</button>
     <button class="btn light" id="voice-toggle" type="button" aria-pressed="false">Voix : off</button>
     <button class="btn lock-btn" id="lock-vault" type="button">🔒 Verrouiller</button>
@@ -68,9 +68,15 @@
         </div>
         <p class="guide-privacy">🔒 Les informations que vous enregistrez sont chiffrées dans votre coffre sur cet appareil. FibroBot ne remplace pas un professionnel de santé.</p>
       </section>
-      <div class="section-heading"><div><span class="section-kicker">EN UN COUP D’ŒIL</span><h3>Mes repères</h3></div></div><div class="stats"><div class="card stat"><span>Tâches à faire</span><strong id="count-tasks">0</strong></div><div class="card stat"><span>Observations santé</span><strong id="count-health">0</strong></div><div class="card stat"><span>Maladies suivies</span><strong id="count-conditions">0</strong></div></div>
+      <section class="card install-card" aria-label="Installation sur téléphone">
+  <div><h3>FibroBot sur mon téléphone</h3><p class="tiny">Installez la PWA sur l'écran d'accueil pour retrouver plus facilement votre coffre chiffré. Conservez votre phrase secrète.</p>
+   <p class="tiny" id="install-status" role="status" aria-live="polite">L'installation dépend de votre navigateur. Une PWA ne garantit pas les notifications en arrière-plan.</p></div>
+  <button class="btn light" id="install-app" type="button">Installer FibroBot</button>
+ </section>
+ <div class="section-heading"><div><span class="section-kicker">EN UN COUP D’ŒIL</span><h3>Mes repères</h3></div></div><div class="stats"><div class="card stat"><span>Tâches à faire</span><strong id="count-tasks">0</strong></div><div class="card stat"><span>Observations santé</span><strong id="count-health">0</strong></div><div class="card stat"><span>Maladies suivies</span><strong id="count-conditions">0</strong></div></div>
       <div class="two"><div class="card"><h3>Mon énergie du jour</h3><p>Une mesure personnelle, indépendante de votre douleur.</p><label for="daily-energy">Énergie <output id="energy-out">5/10</output></label><input id="daily-energy" type="range" min="0" max="10" step="1" value="5"><p class="callout" id="energy-guide"></p></div><div class="card"><h3>Besoin d'un coup de main ?</h3><p>Je peux aider à organiser les tâches, préparer vos rendez-vous et retrouver des informations médicales sourcées.</p><div class="chips"><button class="chip" data-ask="Comment organiser mes tâches ?" type="button">Organiser</button><button class="chip" data-ask="Quels sont les symptômes de la fibromyalgie ?" type="button">Fibromyalgie</button><button class="chip" data-goto="appointments" type="button">Rendez-vous</button></div></div></div>
       <div class="card priority-card"><div class="priority-top"><div><span class="section-kicker">À MON RYTHME</span><h3>Mes prochaines actions</h3></div><button class="btn light" type="button" data-goto="tasks">Voir toutes mes tâches</button></div><div id="today-tasks" class="records"></div></div>
+      <div class="card priority-card"><div class="priority-top"><div><span class="section-kicker">MES RENDEZ-VOUS</span><h3>À venir dans les 7 jours</h3></div><button class="btn light" type="button" data-goto="appointments">Gérer mes rendez-vous</button></div><div id="upcoming-appointments" class="records" role="status" aria-live="polite"></div><p class="tiny">Rappels affichés lorsque FibroBot est ouvert. Les alertes système ne sont pas garanties en arrière-plan et ne révèlent pas le motif du rendez-vous.</p></div>
     </section>
     <section class="page" id="crisis" aria-label="Soutien pendant une crise">
       <div class="intro"><h2>Traverser une crise, étape par étape</h2><p>Si les symptômes sont habituels pour vous, voici des options de confort. Une douleur nouvelle, inhabituelle ou intense, un malaise, une douleur thoracique, une faiblesse brutale ou une difficulté respiratoire ne doivent pas être considérés automatiquement comme une poussée de fibromyalgie.</p></div>
@@ -91,13 +97,14 @@
         <form id="chat-form" class="chat-input">
           <label class="sr" for="prompt">Votre message à FibroBot</label>
           <div class="chat-composer-field"><textarea id="prompt" rows="2" maxlength="2000" placeholder="Posez une question à FibroBot…" required aria-describedby="prompt-help prompt-count" autocomplete="off"></textarea>
-            <div class="composer-actions"><button class="btn light" id="mic" type="button" aria-label="Dictée strictement locale" title="Dictée locale selon la compatibilité de l’appareil"><span aria-hidden="true">🎙</span></button><button class="btn primary" id="chat-send" type="submit">Envoyer <span aria-hidden="true">↗</span></button></div>
+            <div class="composer-actions"><button class="btn light" id="mic" type="button" aria-pressed="false" aria-label="Démarrer ou arrêter la dictée" title="Dictée locale par défaut ; un service vocal externe est facultatif et exige votre accord"><span aria-hidden="true">🎙</span></button><button class="btn primary" id="chat-send" type="submit">Envoyer <span aria-hidden="true">↗</span></button></div>
           </div>
           <div class="composer-bottom"><span id="prompt-help">Entrée pour envoyer · Maj + Entrée pour une nouvelle ligne</span><span id="prompt-count">0 / 2000</span></div>
-        </form><p id="voice-hint" class="tiny">Voix de synthèse locale optionnelle. Utilisez la dictée de votre clavier selon ses règles de confidentialité.</p></div><div class="card suggestions"><h3>Vos aides immédiates</h3>
+        </form><div class="dictation-permission"><label class="consent" for="dictation-browser-service"><input id="dictation-browser-service" type="checkbox"> Autoriser la dictée du navigateur lorsqu’elle n’est pas disponible localement</label><p id="voice-hint" class="tiny">Sans cette option, la dictée fonctionne seulement si le navigateur confirme un modèle français entièrement local. Si vous l’activez, le fournisseur du navigateur peut traiter votre voix sur ses serveurs : une confirmation est demandée avant chaque démarrage. Aucun message n’est envoyé à Agnes ou Mistral avant d’appuyer sur Envoyer.</p></div></div><div class="card suggestions"><h3>Vos aides immédiates</h3>
  <div class="assist-actions">
  <button class="btn light" type="button" data-assistant-action="plan"><span aria-hidden="true">☑</span> Planning de ma journée</button>
  <button class="btn light" type="button" data-assistant-action="summary"><span aria-hidden="true">♡</span> Résumé de mes observations</button>
+  <button class="btn light" type="button" data-assistant-action="briefing"><span aria-hidden="true">▤</span> Bilan coordonné des agents</button>
  <button class="btn light" type="button" data-assistant-action="visit"><span aria-hidden="true">▣</span> Préparer mon rendez-vous</button>
  <button class="btn light" type="button" data-goto="library"><span aria-hidden="true">▤</span> Rechercher des études</button>
  <button class="btn light" type="button" id="repeat-last" title="Fonctionne seulement si une voix française explicitement locale est disponible"><span aria-hidden="true">▶</span> Lire la dernière réponse</button>

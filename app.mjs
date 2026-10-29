@@ -13,6 +13,9 @@ import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,gen
 import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgnesChat,testAgnesConnection} from "./agnes-bridge.mjs";
 import {autoGeneralAllowed,answerWithAuto,shouldPreferSources} from "./auto-engine.mjs";
 import {sessionPreview,appendSessionTurn} from "./conversation-context.mjs";
+import {startDictation} from "./voice-input.mjs";
+import {upcomingAppointments,appointmentAlertKeys,appointmentCalendarICS} from "./appointment-reminders.mjs";
+import {coordinatedCareBriefing} from "./care-briefing.mjs";
 import {mistralRoute,mistralConsentDescription} from "./mistral-routing.mjs";
 import {CREDENTIAL_ID,validStoredMistralCredential,saveMistralCredential,loadMistralCredential,deleteMistralCredential} from "./mistral-credential-vault.mjs";
 import {callFibroTool,FIBRO_MCP_TOOLS} from "./mcp-fibro-tools.mjs";
@@ -24,7 +27,7 @@ const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"S
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
 const FORMS={tasks:"task-form",symptoms:"health-form",conditions:"condition-form",medications:"med-form",appointments:"appt-form"};
 let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSpeech="",busyChat=false,networkEnabled=false;
-let bookText="",bookIndex=0,speechToken=0;
+let bookText="",bookIndex=0,speechToken=0,activeRecognition=null,dictationStarting=false,pendingInstall=null;
 // Session-only chat context; never persisted and never taken from the health vault.
 const sessionTurns=[];
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
@@ -35,7 +38,7 @@ function blank(target,message){target.replaceChildren(dom("div",message,"empty")
 function action(label,method,store,id){const b=dom("button",label,"mini");b.type="button";b.dataset.action=method;b.dataset.store=store;b.dataset.id=String(id);return b;}
 function record(target,title,subtitle,notes,store,id,extra={}){const row=dom("div",undefined,"record"),copy=dom("div"),buttons=dom("div",undefined,"actions");copy.append(dom("strong",title,extra.done?"done":""));if(subtitle)copy.append(dom("small",subtitle));if(notes)copy.append(dom("p",notes));if(extra.tag)copy.append(dom("span",extra.tag,extra.tag==="À reporter"?"tag later":"tag"));if(store==="tasks")buttons.append(action(extra.done?"Réouvrir":"Terminer","toggle",store,id));if(FORMS[store])buttons.append(action("Modifier","edit",store,id));if(store)buttons.append(action("Supprimer","delete",store,id));row.append(copy,buttons);target.append(row);}
 async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;refreshMistralVaultControls();render();}
-function render(){ $("count-tasks").textContent=DATA.tasks.filter(x=>!x.done).length;$("count-health").textContent=DATA.symptoms.length;$("count-conditions").textContent=DATA.conditions.length;$("daily-energy").value=energy;$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();renderHealth();renderConditions();renderMeds();renderAppointments();renderLibrary();renderChat();patientUX?.refreshGuide(); }
+function render(){ $("count-tasks").textContent=DATA.tasks.filter(x=>!x.done).length;$("count-health").textContent=DATA.symptoms.length;$("count-conditions").textContent=DATA.conditions.length;$("daily-energy").value=energy;$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();renderHealth();renderConditions();renderMeds();renderAppointments();renderUpcomingAppointments();renderLibrary();renderChat();patientUX?.refreshGuide(); }
 function renderTasks(){const tasks=rankTasks(DATA.tasks,energy),out=$("tasks-list"),home=$("today-tasks");out.replaceChildren();home.replaceChildren();if(!tasks.length)blank(home,"Aucune tâche urgente. Vous pouvez vous reposer.");else tasks.slice(0,5).forEach(t=>record(home,t.title,"Effort "+t.effort+"/3",null,null,t.id,{tag:t.adapted?"Effort compatible":"À reporter"}));if(!DATA.tasks.length)blank(out,"Vous pouvez ajouter vos tâches ici.");else [...tasks,...DATA.tasks.filter(x=>x.done)].forEach(t=>record(out,t.title,(t.priority==="important"?"Essentielle":t.priority==="delegable"?"Délégable":"Flexible")+" · effort "+t.effort+"/3"+(t.due?" · "+t.due:""),null,"tasks",t.id,{done:t.done,tag:t.done?"Terminée":t.adapted?"Effort compatible":"À reporter"}));}
 function renderHealth(){const out=$("health-list");out.replaceChildren();if(!DATA.symptoms.length)blank(out,"Aucune observation enregistrée.");else [...DATA.symptoms].sort((a,b)=>String(b.date).localeCompare(String(a.date))).forEach(s=>{const notes=[s.energy!=null?"Énergie "+s.energy+"/10":"",s.fatigue!=null?"Fatigue "+s.fatigue+"/10":"",s.sleep!=null?"Sommeil "+s.sleep+"/10":"",s.notes].filter(Boolean).join(" · ");record(out,s.name,String(s.date).slice(0,10)+" · Intensité "+s.intensity+"/10"+(s.condition?" · "+s.condition:""),notes,"symptoms",s.id);});const select=$("health-condition"),old=select.value;select.replaceChildren();let option=dom("option","Non précisée");option.value="";select.append(option);for(const c of DATA.conditions){option=dom("option",c.name);option.value=c.name;select.append(option);}select.value=old;}
 function renderConditions(){const out=$("conditions-list");out.replaceChildren();if(!DATA.conditions.length)blank(out,"Aucune maladie connue enregistrée.");else DATA.conditions.forEach(c=>record(out,c.name,"Information saisie par vous",c.notes,"conditions",c.id));}
@@ -149,6 +152,63 @@ function speak(message,{requested=false}={}){
   try{speechSynthesis.speak(utterance);}catch{notify("Lecture vocale indisponible.");}
  };
  next();return true;
+}
+function installGuidance(){
+ const node=$("install-status");if(!node)return;
+ const installed=window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone===true;
+ if(installed){node.textContent="FibroBot est déjà lancé comme application installée.";return;}
+ if(pendingInstall){node.textContent="Installation disponible sur cet appareil : utilisez le bouton Installer FibroBot.";return;}
+ node.textContent=/iPad|iPhone|iPod/i.test(navigator.userAgent)?"Sur iPhone/iPad : dans Safari, touchez Partager puis « Sur l'écran d'accueil ».":"Sur Android : utilisez le menu du navigateur, puis « Installer l'application » ou « Ajouter à l'écran d'accueil ».";
+}
+async function requestPWAInstallation(){
+ const status=$("install-status");
+ if(window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone===true){installGuidance();return;}
+ if(!pendingInstall){installGuidance();return;}
+ const event=pendingInstall;pendingInstall=null;
+ try{
+  await event.prompt();
+  const decision=await event.userChoice;
+  status.textContent=decision?.outcome==="accepted"?"Installation acceptée par le navigateur.":"Installation refusée ou annulée. Vous pouvez utiliser le menu du navigateur.";
+ }catch{installGuidance();}
+}
+function updateConnectionState(){
+ const node=$("connection-state");if(!node)return;
+ const online=navigator.onLine!==false;
+ node.textContent=online?"Connexion disponible":"Hors ligne · coffre, suivi et bibliothèque accessibles";
+ node.setAttribute("data-online",String(online));
+}
+function updateDictationButton(){
+ const b=$("mic");if(!b)return;
+ b.disabled=dictationStarting;b.setAttribute("aria-pressed",String(Boolean(activeRecognition)));
+ b.textContent=activeRecognition?"Arrêter la dictée":dictationStarting?"Initialisation…":"🎙 Dicter";
+}
+async function handleDictation(){
+ if(activeRecognition){
+  try{activeRecognition.abort();}catch{}
+  activeRecognition=null;updateDictationButton();return;
+ }
+ if(dictationStarting)return;
+ if(!db){notify("Déverrouillez le coffre avant de dicter.");return;}
+ const browserService=Boolean($("dictation-browser-service")?.checked);
+ if(browserService&&!confirm("La reconnaissance vocale du navigateur peut envoyer votre voix aux serveurs de son fournisseur. Ne dictez pas de données de santé ou d'informations privées. Démarrer cette dictée externe ?"))return;
+ const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;
+ dictationStarting=true;updateDictationButton();
+ try{
+  activeRecognition=await startDictation({
+   Speech,allowBrowserService:browserService,
+   onText:transcript=>{
+    if(!db)return;
+    const field=$("prompt");
+    field.value=((field.value.trim()?field.value.trim()+" ":"")+transcript).slice(0,field.maxLength);
+    refreshComposer();field.focus();
+    notify("Dictée terminée. Vérifiez le texte avant de l'envoyer.");
+   },
+   onError:code=>notify("Dictée interrompue ("+code+"). Vérifiez les autorisations du micro."),
+   onEnd:()=>{activeRecognition=null;updateDictationButton();}
+  });
+  notify(browserService?"Dictée du navigateur activée : l'audio peut être traité à distance.":"Dictée locale activée.");
+ }catch(e){activeRecognition=null;notify(String(e?.message||e).slice(0,220));}
+ finally{dictationStarting=false;updateDictationButton();}
 }
 function refreshBook(){
  const page=$("book-page"),status=$("book-state"),prev=$("book-prev"),next=$("book-next"),read=$("book-read");
@@ -393,6 +453,27 @@ function showLocalAnswer(answer){
  tab("chat");speak(answer);
 }
 function renderReminders(){const out=$("due-reminders");out.replaceChildren();const due=dueReminders(DATA.medications,DATA.medicationLogs);if(!due.length){blank(out,"Aucune prise à confirmer maintenant.");return;}for(const x of due){const row=dom("div",undefined,"record"),left=dom("div"),buttons=dom("div",undefined,"actions");left.append(dom("strong",x.name),dom("small","Heure prévue : "+x.time+" (déclarée)"));buttons.append(action("Pris","reminder","taken",x.medicationId),action("Ignoré","reminder","skipped",x.medicationId));row.append(left,buttons);out.append(row);if(!seen.has(x.key)){seen.add(x.key);notify("Un rappel de traitement est à vérifier dans FibroBot.");if("Notification" in window&&Notification.permission==="granted"&&document.visibilityState==="visible"){try{new Notification("FibroBot • rappel",{body:"Consultez votre prise planifiée dans FibroBot.",tag:"fibrobot-"+x.key});}catch(e){/* Indisponible sur certaines PWA */}}}}}
+function renderUpcomingAppointments(){
+ const out=$("upcoming-appointments");if(!out||!db)return;
+ const upcoming=upcomingAppointments(DATA.appointments,new Date(),7);
+ out.replaceChildren();
+ if(!upcoming.length){blank(out,"Aucun rendez-vous déclaré pour les 7 prochains jours.");return;}
+ for(const appointment of upcoming){
+  const row=dom("div",undefined,"record"),details=dom("div");
+  details.append(dom("strong",appointment.title),dom("small",appointment.inDays===0?"Aujourd'hui":appointment.inDays===1?"Demain":"Dans "+appointment.inDays+" jours"));
+  details.append(dom("small",appointment.date+(appointment.time?" · "+appointment.time:" · heure non renseignée")));
+  const calendarButton=dom("button","Agenda (.ics)","btn light");calendarButton.type="button";calendarButton.dataset.calendarId=String(appointment.id);calendarButton.setAttribute("aria-label","Exporter ce rendez-vous dans le calendrier");
+  row.append(details,calendarButton);out.append(row);
+ }
+ for(const key of new Set(appointmentAlertKeys(DATA.appointments,new Date()))){
+  if(seen.has(key))continue;
+  seen.add(key);
+  notify("Un rendez-vous approche : consultez l'accueil FibroBot.");
+  if("Notification" in window&&Notification.permission==="granted"&&document.visibilityState==="visible"){
+   try{new Notification("FibroBot · rendez-vous",{body:"Un rendez-vous déclaré approche. Ouvrez votre espace personnel.",tag:"fibrobot-"+key});}catch{/* Fonctionnalité dépend du navigateur mobile. */}
+  }
+ }
+}
 async function write(store,entity,form){const id=Number(form.dataset.edit||0);if(id){const old=DATA[store].find(x=>x.id===id);if(!old)throw Error("Enregistrement introuvable.");entity={...old,...entity,id};}await put(db,store,entity);form.reset();form.dataset.edit="";$("health-date").value=today();$("appt-date").value=today();await reload();notify(id?"Modifications conservées.":"Information enregistrée sur cet appareil.");}
 function edit(store,id){const x=DATA[store].find(x=>x.id===id);if(!x)return;tab(store==="symptoms"?"health":store==="medications"?"medications":store);const f=$(FORMS[store]);f.dataset.edit=id;const values=store==="tasks"?{"task-name":x.title,"task-effort":x.effort,"task-priority":x.priority,"task-due":x.due||""}:store==="symptoms"?{"health-name":x.name,"health-date":String(x.date).slice(0,10),"health-condition":x.condition||"","pain":x.intensity,"health-energy":x.energy??"","fatigue":x.fatigue??"","sleep":x.sleep??"","health-notes":x.notes||""}:store==="conditions"?{"condition-name":x.name,"condition-notes":x.notes||""}:store==="medications"?{"med-name":x.name,"med-dose":x.dose||"","med-schedule":x.schedule||"","med-prescriber":x.prescriber||"","med-reminder-time":x.reminderTime||"","med-notes":x.notes||""}:{"appt-name":x.title,"appt-date":x.date,"appt-time":x.time||"","appt-place":x.place||"","appt-questions":x.questions||""};for(const [id,value] of Object.entries(values))$(id).value=value;f.scrollIntoView({behavior:"smooth",block:"start"});f.querySelector("input")?.focus({preventScroll:true});notify("Mode modification : enregistrez pour conserver les changements.");}
 async function command(btn){const method=btn.dataset.action,store=btn.dataset.store,id=Number(btn.dataset.id);if(method==="reminder"){await put(db,"medicationLogs",reminderLog(id,store));await reload();notify(store==="taken"?"Prise déclarée enregistrée.":"Rappel ignoré.");return;}if(!DATA[store]||!Number.isInteger(id))return;if(method==="edit"){edit(store,id);return;}const item=DATA[store].find(x=>x.id===id);if(!item)return;if(method==="toggle"&&store==="tasks"){await put(db,"tasks",{...item,done:!item.done});await reload();return;}if(method==="delete"&&confirm("Supprimer définitivement cet enregistrement ?")){await del(db,store,id);if(store==="medications")for(const x of DATA.medicationLogs.filter(x=>x.medicationId===id))await del(db,"medicationLogs",x.id);await reload();notify("Enregistrement supprimé.");}}
@@ -436,6 +517,7 @@ function events(){
   notify("Contexte IA effacé. L'historique chiffré du coffre n'est pas modifié.");
  });
  $("chat-voice-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
+ $("install-app").addEventListener("click",requestPWAInstallation);
  $("auto-mode").addEventListener("change",()=>{updateEngineNote();notify($("auto-mode").checked?"IA activée : Agnes puis Mistral selon disponibilité.":"IA conversationnelle désactivée.");});
  $("agnes-connect").addEventListener("click",()=>{
   const key=$("agnes-key").value.trim();$("agnes-key").value="";
@@ -591,6 +673,19 @@ function events(){
   updateEngineNote();
  });
  document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+ if(b.dataset.calendarId){
+  if(!db){notify("Déverrouillez le coffre pour exporter le rendez-vous.");return;}
+  const entry=DATA.appointments.find(x=>String(x.id)===b.dataset.calendarId);
+  if(!entry){notify("Rendez-vous introuvable.");return;}
+  try{
+   const content=appointmentCalendarICS(entry);
+   const file=new Blob([content],{type:"text/calendar;charset=utf-8"}),url=URL.createObjectURL(file),link=dom("a");
+   link.href=url;link.download="fibrobot-rendez-vous-"+entry.date+".ics";document.body.append(link);link.click();link.remove();
+   setTimeout(()=>URL.revokeObjectURL(url),3000);
+   notify("Fichier calendrier créé sans nom ni détail médical. Importez-le volontairement dans votre agenda.");
+  }catch(err){notify("Export agenda impossible : "+String(err.message||err).slice(0,110));}
+  return;
+ }
  if(b.dataset.specialist){
   if(!db){notify("Déverrouillez le coffre personnel.");return;}
   try{
@@ -602,7 +697,7 @@ function events(){
  }
  if(b.dataset.tab)tab(b.dataset.tab);else if(b.dataset.goto)tab(b.dataset.goto);else if(b.dataset.ask)ask(b.dataset.ask);else if(b.dataset.assistantAction){
   if(!db){notify("Ouvrez votre coffre pour utiliser ces fonctions.");return;}
-  const output=b.dataset.assistantAction==="plan"?planDaily({...DATA,energy}):b.dataset.assistantAction==="summary"?summarizeObservations(DATA):prepareVisit(DATA);
+  const output=b.dataset.assistantAction==="plan"?planDaily({...DATA,energy}):b.dataset.assistantAction==="summary"?summarizeObservations(DATA):b.dataset.assistantAction==="briefing"?coordinatedCareBriefing({...DATA,energy}):prepareVisit(DATA);
   showLocalAnswer(output);
  }else if(b.dataset.action)command(b).catch(err=>notify(err.message));});
  $("daily-energy").addEventListener("input",e=>{energy=Number(e.target.value);$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();});
@@ -633,7 +728,7 @@ function events(){
     }catch{notify("Copie impossible sur ce navigateur. Sélectionnez le texte manuellement.");}
    }
   });
- $("mic").addEventListener("click",async()=>{const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Speech||typeof Speech.available!=="function"){notify("Reconnaissance vocale strictement locale non vérifiable ici. Utilisez le clavier de l'appareil ; sa dictée suit les règles du fabricant.");return;}try{const availability=await Speech.available({langs:["fr-FR"],processLocally:true});if(availability!=="available"){notify("Modèle de dictée locale non installé ou indisponible.");return;}const recognition=new Speech();recognition.processLocally=true;recognition.lang="fr-FR";recognition.onresult=e=>{$("prompt").value=e.results[0][0].transcript;refreshComposer();notify("Texte dicté localement. Vérifiez-le avant d'envoyer.");};recognition.onerror=()=>notify("La dictée locale n'a pas abouti.");recognition.start();}catch(e){notify("Dictée locale indisponible sur ce navigateur.");}});
+ $("mic").addEventListener("click",handleDictation);
  $("export").addEventListener("click",()=>exportBackup().catch(e=>notify("Export impossible : "+e.message)));
  $("print-report").addEventListener("click",printReport);
  $("erase").addEventListener("click",async()=>{if(!confirm("Supprimer définitivement toutes les données FibroBot de ce navigateur ?"))return;try{disableMistralSession();db.close();await wipeDB();location.reload();}catch(e){notify("Effacement bloqué : "+e.message);}});
@@ -725,7 +820,7 @@ function events(){
   speak(lastSpeech);
  });
  $("erase-legacy").addEventListener("click",async()=>{if(!confirm("Supprimer l'ancienne base FibrobotDB non chiffrée de CE navigateur ? Vérifiez d'abord que vos données ont bien été migrées dans le coffre."))return;try{await eraseLegacy();notify("Ancienne base non chiffrée supprimée.");}catch(e){notify(e.message);}});
- $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
+ $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;try{activeRecognition?.abort();}catch{}activeRecognition=null;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
  $("breath-start")?.addEventListener("click",breathing);
  $("relax-script")?.addEventListener("click",()=>{
    const script="Vous pouvez arrêter à tout moment. Installez-vous si possible dans une position confortable. Prenez conscience des points de contact de votre corps avec le support. Laissez votre respiration trouver son rythme naturel, sans la forcer. Observez les sons autour de vous. Si vous ressentez de l'inconfort, ouvrez les yeux et arrêtez. Vous n'avez rien à réussir. Quel petit geste pourrait rendre cet instant plus confortable ?";
@@ -734,8 +829,13 @@ function events(){
  });
 }
 async function init(){
- renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();
+ renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();
+ window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
+ window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
+ window.addEventListener("online",updateConnectionState);
+ window.addEventListener("offline",updateConnectionState);
  window.addEventListener("pagehide",()=>{
+  try{activeRecognition?.abort();}catch{}activeRecognition=null;
   disconnectMistral();disconnectAgnes();sessionTurns.length=0;
   $("agnes-key").value="";
   const field=$("mistral-key");if(field)field.value="";
@@ -758,7 +858,7 @@ async function init(){
    const i=DATA.settings.findIndex(s=>s.id===id);
    if(i<0)DATA.settings.push({id,value});else DATA.settings[i]={id,value};
  },notify});
- try{db=await openSecureDB();await reload();setInterval(()=>{if(document.visibilityState==="visible"&&db)renderReminders();},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&db)renderReminders();});}
+ try{db=await openSecureDB();await reload();setInterval(()=>{if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}});}
  catch(e){console.error(e);notify("Stockage local indisponible : l'application ne peut pas enregistrer vos données. Autorisez le stockage pour ce site.");}
  if("serviceWorker" in navigator&&window.isSecureContext){navigator.serviceWorker.register("./sw.js").catch(()=>{/* hors ligne facultatif */});}
 }

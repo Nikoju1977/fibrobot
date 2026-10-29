@@ -4,6 +4,7 @@ import {readFileSync} from "node:fs";
 const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");
 const css=readFileSync(new URL("../ux-pro.css",import.meta.url),"utf8");
 const app=readFileSync(new URL("../app.mjs",import.meta.url),"utf8");
+const voice=readFileSync(new URL("../voice-input.mjs",import.meta.url),"utf8");
 
 test("assistant : la discussion apparaît avant les options de modèles",()=>{
  const section=html.slice(html.indexOf('id="chat"'),html.indexOf('id="tasks"'));
@@ -20,7 +21,10 @@ test("assistant : composer multiligne utilisable au clavier et à la voix locale
  assert.match(app,/event\.key==="Enter"&&!event\.shiftKey&&!event\.isComposing/);
  assert.match(app,/syncVoiceControls/);
  assert.match(app,/refreshComposer/);
- assert.match(app,/processLocally=true/);
+ assert.match(voice,/processLocally:true/);
+ assert.match(voice,/processLocally=!allowBrowserService/);
+ assert.match(html,/id="dictation-browser-service" type="checkbox"/);
+ assert.match(app,/startDictation\(/);
 });
 test("assistant : boutons de réponse sans HTML brut, sans appels réseau",()=>{
  assert.match(app,/dataset\.chatCopy="1"/);

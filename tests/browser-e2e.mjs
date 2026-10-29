@@ -34,6 +34,25 @@ try{
  assert.equal(await page.getByText("Studio Niko Design").first().count(),1,"Designer credit must be visible");
  await page.locator("#dismiss-guide").click();
  await page.locator("#first-steps").waitFor({state:"hidden",timeout:10000});
+ await page.locator("#install-app").click();
+ assert.match(await page.locator("#install-status").textContent(),/Android|installer|installée|accueil/i);
+ // V25: appointment reminder visible in the encrypted home dashboard.
+ const tomorrow=await page.evaluate(()=>{
+  const d=new Date();d.setDate(d.getDate()+1);
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+ });
+ await page.locator('#nav [data-tab="appointments"]').click();
+ await page.locator("#appt-name").fill("Consultation V25 privée");
+ await page.locator("#appt-date").fill(tomorrow);
+ await page.locator("#appt-form button[type=submit]").click();
+ await page.locator('#nav [data-tab="today"]').click();
+ await page.locator("#upcoming-appointments").getByText("Consultation V25 privée").waitFor({timeout:10000});
+ const [ics]=await Promise.all([
+  page.waitForEvent("download"),
+  page.locator('#upcoming-appointments button[data-calendar-id]').first().click()
+ ]);
+ assert.match(ics.suggestedFilename(),/^fibrobot-rendez-vous-\d{4}-\d{2}-\d{2}\.ics$/);
+ assert.ok(!ics.suggestedFilename().includes("Consultation"),"Calendar export filename must not leak a medical topic");
  // Internet : jamais d'appel sans double consentement explicite,
  // requête seule (pas de note patient), citations vérifiables et mode local intact.
  await page.locator('#nav [data-tab="chat"]').click();
@@ -53,7 +72,23 @@ try{
  await page.locator("#chat-voice-speed").selectOption("1.15");
  assert.equal(await page.locator("#chat-voice-speed").inputValue(),"1.15");
  await page.locator("#chat-voice-stop").click();
+ // V25: browser-service dictation must be enabled and consented to by the user.
+ assert.equal(await page.locator("#dictation-browser-service").isChecked(),false);
+ await page.evaluate(()=>{
+  window.SpeechRecognition=class{
+   start(){setTimeout(()=>{this.onresult?.({results:[[{transcript:"Phrase vocale de test"}]]});this.onend?.();},20);}
+   abort(){this.onend?.();}
+  };
+ });
+ await page.locator("#dictation-browser-service").check();
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/voix aux serveurs/i);dialog.accept();});
+ await page.locator("#mic").click();
+ await page.waitForFunction(()=>document.getElementById("prompt")?.value.includes("Phrase vocale de test"),{timeout:8000});
+ assert.match(await page.locator("#prompt").inputValue(),/Phrase vocale de test/);
+ await page.locator("#dictation-browser-service").uncheck();
 
+ await page.locator('[data-assistant-action="briefing"]').click();
+ await page.locator("#messages").getByText(/BILAN COORDONNÉ/).last().waitFor({timeout:10000});
  await page.locator("#prompt").fill("Une question");
  assert.match(await page.locator("#prompt-count").textContent(),/12 \/ 2000/);
  await page.locator("#prompt").press("Shift+Enter");
@@ -319,6 +354,7 @@ try{
  // L'application statique et le coffre doivent aussi se déverrouiller hors ligne une fois le shell mis en cache.
  await page.evaluate(async()=>{if(!("serviceWorker" in navigator))throw Error("ServiceWorker indisponible");await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>setTimeout(()=>reject(Error("ServiceWorker non prêt après 15 secondes")),15000))]);});
  await context.setOffline(true);
+ await page.locator("#connection-state").getByText(/Hors ligne/).waitFor({timeout:10000});
  try{
   await page.reload({waitUntil:"domcontentloaded"});
   await page.locator("#vault-gate").waitFor({state:"visible",timeout:15000});
@@ -328,6 +364,7 @@ try{
   await page.locator('#nav [data-tab="health"]').click();
   await page.locator("#health-list").getByText(value).waitFor({timeout:10000});
  }finally{await context.setOffline(false);}
+ await page.locator("#connection-state").getByText(/Connexion disponible/).waitFor({timeout:10000});
  // Restore the encrypted backup in an independent browsing context.
  const restored=await browser.newPage();
  try{
