@@ -10,10 +10,14 @@ export function coordinatedCareBriefing(context={},now=new Date()){
  const conditions=Array.isArray(context.conditions)?context.conditions:[];
  const appts=upcomingAppointments(context.appointments||[],now,14);
  const next=appts[0];
+ const timeline=observations.filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x?.date||""))&&Number.isInteger(Number(x?.intensity))&&Number(x.intensity)>=0&&Number(x.intensity)<=10)
+  .sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,3)
+  .map(x=>trim(x.date,10)+" · "+trim(x.name,80)+" · intensité déclarée "+Number(x.intensity)+"/10");
  const lines=[
   "BILAN COORDONNÉ — préparation personnelle, non médicale",
   "1. Douleur, fatigue et sommeil · synthèse descriptive",
   summarizeObservations({symptoms:observations}),
+  "Dernières observations déclarées : "+(timeline.length?timeline.join(" ; "):"aucune note datée exploitable")+". Ces valeurs ne permettent aucune prédiction.",
   "",
   "2. Activités et énergie · organisation à adapter",
   planDaily({tasks:context.tasks||[],energy:context.energy}),
