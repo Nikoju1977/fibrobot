@@ -74,7 +74,7 @@ async function sendMistral(messages,{model="mistral-small-latest",fetchImpl=glob
  if(signal?.aborted)controller.abort();else signal?.addEventListener("abort",abort,{once:true});
  const timeout=setTimeout(abort,12000);
  try{
-  reserveApiRequest("mistral");
+  if(fetchImpl===globalThis.fetch)reserveApiRequest("mistral");
   const res=await fetchImpl(ENDPOINT,{method:"POST",mode:"cors",credentials:"omit",cache:"no-store",
    headers:{"Authorization":"Bearer "+sessionKey,"Content-Type":"application/json"},
    body:JSON.stringify({model,messages,temperature:0.2,max_tokens:420,stream:false}),signal:controller.signal});
