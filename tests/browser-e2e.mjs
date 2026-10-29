@@ -63,6 +63,20 @@ try{
  assert.equal(await page.locator("#chat-voice-toggle").getAttribute("aria-pressed"),"false");
  assert.equal(await page.locator("#chat-memory-optin").isChecked(),false,"Session memory must be opt-in");
  assert.equal(await page.locator("#sources-first").isChecked(),false,"Sourced search must be opt-in");
+ // V26: encrypted preference is opt-in and cannot contain clinical information.
+ assert.equal(await page.locator("#preference-share").isChecked(),false);
+ await page.locator("#general-preference").fill("Je préfère des réponses claires et des exemples.");
+ await page.locator("#preference-save").click();
+ assert.match(await page.locator("#preference-status").textContent(),/coffre chiffré/i);
+ await page.locator("#preference-share").check();
+ await page.locator("#api-budget-select").selectOption("5");
+ assert.match(await page.locator("#api-budget-status").textContent(),/5 restant/);
+ await page.locator("#api-budget-select").selectOption("20");
+ await page.locator("#easy-reading").check();
+ assert.equal(await page.locator("body").evaluate(e=>e.classList.contains("easy-reading")),true);
+ await page.locator("#reading-size").selectOption("extra");
+ assert.equal(await page.locator("body").getAttribute("data-reading-size"),"extra");
+ await page.locator("#easy-reading").uncheck();
  await page.locator("#chat-memory-optin").check();
  assert.match(await page.locator("#chat-memory-state").textContent(),/prochains échanges/i);
  await page.locator("#chat-memory-clear").click();
@@ -72,6 +86,8 @@ try{
  await page.locator("#chat-voice-speed").selectOption("1.15");
  assert.equal(await page.locator("#chat-voice-speed").inputValue(),"1.15");
  await page.locator("#chat-voice-stop").click();
+ await page.locator("#chat-voice-pause").click();
+ await page.locator("#chat-voice-resume").click();
  // V25: browser-service dictation must be enabled and consented to by the user.
  assert.equal(await page.locator("#dictation-browser-service").isChecked(),false);
  await page.evaluate(()=>{
@@ -89,6 +105,13 @@ try{
 
  await page.locator('[data-assistant-action="briefing"]').click();
  await page.locator("#messages").getByText(/BILAN COORDONNÉ/).last().waitFor({timeout:10000});
+ await page.locator("#book-panel summary").click();
+ await page.locator("#book-file").setInputFiles({name:"rapport.pdf",mimeType:"application/pdf",buffer:Buffer.from("%PDF-1.7\ncontenu de test")});
+ await page.locator("#book-pdf-open").waitFor({state:"visible",timeout:10000});
+ assert.match(await page.locator("#book-state").textContent(),/PDF prêt/i);
+ await page.locator("#book-file").setInputFiles({name:"livre.txt",mimeType:"text/plain",buffer:Buffer.from("Mon livre privé de test.")});
+ await page.locator("#book-page").getByText(/Mon livre privé de test/).waitFor({timeout:10000});
+ assert.equal(await page.locator("#book-pdf-open").isVisible(),false);
  await page.locator("#prompt").fill("Une question");
  assert.match(await page.locator("#prompt-count").textContent(),/12 \/ 2000/);
  await page.locator("#prompt").press("Shift+Enter");
@@ -117,7 +140,10 @@ try{
  await page.locator("#messages").getByText(/fer puddlé/).waitFor({timeout:12000});
  assert.equal(agnesCalls,1,"Agnes must be called with explicit consent");
  assert.ok(!agnesPost.includes(secret),"No vault secret sent to Agnes");
- assert.deepEqual(JSON.parse(agnesPost).messages.map(x=>x.role),["system","user"]);
+ assert.deepEqual(JSON.parse(agnesPost).messages.map(x=>x.role),["system","user","assistant","user"],"Explicitly shared style preference should be visible in AI request");
+ assert.ok(agnesPost.includes("Je préfère des réponses claires"),"Opted-in encrypted preference transmitted only with consent");
+ assert.match(await page.locator("#api-budget-status").textContent(),/1 appel/);
+ await page.locator("#preference-share").uncheck();
  await page.locator("#agnes-disconnect").click();
  assert.equal(await page.locator("#agnes-test").isDisabled(),true);
  await page.locator("#auto-mode").uncheck();
@@ -166,6 +192,11 @@ try{
  await page.locator("#pain").fill("6");
  await page.locator("#health-form button[type=submit]").click();
  await page.locator("#health-list").getByText(value).waitFor();
+ assert.match(await page.locator("#trend-summary").textContent(),/1 note/);
+ assert.ok(await page.locator("#trend-chart svg circle").count()>0,"Trends must display a declared observation");
+ await page.locator("#trend-metric").selectOption("fatigue");
+ assert.match(await page.locator("#trend-summary").textContent(),/Aucune valeur/);
+ await page.locator("#trend-metric").selectOption("intensity");
  // JARVIS distant : mémoire volatile, double consentement, aucun patient.
  await page.locator('#nav [data-tab="chat"]').click();
  await page.locator("#mistral-options summary").click();
@@ -289,6 +320,9 @@ try{
  await page.locator("#vault-submit").click();
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:15000});
  await page.locator("#first-steps").waitFor({state:"hidden",timeout:10000});
+ await page.locator('#nav [data-tab="chat"]').click();
+ assert.equal(await page.locator("#general-preference").inputValue(),"Je préfère des réponses claires et des exemples.","Encrypted preference must survive vault lock/unlock");
+ assert.equal(await page.locator("#preference-share").isChecked(),false,"Preference remote-sharing consent must be session-only");
  await page.locator('#nav [data-tab="health"]').click();
  await page.locator("#health-list").getByText(value).waitFor();
  await page.locator('#nav [data-tab="chat"]').click();
