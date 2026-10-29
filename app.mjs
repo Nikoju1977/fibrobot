@@ -27,7 +27,7 @@ const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"S
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
 const FORMS={tasks:"task-form",symptoms:"health-form",conditions:"condition-form",medications:"med-form",appointments:"appt-form"};
 let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSpeech="",busyChat=false,networkEnabled=false;
-let bookText="",bookIndex=0,speechToken=0,activeRecognition=null,dictationStarting=false;
+let bookText="",bookIndex=0,speechToken=0,activeRecognition=null,dictationStarting=false,pendingInstall=null;
 // Session-only chat context; never persisted and never taken from the health vault.
 const sessionTurns=[];
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
@@ -152,6 +152,24 @@ function speak(message,{requested=false}={}){
   try{speechSynthesis.speak(utterance);}catch{notify("Lecture vocale indisponible.");}
  };
  next();return true;
+}
+function installGuidance(){
+ const node=$("install-status");if(!node)return;
+ const installed=window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone===true;
+ if(installed){node.textContent="FibroBot est déjà lancé comme application installée.";return;}
+ if(pendingInstall){node.textContent="Installation disponible sur cet appareil : utilisez le bouton Installer FibroBot.";return;}
+ node.textContent=/iPad|iPhone|iPod/i.test(navigator.userAgent)?"Sur iPhone/iPad : dans Safari, touchez Partager puis « Sur l'écran d'accueil ».":"Sur Android : utilisez le menu du navigateur, puis « Installer l'application » ou « Ajouter à l'écran d'accueil ».";
+}
+async function requestPWAInstallation(){
+ const status=$("install-status");
+ if(window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone===true){installGuidance();return;}
+ if(!pendingInstall){installGuidance();return;}
+ const event=pendingInstall;pendingInstall=null;
+ try{
+  await event.prompt();
+  const decision=await event.userChoice;
+  status.textContent=decision?.outcome==="accepted"?"Installation acceptée par le navigateur.":"Installation refusée ou annulée. Vous pouvez utiliser le menu du navigateur.";
+ }catch{installGuidance();}
 }
 function updateConnectionState(){
  const node=$("connection-state");if(!node)return;
@@ -499,6 +517,7 @@ function events(){
   notify("Contexte IA effacé. L'historique chiffré du coffre n'est pas modifié.");
  });
  $("chat-voice-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
+ $("install-app").addEventListener("click",requestPWAInstallation);
  $("auto-mode").addEventListener("change",()=>{updateEngineNote();notify($("auto-mode").checked?"IA activée : Agnes puis Mistral selon disponibilité.":"IA conversationnelle désactivée.");});
  $("agnes-connect").addEventListener("click",()=>{
   const key=$("agnes-key").value.trim();$("agnes-key").value="";
@@ -810,7 +829,9 @@ function events(){
  });
 }
 async function init(){
- renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();
+ renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();
+ window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
+ window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
  window.addEventListener("offline",updateConnectionState);
  window.addEventListener("pagehide",()=>{
