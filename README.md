@@ -348,3 +348,5 @@ Les histoires et demandes de conversation générales utilisent l'IA connectée 
 **Réseau et accessibilité :** un indicateur hors-ligne annonce quand le suivi et la bibliothèque restent consultables mais que les fournisseurs IA distants ne le sont pas. Les contrôles de dictée ont une taille tactile accrue et un état accessible. Aucun mode IA local génératif n'est rétabli dans l'interface.
 
 Tests des nouveaux modules : tests/v25-companion.test.mjs. Les tests d'intégration Chromium et smoke mobile restent nécessaires avant toute fusion. Les API réelles Agnes/Mistral et les périphériques iOS/Android physiques ne sont pas couverts par les tests simulés.
+
+**Export calendrier privé (.ics) :** chaque rendez-vous à venir dispose d'un bouton « Agenda (.ics) » qui télécharge un événement générique, sans nom, spécialité médicale, lieu ni données du coffre. Les événements avec heure comportent un rappel suggéré d'une heure ; ceux sans heure un rappel suggéré d'un jour. C'est le calendrier du téléphone qui accepte, importe ou ignore l'événement et ses alertes. Cet export ne déclenche aucune modification du calendrier sans action explicite de l'utilisateur.
