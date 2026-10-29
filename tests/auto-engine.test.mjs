@@ -77,11 +77,46 @@ test("PWA: new modules cached, UI connected, no hardcoded keys",()=>{
  const html=readFileSync(new URL("../index.html",import.meta.url),"utf8");
  const app=readFileSync(new URL("../app.mjs",import.meta.url),"utf8");
  assert.match(sw,/agnes-bridge\.mjs/);assert.match(sw,/auto-engine\.mjs/);
- assert.match(sw,/fibrobot-shell-v23/);
+ assert.match(sw,/fibrobot-shell-v24/);
  for(const id of ["auto-mode","auto-brain-status","agnes-key","agnes-connect","agnes-test","agnes-disconnect","agnes-status","agnes-model"])
   assert.equal(html.split('id="'+id+'"').length-1,1,id);
  assert.match(html,/https:\/\/apihub\.agnes-ai\.com/);
  assert.match(app,/autoGeneralAllowed/);
  assert.match(app,/answerWithAuto/);
  assert.match(app,/disconnectAgnes\(\)/);
+});
+
+
+test("v24: opt-in context is private and filtered",async()=>{
+ const {sessionMessages,sessionPreview,appendSessionTurn}=await import("../conversation-context.mjs");
+ const memory=[];
+ appendSessionTurn(memory,"Parle-moi des anneaux de Saturne","Ils sont principalement composés de glace.");
+ assert.equal(memory.length,2);
+ const noContext=sessionMessages("Pourquoi brillent-ils ?",memory,false);
+ assert.equal(noContext.length,2);
+ const withContext=sessionMessages("Pourquoi brillent-ils ?",memory,true);
+ assert.equal(withContext.length,4);
+ assert.match(sessionPreview("Pourquoi brillent-ils ?",memory,true),/Saturne/);
+ appendSessionTurn(memory,"Mon traitement est le tramadol","Une réponse personnelle");
+ assert.equal(memory.length,2,"No clinical question in session context");
+ appendSessionTurn(memory,"Je m'appelle Alice","Enchanté Alice");
+ assert.equal(memory.length,2,"No personal identifier in outgoing context");
+});
+test("v24: source-first applies to public facts, not stories or medical requests",async()=>{
+ const {shouldPreferSources}=await import("../auto-engine.mjs");
+ assert.equal(shouldPreferSources("Qui a découvert Neptune ?","general",{kind:"refusal"}),true);
+ assert.equal(shouldPreferSources("Raconte une histoire","general",{kind:"refusal"}),false);
+ assert.equal(shouldPreferSources("Quels médicaments dois-je prendre ?","medical",{kind:"refusal"}),false);
+});
+test("v24: 401 blocks repeated Agnes network requests until reconnect",async()=>{
+ disconnectAgnes();connectAgnes("test-token-for-agnes-12345");
+ let count=0;
+ const fetchImpl=async()=>{count++;return{ok:false,status:401,headers:{get:()=>null}};};
+ await assert.rejects(generateAgnesChat("Qui est Victor Hugo ?",{fetchImpl}),/refusée/i);
+ assert.equal(agnesStatus().authorizationBlocked,true);
+ await assert.rejects(generateAgnesChat("Qui est Victor Hugo ?",{fetchImpl}),/reconnectez/i);
+ assert.equal(count,1);
+ connectAgnes("new-agnes-token-abcdefgh");
+ assert.equal(agnesStatus().authorizationBlocked,false);
+ disconnectAgnes();
 });

@@ -8,7 +8,7 @@ import {publicMedicalExplanationMessages} from "./medical-rag.mjs";
 const ENDPOINT="https://api.mistral.ai/v1/chat/completions";
 const APPROVED_MODELS=Object.freeze(["mistral-small-latest","mistral-medium-latest","mistral-large-latest"]);
 let sessionKey=""; // Jamais dans IndexedDB, le coffre, localStorage, logs ou URL.
-let cooldownUntil=0,lastFailure="";
+let cooldownUntil=0,lastFailure="",authorizationBlocked=false;
 const activeRequests=new Set();
 const MAX_COOLDOWN_S=900;
 const MIN_COOLDOWN_S=15;
@@ -33,12 +33,12 @@ export const MISTRAL_MODELS=APPROVED_MODELS;
 export function connectMistral(key){
  const value=String(key||"").trim();
  if(value.length<12||value.length>500||/[\r\n\s]/.test(value))throw Error("Clé Mistral invalide. Ne la saisissez pas dans la conversation.");
- sessionKey=value;return true;
+ sessionKey=value;authorizationBlocked=false;return true;
 }
-export function disconnectMistral(){sessionKey="";lastFailure="";cooldownUntil=0;cancelMistralRequests();}
+export function disconnectMistral(){sessionKey="";lastFailure="";cooldownUntil=0;authorizationBlocked=false;cancelMistralRequests();}
 export function cancelMistralRequests(){for(const ctrl of activeRequests)ctrl.abort();activeRequests.clear();}
 export function mistralStatus(){
- return {connected:!!sessionKey,models:APPROVED_MODELS,cooldownSeconds:Math.max(0,Math.ceil((cooldownUntil-Date.now())/1000)),lastFailure};
+ return {connected:!!sessionKey,models:APPROVED_MODELS,cooldownSeconds:Math.max(0,Math.ceil((cooldownUntil-Date.now())/1000)),lastFailure,authorizationBlocked};
 }
 const nonClinical=question=>nonMedicalMessages(question,[]);
 export function validateMistralMessages(messages){
@@ -58,6 +58,7 @@ const errorFromStatus=n=>n===401?"Clé API Mistral rejetée (401).":n===403?"Cl�
 // planning prompts. Public mistralCompletion continues to reject clinical text.
 async function sendMistral(messages,{model="mistral-small-latest",fetchImpl=globalThis.fetch,signal}={},scope="general"){
  if(!sessionKey)throw Error("Mistral n'est pas connecté dans cette session.");
+  if(authorizationBlocked)throw Error("Clé ou crédit Mistral invalide : reconnectez une clé valide.");
  const remaining=Math.ceil((cooldownUntil-Date.now())/1000);
  if(remaining>0)throw Error("Mistral est temporairement désactivé après l'erreur 429 ("+remaining+" s restantes). Le mode local reste disponible.");
  if(!APPROVED_MODELS.includes(model))throw Error("Modèle non approuvé.");
@@ -77,7 +78,8 @@ async function sendMistral(messages,{model="mistral-small-latest",fetchImpl=glob
    body:JSON.stringify({model,messages,temperature:0.2,max_tokens:420,stream:false}),signal:controller.signal});
   if(!res.ok){
    if(res.status===429)throw Error(rateLimitCooldown(res));
-   lastFailure=errorFromStatus(res.status);
+   if([401,402,403].includes(res.status))authorizationBlocked=true;
+    lastFailure=errorFromStatus(res.status);
    throw Error(lastFailure);
   }
   const payload=await res.json();

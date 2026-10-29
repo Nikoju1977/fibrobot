@@ -474,3 +474,14 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 #gemma-options[hidden]{display:none!important}
 #chat .auto-brain-card{border-color:#b4dfc9;background:linear-gradient(130deg,#f2faf6,#e4f6ed)}
 #chat .auto-brain-status{font-weight:700}
+
+/* v24: large accessible touch areas and opt-in conversation privacy */
+#chat .conversation-controls{padding:16px 20px;margin:14px 0;border:1px solid var(--border,#cdd8d1);border-radius:16px}
+#chat .conversation-controls h3{margin:0 0 10px}
+#chat .conversation-controls .consent{display:flex;align-items:flex-start;gap:10px;margin:12px 0;line-height:1.5}
+#chat .conversation-controls input[type="checkbox"]{width:20px;height:20px;min-width:20px;accent-color:#187a55}
+#chat .conversation-controls .tiny{line-height:1.5}
+#chat #chat-voice-speed{width:100%;max-width:230px;min-height:44px;margin:4px 0 8px}
+#chat #chat-voice-stop{min-height:44px}
+#chat #chat-memory-clear{min-height:44px}
+@media(max-width:650px){#chat .conversation-controls{padding:14px}#chat .chat-header-actions{flex-wrap:wrap}#chat #chat-voice-stop{font-size:.8rem}}
