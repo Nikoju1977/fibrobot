@@ -261,3 +261,19 @@ Le diagnostic hors ligne **ne valide pas l'accès à Mistral, sa facturation, le
 - Améliorations tactiles et d'accessibilité : contrastes, cibles de 44–46 px, focus visible, textes lisibles, adaptation aux petits écrans, mouvements réduits.
 - Le service worker passe à **v19**. Les données médicales restent dans le coffre existant. En cas de difficulté après déploiement, fermer/réouvrir la PWA, sans effacer les données du site.
 - La nouvelle interface ne valide ni l'exactitude clinique ni les performances des IA. Tester les plateformes physiques et les lecteurs d'écran avant tout usage patient généralisé.
+
+
+## FibroBot Compagnon : écouter et faciliter le quotidien (octobre 2026)
+
+### Conversation et accompagnement
+FibroBot propose maintenant cinq modes dans l'écran Assistant : **Automatique**, **Compagnon**, **Écoute douleur** (préparer des questions à l'algologue), **Suivi des soins** (préparer des échanges avec l'infirmier ou le médecin) et **Soutien moral** (écoute sans se prétendre psychologue). Le système répond en français avec un ton chaleureux et précis, inspiré des assistants de science-fiction sans reproduire une voix ou un personnage de fiction. Le mode automatique reconnaît certaines formulations explicites et sait continuer quelques échanges courts en gardant le contexte dans le coffre local. Il ne remplace pas un dialogue libre avec un grand modèle linguistique.
+
+**Priorité aux garde-fous :** toute question passe d'abord par le routeur de sécurité existant ; les urgences et les prescriptions restent réservées aux réponses encadrées. L'écoute n'effectue pas de diagnostic, de psychothérapie, de triage fiable, d'acte infirmier ni de modification d'ordonnance. Les messages d'écoute ne sont pas transmis à Mistral ni aux moteurs de recherche. Les modèles IA généralistes et les sources Internet restent facultatifs et soumis à leurs limites et consentements existants.
+
+### Commandes pratiques
+- « Ouvre YouTube », « Ouvre Facebook », « Ouvre Wikipédia », « Ouvre Google Maps », « Ouvre Gmail », « Ouvre Google Agenda », « Ouvre Spotify » ou « Ouvre Gutenberg » : FibroBot affiche **un lien à toucher**. Le navigateur ouvre seulement un site connu depuis une liste fermée. L'application ne se connecte pas à votre compte, n'appuie pas sur les boutons du site et n'exécute aucune commande système. Les URL libres ne sont jamais ouvertes automatiquement.
+- « Raconte-moi une histoire » : propose une petite histoire **originale incluse hors ligne** sur la forêt, l'espace ou la mer ; une voix locale peut la lire si elle est disponible.
+- « Lis-moi un livre » : ouvre le lecteur local de **fichiers texte .txt ou .md, 1 Mo maximum**. Import volontaire, pagination, page précédente / suivante, lecture française locale et arrêt manuel. Les fichiers sont gardés uniquement dans la mémoire de l'onglet et ne sont pas sauvegardés dans le coffre ni transmis. PDF, EPUB, ouvrages DRM et téléchargement de livres ne sont pas pris en charge dans ce lecteur. Pour des livres du domaine public, ouverture volontaire de Project Gutenberg.
+
+### Compatibilité et limites
+Les commandes texte et histoires déterministes fonctionnent sans serveur après installation du cache PWA v20. La **dictée vocale locale** exige un navigateur qui atteste `SpeechRecognition.processLocally` ; la **lecture vocale** exige une voix française dont `localService` est explicitement vraie. Les restrictions Web Speech sur Android et iOS ne sont pas levées. L'écoute permanente en arrière-plan et le pilotage intégral des autres applications ne sont pas possibles avec cette PWA statique. Les questions générales libres demandent un modèle IA chargé ou une source externe autorisée : FibroBot ne garantit pas une réponse universelle et ne prétend pas savoir ce qu'il ne peut pas vérifier.
