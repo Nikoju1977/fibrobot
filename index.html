@@ -85,7 +85,8 @@
         <div class="assistant-hero-symbol" aria-hidden="true"><span>✳</span></div>
       </div>
       <div class="two chat-layout"><div class="card chat-card">
-        <div class="chat-window-top"><div class="chat-window-heading"><span class="assistant-avatar" aria-hidden="true">✳</span><div><strong>FibroBot</strong><small>Votre compagnon de soutien</small></div></div><div class="chat-header-actions"><span id="assistant-mode-badge" class="assistant-mode-badge">Documentaire local</span><button type="button" id="chat-voice-toggle" class="chat-voice-toggle" aria-pressed="false" aria-label="Activer la lecture vocale locale">Voix désactivée</button></div></div>
+        <div class="companion-mode-bar"><label for="companion-mode">Mode d'écoute</label><select id="companion-mode" aria-describedby="companion-mode-note"><option value="auto">Automatique</option><option value="friend">Compagnon</option><option value="pain">Douleur • soutien algologique</option><option value="care">Soins • organisation infirmière</option><option value="emotion">Soutien moral • écoute</option></select><span id="companion-mode-note">Un compagnon numérique, jamais un médecin, infirmier ou psychologue réel.</span></div>
+      <div class="chat-window-top"><div class="chat-window-heading"><span class="assistant-avatar" aria-hidden="true">✳</span><div><strong>FibroBot</strong><small>Votre compagnon de soutien</small></div></div><div class="chat-header-actions"><span id="assistant-mode-badge" class="assistant-mode-badge">Documentaire local</span><button type="button" id="chat-voice-toggle" class="chat-voice-toggle" aria-pressed="false" aria-label="Activer la lecture vocale locale">Voix désactivée</button></div></div>
         <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversation avec FibroBot"></div><div class="chat-starters" role="group" aria-label="Questions fréquentes"><span>Pour commencer</span><button type="button" class="starter-chip" data-ask="Comment organiser mes tâches ?">Organiser ma journée</button><button type="button" class="starter-chip" data-ask="Quels sont les symptômes de la fibromyalgie ?">Comprendre la fibromyalgie</button><button type="button" class="starter-chip" data-ask="Comment préparer un rendez-vous médical ?">Préparer une consultation</button></div>
         <form id="chat-form" class="chat-input">
           <label class="sr" for="prompt">Votre message à FibroBot</label>
@@ -105,6 +106,24 @@
  <button class="btn light" type="button" id="repeat-last" title="Fonctionne seulement si une voix française explicitement locale est disponible"><span aria-hidden="true">▶</span> Lire la dernière réponse</button>
  </div>
  <h3>Vous pouvez demander</h3><div class="chips"><button class="chip" data-ask="Quelle heure est-il ?" type="button">L'heure actuelle</button><button class="chip" data-ask="Que recommande la HAS pour la fibromyalgie ?" type="button">La fibromyalgie</button><button class="chip" data-ask="Comment alléger mon ménage ?" type="button">Alléger mes tâches</button><button class="chip" data-ask="Comment préparer un rendez-vous médical ?" type="button">Une consultation</button><button class="chip" data-ask="Quel temps fait-il ?" type="button">La météo</button></div><p class="callout">La météo n'est pas disponible en mode 100 % local sans données météo préchargées. L'application ne l'invente jamais.</p></div></div>
+      <section class="card companion-tools" id="companion-tools" aria-label="Actions quotidiennes du compagnon">
+ <div class="companion-tools-intro"><div><span class="section-kicker">UN COUP DE MAIN</span><h3>Lire, raconter et ouvrir mes sites</h3><p>Ces commandes sont manuelles et locales, sauf l'ouverture volontaire d'un site dans le navigateur.</p></div></div>
+ <div class="companion-shortcuts" aria-label="Commandes rapides">
+  <button type="button" class="btn light" data-ask="Raconte-moi une histoire dans l'espace">Raconte une histoire</button>
+  <button type="button" class="btn light" data-ask="Ouvre YouTube">Ouvre YouTube</button>
+  <button type="button" class="btn light" data-ask="Ouvre Facebook">Ouvre Facebook</button>
+  <button type="button" class="btn light" data-ask="Lis-moi un livre">Lis un livre</button>
+ </div>
+ <details id="book-panel" class="book-panel">
+  <summary>Ma bibliothèque de lecture locale (.txt ou .md)</summary>
+  <p>Choisissez un livre libre de droits, un texte personnel ou un fichier que vous avez le droit d'utiliser. Le texte n'est ni téléchargé vers un serveur ni conservé dans le coffre. Maximum : 1 Mo.</p>
+  <label for="book-file">Ouvrir un fichier texte</label><input id="book-file" type="file" accept=".txt,.md,text/plain,text/markdown">
+  <p id="book-state" role="status" aria-live="polite">Aucun livre ouvert.</p>
+  <div id="book-page" class="book-page" tabindex="0" aria-label="Page actuelle de votre livre"></div>
+  <div class="book-controls"><button type="button" class="btn light" id="book-prev" disabled>Page précédente</button><button type="button" class="btn light" id="book-next" disabled>Page suivante</button><button type="button" class="btn primary" id="book-read" disabled>Lire cette page à voix haute</button><button type="button" class="btn light" id="book-stop">Arrêter la voix</button></div>
+  <p class="tiny">La lecture vocale exige une voix française locale disponible. Aucune lecture de livre protégé n'est téléchargée automatiquement.</p>
+ </details>
+ </section>
       <p id="chat-engine-state" class="chat-engine-state" role="status" aria-live="polite">Assistant documentaire actif · IA locale non chargée.</p>
       <section class="specialists card" aria-labelledby="specialists-heading">
        <h3 id="specialists-heading">Mes 7 agents de soutien spécialisés</h3>
