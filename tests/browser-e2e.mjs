@@ -43,9 +43,9 @@ try{
   (await page.locator("#gemma-options").boundingBox()).y,"Conversation visible before IA settings");
  assert.equal(await page.locator("#chat-voice-toggle").getAttribute("aria-pressed"),"false");
  await page.locator("#prompt").fill("Une question");
- assert.match(await page.locator("#prompt-count").textContent(),/12 \\/ 2000/);
+ assert.match(await page.locator("#prompt-count").textContent(),/12 \/ 2000/);
  await page.locator("#prompt").press("Shift+Enter");
- assert.match(await page.locator("#prompt").inputValue(),/Une question\\n/);
+ assert.match(await page.locator("#prompt").inputValue(),/Une question\n/);
  await page.locator("#prompt").fill("");
  // Tous les scénarios de diagnostic utilisent uniquement les moteurs locaux.
  await page.locator("#assistant-diagnostics-panel summary").click();
