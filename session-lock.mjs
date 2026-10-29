@@ -2,6 +2,7 @@
 export const AUTO_LOCK_SETTING="auto-lock-minutes-v26";
 export const AUTO_LOCK_OPTIONS=Object.freeze([0,5,15,30]);
 export function sanitizeAutoLockMinutes(value){
+ if(value===null||value===undefined||String(value).trim()==="")throw Error("Délai de verrouillage non valide.");
  const n=Number(value);
  if(!Number.isInteger(n)||!AUTO_LOCK_OPTIONS.includes(n))throw Error("Délai de verrouillage non valide.");
  return n;
