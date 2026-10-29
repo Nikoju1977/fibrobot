@@ -120,3 +120,16 @@ test("v24: 401 blocks repeated Agnes network requests until reconnect",async()=>
  assert.equal(agnesStatus().authorizationBlocked,false);
  disconnectAgnes();
 });
+
+test("IA: refusal of Agnes consent stops routing without prompting Mistral",async()=>{
+ const attempted=[];
+ const result=await answerWithAuto({
+  question:"Explique les satellites",intent:"general",response:{kind:"refusal"},
+  state:{agnesConnected:true,mistralConnected:true},
+  authorize:async provider=>{attempted.push(provider);return false;},
+  agnes:async()=>{throw Error("Agnes must not be called");},
+  mistral:async()=>{throw Error("Mistral must not be called");}
+ });
+ assert.deepEqual(attempted,["agnes"]);
+ assert.equal(result.skipped,"consent-denied");
+});
