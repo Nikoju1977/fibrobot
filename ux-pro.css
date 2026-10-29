@@ -510,3 +510,36 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .install-card p{margin:4px 0}
 .install-card #install-app{min-height:44px;white-space:nowrap}
 @media(max-width:650px){.install-card{flex-direction:column;align-items:stretch;gap:12px;padding:14px}.install-card #install-app{width:100%}}
+
+/* FibroBot V26 — accessible companion, privacy and health chart */
+#chat .preference-controls,#chat .accessibility-controls,#chat .ai-budget-controls{padding:13px 15px;margin:12px 0;background:#f4faf7;border:1px solid #cfdfd7;border-radius:14px;display:grid;gap:8px}
+#chat .preference-controls h4,#chat .accessibility-controls h4{margin:0;color:#204f43;font-size:.96rem}
+#chat #general-preference,#chat #reading-size,#chat #api-budget-select{min-height:44px;max-width:100%;padding:10px;border-radius:9px}
+#chat #preference-save,#chat #preference-delete{min-height:44px}
+#chat .preference-controls .consent,#chat .accessibility-controls .consent{display:flex;gap:9px;align-items:flex-start}
+#chat .preference-controls input[type="checkbox"],#chat .accessibility-controls input[type="checkbox"]{width:20px;height:20px;flex:none;margin:2px 0}
+#chat #chat-voice-pause,#chat #chat-voice-resume{min-height:44px}
+#health .health-trends{margin:18px 0;padding:18px;overflow:hidden}
+#health .health-trends h3{margin:0 0 8px}
+#health .trend-options{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:15px 0}
+#health .trend-options select{min-width:120px;min-height:44px;max-width:100%;padding:8px;border:1px solid #bed6c9;border-radius:10px}
+#health .trend-chart{width:100%;overflow:hidden;background:#fafdfb;border:1px solid #e4ede8;border-radius:12px;padding:8px}
+#health .trend-chart svg{width:100%;height:auto;display:block}
+#health .trend-grid{stroke:#dee8e3;stroke-width:1}
+#health .trend-tick{font:13px system-ui,sans-serif;fill:#537469}
+#health .trend-line{stroke:#18805c;stroke-width:2.8;stroke-linecap:round}
+#health .trend-point{fill:#15795c;stroke:#fff;stroke-width:1.5}
+#health .trend-values{overflow-x:auto}
+#health .trend-values table{width:100%;border-collapse:collapse;font-size:.88rem}
+#health .trend-values th,#health .trend-values td{border-bottom:1px solid #e1e9e4;padding:8px;text-align:left}
+#chat #book-pdf-open{min-height:44px;margin:8px 0}
+body.easy-reading *,body.easy-reading *::before,body.easy-reading *::after{animation-duration:0s!important;transition-duration:0s!important;scroll-behavior:auto!important}
+body.easy-reading .hero-art,body.easy-reading .assistant-hero-symbol,body.easy-reading .orbit{display:none!important}
+body[data-reading-size="large"] #chat .bubble-body{font-size:1.11rem;line-height:1.75}
+body[data-reading-size="extra"] #chat .bubble-body{font-size:1.26rem;line-height:1.85}
+@media(max-width:650px){
+ #chat .preference-controls,#chat .accessibility-controls,#chat .ai-budget-controls{padding:12px}
+ #health .health-trends{padding:12px}
+ #health .trend-options{display:grid;grid-template-columns:auto 1fr;gap:9px}
+ #chat .chat-header-actions{flex-wrap:wrap;gap:6px}
+}
