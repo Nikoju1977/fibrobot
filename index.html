@@ -8,7 +8,7 @@
 <meta name="description" content="FibroBot, espace privé pour un seul patient, conçu par Studio Niko Design. Suivi, tâches et informations sourcées.">
 <meta name="author" content="Studio Niko Design">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.run https://cdn.jsdelivr.net https://esm.sh 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://www.ebi.ac.uk https://api.mistral.ai https://fr.wikipedia.org https://en.wikipedia.org https://www.wikidata.org https://fr.wiktionary.org https://api.openalex.org https://api.crossref.org https://openlibrary.org https://api.github.com https://esm.run https://esm.sh https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co https://github.com https://*.githubusercontent.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.run https://cdn.jsdelivr.net https://esm.sh 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://www.ebi.ac.uk https://api.mistral.ai https://apihub.agnes-ai.com https://fr.wikipedia.org https://en.wikipedia.org https://www.wikidata.org https://fr.wiktionary.org https://api.openalex.org https://api.crossref.org https://openlibrary.org https://api.github.com https://esm.run https://esm.sh https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co https://github.com https://*.githubusercontent.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
 <link rel="icon" href="./icon.svg">
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./styles.css">
@@ -90,7 +90,7 @@
         <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversation avec FibroBot"></div><div class="chat-starters" role="group" aria-label="Questions fréquentes"><span>Pour commencer</span><button type="button" class="starter-chip" data-ask="Comment organiser mes tâches ?">Organiser ma journée</button><button type="button" class="starter-chip" data-ask="Quels sont les symptômes de la fibromyalgie ?">Comprendre la fibromyalgie</button><button type="button" class="starter-chip" data-ask="Comment préparer un rendez-vous médical ?">Préparer une consultation</button></div>
         <form id="chat-form" class="chat-input">
           <label class="sr" for="prompt">Votre message à FibroBot</label>
-          <div class="chat-composer-field"><textarea id="prompt" rows="2" maxlength="2000" placeholder="Écrivez votre message…" required aria-describedby="prompt-help prompt-count" autocomplete="off"></textarea>
+          <div class="chat-composer-field"><textarea id="prompt" rows="2" maxlength="2000" placeholder="Posez une question à FibroBot…" required aria-describedby="prompt-help prompt-count" autocomplete="off"></textarea>
             <div class="composer-actions"><button class="btn light" id="mic" type="button" aria-label="Dictée strictement locale" title="Dictée locale selon la compatibilité de l’appareil"><span aria-hidden="true">🎙</span></button><button class="btn primary" id="chat-send" type="submit">Envoyer <span aria-hidden="true">↗</span></button></div>
           </div>
           <div class="composer-bottom"><span id="prompt-help">Entrée pour envoyer · Maj + Entrée pour une nouvelle ligne</span><span id="prompt-count">0 / 2000</span></div>
@@ -130,7 +130,12 @@
        <p class="tiny">Choisissez un agent pour obtenir un résumé local fondé sur vos notes et les fiches documentaires. Ces assistants n'ont pas de qualification médicale et ne modifient jamais vos traitements.</p>
        <div id="specialist-list" class="specialists-grid" aria-label="Choisir un agent FibroBot"></div>
       </section>
-      <div class="assistant-advanced-heading"><div><span class="section-kicker">POUR ALLER PLUS LOIN</span><h3>Options et moteurs de l’assistant</h3><p>Facultatif : FibroBot peut fonctionner avec ses ressources locales, sans installer d’intelligence artificielle.</p></div></div>
+      <section class="card auto-brain-card" aria-labelledby="auto-brain-title">
+  <div class="auto-brain-header"><div><span class="section-kicker">MOTEUR INTELLIGENT</span><h3 id="auto-brain-title">Mode Auto</h3><p>Local → Agnes AI → Mistral, selon les moteurs réellement prêts. Tes informations de santé restent traitées localement.</p></div><label class="auto-switch"><input type="checkbox" id="auto-mode" checked aria-describedby="auto-brain-desc"><span>Activé</span></label></div>
+  <p id="auto-brain-desc" class="tiny">Les services distants nécessitent une clé, peuvent imposer des quotas ou des frais et demandent ton accord avant chaque question générale admissible. Aucun transfert automatique du coffre patient.</p>
+  <p id="auto-brain-status" class="auto-brain-status" role="status">Mode Auto : fonctions locales prêtes. Agnes et Mistral sont facultatifs.</p>
+</section>
+<div class="assistant-advanced-heading"><div><span class="section-kicker">POUR ALLER PLUS LOIN</span><h3>Options et moteurs de l’assistant</h3><p>Facultatif : FibroBot peut fonctionner avec ses ressources locales, sans installer d’intelligence artificielle.</p></div></div>
       <details class="card ai-card" id="gemma-options">
   <summary><span class="ai-summary-icon" aria-hidden="true">✳</span><span><strong>Modèles IA locaux (option facultative)</strong><small>Gemma 4, Qwen, SmolLM et autres modèles réellement compatibles · sans compte</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
   <div class="ai-details">
@@ -159,8 +164,22 @@
  </div>
 </div>
 </details>
-      <details class="card ai-card" id="mistral-options">
-       <summary><span class="ai-summary-icon" aria-hidden="true">◎</span><span><strong>Mistral AI · cerveau conversationnel facultatif</strong><small>Questions générales, explications de fiches médicales publiques et organisation, avec consentement</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
+      <details class="card ai-card" id="agnes-options">
+ <summary><span class="ai-summary-icon" aria-hidden="true">◈</span><span><strong>Agnes AI · secours conversationnel optionnel</strong><small>Questions générales uniquement, avec confirmation avant l'envoi</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
+ <div class="ai-details">
+  <p>Agnes est un fournisseur distant distinct de FibroBot. Il nécessite une clé API et une connexion compatibles. La clé est conservée uniquement en mémoire pendant la session ; aucun enregistrement dans le coffre ni sur GitHub. Les appels directs peuvent être bloqués par CORS. Les quotas, tarifs et promotions peuvent évoluer.</p>
+  <div class="form model-form">
+   <label for="agnes-key">Clé API Agnes personnelle</label>
+   <input id="agnes-key" type="password" maxlength="500" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Saisir une clé depuis Agnes">
+   <label for="agnes-model">Modèle texte</label>
+   <select id="agnes-model"><option value="agnes-3.0-flash">Agnes 3.0 Flash</option><option value="agnes-2.5-flash">Agnes 2.5 Flash</option></select>
+   <div class="button-row"><button type="button" id="agnes-connect" class="btn light">Connecter Agnes</button><button type="button" id="agnes-test" class="btn light" disabled>Tester Agnes</button><button type="button" id="agnes-disconnect" class="btn light" disabled>Déconnecter Agnes</button></div>
+   <p id="agnes-status" class="tiny" role="status">Agnes non connecté. FibroBot reste disponible en mode local.</p>
+  </div>
+ </div>
+</details>
+<details class="card ai-card" id="mistral-options">
+       <summary><span class="ai-summary-icon" aria-hidden="true">◎</span><span><strong>Mistral AI · dernier recours distant</strong><small>Questions générales, explications de fiches médicales publiques et organisation, avec consentement</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
        <div class="ai-details">
         <p class="callout">Mistral AI est un service distant, distinct des modèles locaux. Une clé personnelle valide et un accès API peuvent être payants. Si le navigateur bloque les requêtes directes (CORS), le mode Mistral ne fonctionnera pas sur cette PWA sans passerelle sécurisée. N'entrez pas une clé contenant des données privées.</p>
         <div class="form model-form">
@@ -182,7 +201,7 @@
           <button type="button" id="mistral-restore" class="btn light" disabled>Activer la clé de mon coffre</button>
           <button type="button" id="mistral-forget" class="btn light" disabled>Supprimer la clé du coffre</button>
          </div>
-         <label class="consent"><input type="checkbox" id="mistral-use" disabled>Utiliser Mistral en priorité pour les questions générales, les explications médicales documentaires et les conseils anonymes, avec confirmation à chaque demande</label>
+         <label class="consent"><input type="checkbox" id="mistral-use" disabled>Utiliser aussi Mistral pour les explications documentaires et les conseils génériques ; en mode Auto, Mistral intervient en dernier recours sur les questions générales après ton accord</label>
          <p id="mistral-status" class="tiny" role="status">Mistral désactivé. Aucune clé active. Déverrouillez le coffre pour utiliser une clé sauvegardée.</p>
          <p class="tiny">Une fois connecté, Mistral reçoit uniquement votre question générale confirmée, ou le texte d’une fiche médicale PUBLIQUE approuvée, ou une consigne générique d’organisation. Il ne reçoit ni vos observations, ni traitements, ni noms de tâches, ni votre question médicale personnelle. Les urgences, diagnostics, prescriptions, résumés personnels et consultations restent traités localement. La clé est conservée en mémoire pendant la connexion ; si vous choisissez de la sauvegarder, seule sa version chiffrée est conservée dans le coffre et dans les sauvegardes chiffrées. Le chiffrement ne protège pas contre une page, un navigateur ou une extension compromis. Une clé API utilisée directement depuis le navigateur peut être exposée : limitez les permissions et le budget de votre clé Mistral.</p>
         </div>

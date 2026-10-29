@@ -277,3 +277,19 @@ FibroBot propose maintenant cinq modes dans l'écran Assistant : **Automatique**
 
 ### Compatibilité et limites
 Les commandes texte et histoires déterministes fonctionnent sans serveur après installation du cache PWA v20. La **dictée vocale locale** exige un navigateur qui atteste `SpeechRecognition.processLocally` ; la **lecture vocale** exige une voix française dont `localService` est explicitement vraie. Les restrictions Web Speech sur Android et iOS ne sont pas levées. L'écoute permanente en arrière-plan et le pilotage intégral des autres applications ne sont pas possibles avec cette PWA statique. Les questions générales libres demandent un modèle IA chargé ou une source externe autorisée : FibroBot ne garantit pas une réponse universelle et ne prétend pas savoir ce qu'il ne peut pas vérifier.
+
+
+## Mode Auto — Local → Agnes AI → Mistral (29 octobre 2026)
+
+La case **Mode Auto** de l'onglet Assistant est activée par défaut. Elle fonctionne sans clé et ne télécharge pas de modèle silencieusement. Pour une question **générale, non médicale et sans information personnelle**, FibroBot tente, dans cet ordre :
+
+1. Un modèle IA chargé **sur l'appareil**, lorsqu'il est effectivement activé et opérationnel.
+2. **Agnes AI**, seulement si l'utilisateur a fourni une clé API active pour la session, que le fournisseur n'est pas en pause et qu'il **confirme l'envoi de la question exacte**. Modèles texte sélectionnables : `agnes-3.0-flash` ou `agnes-2.5-flash`.
+3. **Mistral AI**, si Agnes n'a pas répondu, si une clé Mistral est activée, sans période de pause, et après **un nouvel accord explicite** pour cet autre fournisseur.
+4. Sans réponse des modèles : message documentaire local déjà disponible. Aucun fait n'est inventé.
+
+L'ordre n'est **pas** une promesse de gratuité ou de disponibilité : les quotas et les tarifs peuvent changer, et l'appel navigateur direct peut être bloqué par les politiques CORS des fournisseurs. Les limitations 429 provoquent un délai de pause ; la PWA ne peut ni les contourner ni augmenter le quota. Le statut affiché à la place du long message d'erreur explique simplement que FibroBot continue en local.
+
+**Confidentialité :** chaque tentative distante valide le contenu par le filtre des questions non médicales et privées. Aucune maladie, note, prescription, nom de tâche, historique de conversation ou donnée du coffre n'est envoyée au fournisseur distant. Les modes spécialisés, crises, suivi, rendez-vous et fiches institutionnelles restent prioritaires. Aucune question personnelle n'est automatiquement transmise. La clé Agnes n'est conservée qu'en mémoire pour la session et supprimée à la fermeture, au verrouillage ou à la déconnexion. Les clés saisies directement dans le navigateur peuvent être exposées dans un environnement compromis ; privilégier des clés à droits et budgets restreints. Mistral conserve son coffre chiffré **sur demande explicite**.
+
+Pour la lecture, les histoires et les commandes d'ouverture de sites, les fonctions locales dédiées restent prioritaires. Désactiver **Mode Auto** permet de retrouver les réglages manuels existants pour le moteur Mistral, la recherche et le modèle local. Les tests CI utilisent des réponses simulées des fournisseurs ; une vraie clé, un vrai quota et la prise en charge CORS sur Android/iOS demandent encore une vérification sur l'appareil.

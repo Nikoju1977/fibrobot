@@ -457,3 +457,15 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 #chat .book-controls .btn:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:650px){#chat .companion-mode-bar{align-items:stretch}#chat .companion-mode-bar label{align-self:center}#chat .companion-mode-bar select{flex:1 1 100%}#chat .companion-tools{padding:16px 14px}#chat .companion-shortcuts .btn{flex:1 1 calc(50% - 9px);min-width:0;padding:10px 9px}#chat .book-controls .btn{flex:1 1 140px}#chat .book-page{font-size:.88rem;padding:13px}}
 @media(prefers-reduced-motion:reduce){#chat .approved-site-link{transition:none}}
+
+/* Auto Brain: compact, readable status instead of raw HTTP 429 paragraphs */
+#chat .auto-brain-card{padding:17px 20px;margin:16px 0;border:1px solid #cbded5;border-radius:18px;background:linear-gradient(130deg,#f4fbf6,#e7f5ed)}
+#chat .auto-brain-header{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}
+#chat .auto-brain-header h3{margin:3px 0 5px;color:#1b563f}
+#chat .auto-brain-header p{font-size:.83rem;margin:0;color:#416f59;max-width:610px}
+#chat .auto-switch{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #b9d8c6;padding:10px 13px;min-height:46px;border-radius:12px;font-size:.82rem;font-weight:800;white-space:nowrap;color:#1a6145;cursor:pointer}
+#chat .auto-switch input{width:21px;height:21px;accent-color:#168059}
+#chat .auto-brain-card .tiny{margin:10px 0 7px;line-height:1.55}
+#chat .auto-brain-status{font-size:.77rem;font-weight:700;color:#265c47;background:#fff;border:1px solid #d3e7d9;border-radius:9px;padding:9px 11px;margin:8px 0 0}
+#chat #mistral-status,#chat #agnes-status{display:block;max-width:100%;overflow-wrap:anywhere;font-size:.79rem;line-height:1.5;padding:9px 10px;border-radius:10px;background:#f4faf7;border:1px solid #d8e8df;margin:12px 0}
+@media(max-width:650px){#chat .auto-brain-card{padding:15px}#chat .auto-brain-header{flex-direction:column;gap:10px}#chat .auto-switch{align-self:flex-start}}
