@@ -10,10 +10,11 @@ const clean=s=>String(s??"").replace(/<[^>]*>/g," ").replace(/&(?:nbsp|amp|quot|
 const shorten=(s,n)=>clean(s).slice(0,n);
 const accentless=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const privateText=/(?:[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}|(?:\+33|0[1-9])(?:[ .-]?\d\d){4}|\b\d[ .-]?\d{2}[ .-]?\d{2}[ .-]?\d{2}[ .-]?\d{3}[ .-]?\d{3}[ .-]?\d{2}\b|mot de passe|numero de carte|numero de securite|mon adresse|ma rue|j'habite|je souffre|mes symptomes|mon traitement|mon ordonnance|ma douleur|mon diagnostic|mon dossier|mon etat de sante)/i;
+const sensitiveSelfDisclosure=/(?:\b(?:mon|ma|mes)\s+(?:nom|prenom|adresse|telephone|numero|mail|email|age|date de naissance|dossier|diagnostic|traitement|ordonnance|medicament|symptome|douleur|pathologie)\b|\b(?:je\s+|j[\u0027\u2019])(?:m.appelle|me nomme|habite|souffre|prends|suis sous|suis ne|ai\s+\d{1,3}\s+ans)\b|\b(?:ma mere|mon pere|mon enfant|ma fille|mon fils)\b)/i;
 const publicQuestion=/(\?|^(?:qui|que|quoi|quel|quelle|quand|ou|pourquoi|comment|combien|cherche|recherche|trouve|explique|information|actualite|definition|historique|source|livre|projet|github|etude|article)\b)/i;
 export function isOnlineEligible(question){
  const q=shorten(question,1500);
- return q.length>=5&&q.length<=300&&classifyIntent(q)==="general"&&!privateText.test(accentless(q))&&publicQuestion.test(accentless(q));
+ return q.length>=5&&q.length<=300&&classifyIntent(q)==="general"&&!privateText.test(accentless(q))&&!sensitiveSelfDisclosure.test(accentless(q))&&publicQuestion.test(accentless(q));
 }
 const PROVIDERS=Object.freeze([
  {id:"wikipedia",name:"Wikipédia",kind:"encyclopédie",origin:"https://fr.wikipedia.org"},

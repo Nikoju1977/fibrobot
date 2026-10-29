@@ -239,3 +239,13 @@ Dans **Assistant → Diagnostic du cerveau de FibroBot**, le bouton **Tester les
 Les questions médicales documentées sont maintenant conservées **dans le texte de la fiche institutionnelle**, et ne sont plus automatiquement remplacées par une explication d'agent plus générale. Jusqu'à trois liens de référence issus des fiches locales approuvées sont affichés pour contrôle. Les questions de prescription ou d'urgence n'obtiennent pas de citations générées artificiellement.
 
 Le diagnostic hors ligne **ne valide pas l'accès à Mistral, sa facturation, les quotas, la présence d'un modèle en VRAM, ni une efficacité médicale** : il vérifie le moteur local et affiche les états disponibles. Un test réel de Mistral nécessite toujours la clé de l'utilisateur, sa confirmation et le réseau. En cas de 429, le mécanisme de repli déjà publié reste actif.
+
+
+## Intégrité des données et confidentialité — 29 octobre 2026
+
+- Les scores d'observation vides, blancs ou booléens ne sont plus interprétés comme des notes **0/10**. Un véritable zéro explicitement saisi reste valide ; les notes absentes sont exclues des moyennes descriptives.
+- Les synthèses ignorent les dates impossibles et les entrées incomplètes, sans modifier ni effacer le coffre chiffré existant. Les rendez-vous mal formés ne doivent plus bloquer la préparation d'une consultation.
+- Les messages contenant des formulations courantes d'identité, de situation familiale ou de traitements personnels ne peuvent plus partir en conversation libre Mistral ni vers la recherche Internet publique. Il s'agit d'un **filtre de réduction du risque**, non d'une garantie de détection exhaustive des données personnelles.
+- En l'absence d'un indicateur d'énergie, FibroBot évite d'afficher une valeur non renseignée comme si le patient l'avait saisie. Le classement pratique des tâches conserve sa valeur par défaut, à ajuster.
+- La PWA passe au cache `fibrobot-shell-v18` pour distribuer les nouveaux modules. L'historique du patient reste séparé dans IndexedDB et ne doit pas être supprimé en actualisant la PWA.
+- Tests de régression : `node --test tests/patient-data-privacy.test.mjs`. **Aucune validation clinique ni sur téléphone physique n'est déduite de ces tests unitaires.**
