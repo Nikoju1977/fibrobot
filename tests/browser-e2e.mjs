@@ -190,7 +190,7 @@ try{
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/Je ne dispose pas encore d.une réponse vérifiée/).last().waitFor({timeout:15000});
  assert.equal(mistralCalls,4,"One request only on 429");
- assert.match(await page.locator("#mistral-status").textContent(),/pause|quota/i);
+ await page.waitForFunction(()=>/pause|quota/i.test(document.getElementById("mistral-status")?.textContent||""),{timeout:12000});
  assert.equal(await page.locator("#mistral-use").isChecked(),false,"Disable Mistral automatically when rate-limited");
  assert.equal(await page.locator('#chat-form button[type="submit"]').isDisabled(),false,"Chat form must be re-enabled");
  await page.locator("#prompt").fill("Bonjour");
