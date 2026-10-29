@@ -133,7 +133,7 @@ export async function openPrivateDocument(file){
  if(!Number.isFinite(file?.size)||file.size>MAX_DOCUMENT_BYTES)throw Error("Fichier trop volumineux (limite 12 Mo).");
  if(/\.pdf$/i.test(name)){
   const bytes=new Uint8Array(await file.slice(0,5).arrayBuffer());
-  if(decoder.decode(bytes)!=="%PDF-")throw Error("PDF invalide.");
+  if(!decoder.decode(bytes).startsWith("%PDF-"))throw Error("PDF invalide.");
   return {kind:"pdf",file};
  }
  if(/\.(?:txt|md)$/i.test(name)){
