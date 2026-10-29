@@ -7,18 +7,18 @@ import {nonMedicalMessages,cleanConversationalReply} from "./assistant-engine.mj
 const URL="https://apihub.agnes-ai.com/v1/chat/completions";
 const MODELS=Object.freeze(["agnes-2.5-flash","agnes-2.0-flash","agnes-3.0-flash"]);
 const active=new Set();
-let sessionKey="",cooldownUntil=0,lastFailure="";
+let sessionKey="",cooldownUntil=0,lastFailure="",authorizationBlocked=false;
 export function agnesStatus(){
- return {connected:Boolean(sessionKey),cooldownSeconds:Math.max(0,Math.ceil((cooldownUntil-Date.now())/1000)),lastFailure,models:MODELS};
+ return {connected:Boolean(sessionKey),cooldownSeconds:Math.max(0,Math.ceil((cooldownUntil-Date.now())/1000)),lastFailure,authorizationBlocked,models:MODELS};
 }
 export function connectAgnes(key){
  const k=String(key??"").trim();
  if(k.length<12||k.length>500||/\s/.test(k))throw Error("Clé Agnes invalide. Ne la saisissez jamais dans la conversation.");
- sessionKey=k;cooldownUntil=0;lastFailure="";
+ sessionKey=k;cooldownUntil=0;lastFailure="";authorizationBlocked=false;
  return true;
 }
 export function cancelAgnesRequests(){for(const ctrl of active)ctrl.abort();active.clear();}
-export function disconnectAgnes(){cancelAgnesRequests();sessionKey="";lastFailure="";cooldownUntil=0;}
+export function disconnectAgnes(){cancelAgnesRequests();sessionKey="";lastFailure="";cooldownUntil=0;authorizationBlocked=false;}
 export function secondsToRetryAgnes(value,now=Date.now()){
  const raw=String(value??"").trim();let seconds=Number(raw);
  if(!raw||!Number.isFinite(seconds)){
@@ -27,11 +27,12 @@ export function secondsToRetryAgnes(value,now=Date.now()){
  }
  return Math.max(15,Math.min(900,Math.ceil(seconds)||15));
 }
-export async function generateAgnesChat(question,{model="agnes-2.5-flash",fetchImpl=globalThis.fetch,signal}={}){
+export async function generateAgnesChat(question,{model="agnes-2.5-flash",history=[],fetchImpl=globalThis.fetch,signal}={}){
  if(!sessionKey)throw Error("Agnes non connecté : ajoutez votre clé dans les réglages.");
+ if(authorizationBlocked)throw Error("Clé Agnes refusée : reconnectez une clé valide.");
  if(agnesStatus().cooldownSeconds>0)throw Error("Agnes en pause : quota temporairement atteint.");
  if(!MODELS.includes(model))throw Error("Modèle Agnes non autorisé.");
- const messages=nonMedicalMessages(question,[]); // no medical or private questions, no history
+ const messages=nonMedicalMessages(question,history); // filtered, opt-in session context only
  if(typeof fetchImpl!=="function")throw Error("Fonction réseau indisponible.");
  const controller=new AbortController(),abort=()=>controller.abort();
  active.add(controller);
@@ -47,6 +48,7 @@ export async function generateAgnesChat(question,{model="agnes-2.5-flash",fetchI
    throw Error(lastFailure);
   }
   if(!response.ok){
+   if([401,402,403].includes(response.status))authorizationBlocked=true;
    lastFailure=response.status===401||response.status===403?"Clé Agnes refusée.":response.status===402?"Crédit Agnes insuffisant.":"Service Agnes indisponible (HTTP "+response.status+").";
    throw Error(lastFailure);
   }
