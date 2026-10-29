@@ -469,3 +469,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 #chat .auto-brain-status{font-size:.77rem;font-weight:700;color:#265c47;background:#fff;border:1px solid #d3e7d9;border-radius:9px;padding:9px 11px;margin:8px 0 0}
 #chat #mistral-status,#chat #agnes-status{display:block;max-width:100%;overflow-wrap:anywhere;font-size:.79rem;line-height:1.5;padding:9px 10px;border-radius:10px;background:#f4faf7;border:1px solid #d8e8df;margin:12px 0}
 @media(max-width:650px){#chat .auto-brain-card{padding:15px}#chat .auto-brain-header{flex-direction:column;gap:10px}#chat .auto-switch{align-self:flex-start}}
+
+/* Mode conversationnel: ancien modèle local conservé hors interface, pas d'option local visible. */
+#gemma-options[hidden]{display:none!important}
+#chat .auto-brain-card{border-color:#b4dfc9;background:linear-gradient(130deg,#f2faf6,#e4f6ed)}
+#chat .auto-brain-status{font-weight:700}

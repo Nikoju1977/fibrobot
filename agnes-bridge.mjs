@@ -3,7 +3,7 @@
  * Session key only; never write to storage or logs.
  * The public browser endpoint may block requests (CORS).
  */
-import {nonMedicalMessages,cleanGeneratedReply} from "./assistant-engine.mjs";
+import {nonMedicalMessages,cleanConversationalReply} from "./assistant-engine.mjs";
 const URL="https://apihub.agnes-ai.com/v1/chat/completions";
 const MODELS=Object.freeze(["agnes-2.5-flash","agnes-2.0-flash","agnes-3.0-flash"]);
 const active=new Set();
@@ -53,7 +53,7 @@ export async function generateAgnesChat(question,{model="agnes-2.5-flash",fetchI
   const data=await response.json();
   const raw=data?.choices?.[0]?.message?.content;
   const answer=Array.isArray(raw)?raw.filter(x=>x?.type==="text").map(x=>String(x.text||"")).join(" "):raw;
-  const text=cleanGeneratedReply(answer);
+  const text=cleanConversationalReply(answer);
   lastFailure="";cooldownUntil=0;
   return {text,model};
  }catch(err){

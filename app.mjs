@@ -91,17 +91,18 @@ function setEngineNote(message){
  const node=$("chat-engine-state");if(node)node.textContent=message;
 }
 function updateEngineNote(){
- const state=llmStatus(),enabled=$("gemma-use")?.checked;
- setEngineNote((state.ready?(enabled?"IA locale active : "+state.modelId:"IA chargée mais désactivée : activez-la dans les options."):"Assistant documentaire actif · IA générative non chargée dans cette session.")+
- (networkEnabled?" · Internet : activé avec confirmation":" · Internet : désactivé")+(mistralStatus().connected?" · Mistral : connecté":""));
+ const ag=agnesStatus(),mi=mistralStatus();
+ setEngineNote("Conversation IA : Agnes "+(ag.connected?(ag.cooldownSeconds?"en pause":"connecté"):"non connecté")+
+ " · Mistral "+(mi.connected?(mi.cooldownSeconds?"en pause":"connecté"):"non connecté")+
+ " · Envoi seulement après votre accord.");
  const badge=$("assistant-mode-badge");
- if(badge)badge.textContent=$("auto-mode")?.checked?"Auto · local prioritaire":mistralStatus().connected&&$("mistral-use")?.checked?"Mistral sur accord":networkEnabled?"Recherche sur accord":state.ready&&enabled?"IA locale active":"Documentaire local";
+ if(badge)badge.textContent=$("auto-mode")?.checked?"IA conversationnelle":networkEnabled?"Recherche sur accord":"IA désactivée";
  const auto=$("auto-brain-status");
  if(auto){
   const ag=agnesStatus(),mi=mistralStatus();
   auto.textContent=$("auto-mode")?.checked?
-   "Auto activé · "+(state.ready&&enabled?"IA locale chargée":"assistant documentaire local")+" · Agnes "+(ag.connected?(ag.cooldownSeconds>0?"en pause":"connecté"):"non connecté")+" · Mistral "+(mi.connected?(mi.cooldownSeconds>0?"en pause":"connecté"):"non connecté"):
-   "Auto désactivé · commandes et réponses locales toujours disponibles.";
+   "IA conversationnelle · Agnes "+(ag.connected?(ag.cooldownSeconds>0?"en pause":"connecté"):"à connecter")+" · Mistral "+(mi.connected?(mi.cooldownSeconds>0?"en pause":"connecté"):"à connecter"):
+   "IA désactivée : les informations sourcées et la sécurité restent disponibles.";
  }
 }
 function renderSpecialists(){
@@ -183,13 +184,13 @@ async function ask(q){
    if(site){
     siteId=site.siteId;answer="Je peux ouvrir "+site.label+" pour vous. Touchez le lien « Ouvrir "+site.label+" » dans ma réponse pour confirmer l'ouverture dans votre navigateur. Je ne peux pas piloter votre téléphone, vous connecter ou agir dans ce site à votre place.";
     engine="Raccourci navigateur approuvé";direct=true;
-   }else if(parseStoryCommand(input)&&!($("mistral-use").checked&&mistralStatus().connected)&&!($("gemma-use").checked&&llmStatus().ready)){
+   }else if(parseStoryCommand(input)&&!(($("auto-mode").checked&&(agnesStatus().connected||mistralStatus().connected))||($("mistral-use").checked&&mistralStatus().connected))){
     const story=originalStory(input);answer=story.text;engine="Histoire originale écrite localement";direct=true;
    }else if(parseReadingCommand(input)){
     $("book-panel").open=true;answer="Avec plaisir. Ouvrez le panneau « Ma bibliothèque de lecture locale » ci-dessous puis choisissez un fichier .txt ou .md que vous avez le droit de lire. Je peux afficher ses pages et les lire avec une voix française locale disponible. Le fichier ne quitte pas votre appareil.";engine="Lecteur de textes privé";direct=true;
    }else{
     const companion=companionReply(input,{requested:$("companion-mode").value,safety:response,history:DATA.conversations});
-    if(companion){answer=companion.message;engine=companion.label+" (local, non médical)";companionMode=companion.mode;direct=true;}
+    if(companion&&!(classifyIntent(input)==="general"&&$("auto-mode").checked&&(agnesStatus().connected||mistralStatus().connected))){answer=companion.message;engine=companion.label+" (soutien, non médical)";companionMode=companion.mode;direct=true;}
    }
   }
   if(!direct){
@@ -263,7 +264,7 @@ async function ask(q){
    const state=mistralStatus();
    if(state.cooldownSeconds>0){
     mistralProblem="Mistral temporairement limité (429), réponse locale conservée.";
-    $("mistral-status").textContent="Mistral en pause (quota). FibroBot continue en local.";
+    $("mistral-status").textContent="Mistral en pause (quota). Vous pouvez utiliser Agnes ou réessayer plus tard.";
    }else{
     const description=mistralConsentDescription(route);
     const permission=confirm("Activer Mistral AI pour cette réponse ?\n\n"+description+"\n\nCet appel peut être facturé. Mistral ne recevra pas les notes ou le dossier patient.");
@@ -290,7 +291,7 @@ async function ask(q){
       mistralAttempted=true;
      }catch(error){
       mistralProblem="Mistral indisponible : "+String(error.message||error).slice(0,200);
-      $("mistral-status").textContent=mistralStatus().cooldownSeconds>0?"Mistral en pause (quota). FibroBot continue en local.":"Mistral indisponible. FibroBot continue avec ses ressources locales.";
+      $("mistral-status").textContent=mistralStatus().cooldownSeconds>0?"Mistral en pause (quota). Vous pouvez utiliser Agnes ou réessayer plus tard.":"Mistral indisponible. Vous pouvez utiliser Agnes ou consulter les sources documentaires.";
       notify("Mistral indisponible. FibroBot continue en local.");
       setEngineNote("Mistral indisponible : réponse locale disponible");
       if(mistralStatus().cooldownSeconds>0){
@@ -301,22 +302,19 @@ async function ask(q){
    }
   }
   if(autoEligible){
-   const status=llmStatus(),agnes=agnesStatus(),mistral=mistralStatus();
+   const agnes=agnesStatus(),mistral=mistralStatus();
    const candidate=await answerWithAuto({
     question:input,intent,response,
-    state:{localReady:status.ready&&$("gemma-use").checked,
-     agnesConnected:agnes.connected,agnesCooldown:agnes.cooldownSeconds,
+    state:{agnesConnected:agnes.connected,agnesCooldown:agnes.cooldownSeconds,
      mistralConnected:mistral.connected,mistralCooldown:mistral.cooldownSeconds},
-    local:async q=>({text:await generateGeneralChat(q,DATA.conversations),model:llmStatus().modelId}),
     agnes:async q=>generateAgnesChat(q,{model:$("agnes-model").value}),
     mistral:async q=>generateMistralChat(q,[],{model:$("mistral-model").value}),
-    authorize:(provider,q)=>confirm("Mode Auto : "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" est un fournisseur distant.\n\nEnvoyer cette question générale ?\n« "+q+" »\n\nAucun dossier, médicament ou historique de santé ne sera transmis. L'API peut être facturée. Appuyez sur Annuler pour rester sur les moteurs locaux."),
-    onAttempt:provider=>setEngineNote(provider==="local"?"Auto : génération locale en cours…":"Auto : tentative "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" après votre accord…")
+    authorize:(provider,q)=>confirm("Mode Auto : "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" est un fournisseur distant.\n\nEnvoyer cette question générale ?\n« "+q+" »\n\nAucun dossier, médicament ou historique de santé ne sera transmis. L'API peut être facturée. Annuler pour ne pas envoyer cette question."),
+    onAttempt:provider=>setEngineNote("IA : génération "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" après votre accord…")
    });
    if(candidate.provider){
     answer=candidate.text;sourceId="";references=[];autoAnswered=true;
-    engine=candidate.provider==="local"?"Mode Auto · IA locale : "+candidate.model:
-     "Mode Auto · "+(candidate.provider==="agnes"?"Agnes AI":"Mistral AI")+" : "+candidate.model;
+    engine="IA · "+(candidate.provider==="agnes"?"Agnes AI":"Mistral AI")+" : "+candidate.model;
     if(candidate.provider==="agnes")$("agnes-status").textContent="Agnes disponible · réponse fournie par ce moteur.";
     if(candidate.provider==="mistral")$("mistral-status").textContent="Mistral disponible · réponse fournie par ce moteur.";
    }else if(candidate.errors.length){
@@ -324,17 +322,8 @@ async function ask(q){
    }
    updateEngineNote();
   }
-  if(!autoEligible&&intent==="general"&&!onlineAttempted&&!mistralAttempted&&["refusal","followup"].includes(response.kind)&&$("gemma-use").checked&&llmStatus().ready){
-   setEngineNote("IA locale : génération de la réponse en français…");
-   try{answer=await generateGeneralChat(input,DATA.conversations);sourceId="";engine="IA locale : "+llmStatus().modelId;}
-   catch(error){
-    engine="Assistant documentaire (repli : IA en échec)";
-    setEngineNote("Échec de génération : "+String(error.message).slice(0,180)+". Réponse de secours affichée.");
-    notify("Impossible de générer avec le modèle local. Utilisez « Tester l’IA » dans les options.");
-   }
-  }
-  if(intent==="general"&&!autoAnswered&&!onlineAttempted&&!mistralAttempted&&response.kind==="refusal"&&engine!=="IA locale : "+llmStatus().modelId){
-   answer="Je ne dispose pas encore d'une réponse vérifiée pour cette question. Les fiches de fibromyalgie, les agents de soutien, la bibliothèque et les tâches restent disponibles sans Mistral. Si vous le souhaitez, activez les sources Internet pour une question publique. Je préfère ne pas inventer une réponse.";
+  if(intent==="general"&&!autoAnswered&&!onlineAttempted&&!mistralAttempted&&response.kind==="refusal"){
+   answer="Aucune IA conversationnelle n’a pu répondre. Connectez Agnes ou Mistral dans les options, puis réessayez. Les informations sourcées et les fonctions de sécurité restent disponibles. Je préfère ne pas inventer de réponse.";
    engine="Assistant documentaire de secours";
   }
   if(mistralProblem&&!mistralAttempted){setEngineNote("Mistral en pause. FibroBot répond localement.");}
@@ -409,7 +398,7 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
- $("auto-mode").addEventListener("change",()=>{updateEngineNote();notify($("auto-mode").checked?"Mode Auto activé : local, puis Agnes, puis Mistral selon disponibilité.":"Mode Auto désactivé.");});
+ $("auto-mode").addEventListener("change",()=>{updateEngineNote();notify($("auto-mode").checked?"IA activée : Agnes puis Mistral selon disponibilité.":"IA conversationnelle désactivée.");});
  $("agnes-connect").addEventListener("click",()=>{
   const key=$("agnes-key").value.trim();$("agnes-key").value="";
   try{connectAgnes(key);$("agnes-status").textContent="Agnes connecté pour cette session. Le mode Auto demandera ton accord avant chaque question envoyée.";$("agnes-test").disabled=false;$("agnes-disconnect").disabled=false;}
@@ -421,7 +410,7 @@ function events(){
   if(!confirm("Tester Agnes en envoyant une question d'arithmétique publique ? Cette requête peut être facturée."))return;
   const button=$("agnes-test");button.disabled=true;$("agnes-status").textContent="Vérification de la connexion Agnes…";
   try{const result=await testAgnesConnection({model:$("agnes-model").value});$("agnes-status").textContent="Agnes disponible · test réussi ("+result.model+").";}
-  catch(error){$("agnes-status").textContent=agnesStatus().cooldownSeconds>0?"Agnes en pause (quota). FibroBot continue localement.":"Agnes non disponible. FibroBot continue localement. Vérifie clé, réseau et accès API.";}
+  catch(error){$("agnes-status").textContent=agnesStatus().cooldownSeconds>0?"Agnes en pause (quota). Essayez Mistral ou réessayez plus tard.":"Agnes indisponible. Vérifie la clé, le réseau et l’accès API ; Mistral reste optionnel.";}
   finally{button.disabled=!agnesStatus().connected;updateEngineNote();}
  });
  $("agnes-disconnect").addEventListener("click",()=>{disconnectAgnes();$("agnes-key").value="";$("agnes-test").disabled=true;$("agnes-disconnect").disabled=true;$("agnes-status").textContent="Agnes déconnecté ; clé effacée de la session.";updateEngineNote();});
@@ -458,7 +447,7 @@ function events(){
   out.append(dom("p","Ce diagnostic n'appelle aucune API et ne teste pas la disponibilité réelle de Mistral ou WebGPU. Aucune donnée patient n'est envoyée."));
   $("assistant-diagnostics-state").textContent=core.ok?"Diagnostic local terminé. Vérifiez les états des moteurs ci-dessous.":"Diagnostic local incomplet : la bibliothèque pourrait être indisponible.";
  });
- $("chat-local-mode").addEventListener("click",()=>{
+ $("chat-local-mode")?.addEventListener("click",()=>{
   // Aucune intervention sur les données patient ni sur les clés enregistrées.
   $("mistral-use").checked=false;
   $("gemma-use").checked=false;

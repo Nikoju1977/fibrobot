@@ -2,7 +2,7 @@
  * Ce connecteur n'est pas une API médicale, il ne reçoit AUCUN dossier patient.
  * L'accès navigateur dépend des politiques CORS du prestataire ; sinon repli local.
  */
-import {nonMedicalMessages,cleanGeneratedReply} from "./assistant-engine.mjs";
+import {nonMedicalMessages,cleanConversationalReply} from "./assistant-engine.mjs";
 import {publicMedicalExplanationMessages} from "./medical-rag.mjs";
 
 const ENDPOINT="https://api.mistral.ai/v1/chat/completions";
@@ -83,7 +83,7 @@ async function sendMistral(messages,{model="mistral-small-latest",fetchImpl=glob
   const payload=await res.json();
   const raw=payload?.choices?.[0]?.message?.content;
   const answer=Array.isArray(raw)?raw.filter(x=>x?.type==="text").map(x=>String(x.text||"")).join(" "):raw;
-  const text=scope==="public-medical"?cleanMedicalExplanation(answer):cleanGeneratedReply(answer);
+  const text=scope==="public-medical"?cleanMedicalExplanation(answer):cleanConversationalReply(answer);
   cooldownUntil=0;lastFailure="";
   return {text,model};
  }catch(e){

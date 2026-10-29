@@ -97,6 +97,19 @@ export function cleanGeneratedReply(answer){
  if(/https?:\/\/|www\./i.test(v))throw Error("Lien non vérifié du modèle bloqué.");
  return v;
 }
+/** Broader remote dialogue: permit harmless mentions of health or biology while
+ * keeping personalized medical directives and unverified model links blocked.
+ * Only called after nonMedicalMessages validates a non-sensitive question.
+ */
+export function cleanConversationalReply(value){
+ const v=String(value||"").trim();
+ if(!v||v.length>3800)throw Error("Réponse IA vide ou trop longue.");
+ const q=norm(v);
+ if(/https?:\/\/|www\./i.test(v))throw Error("Lien non vérifié du modèle bloqué.");
+ if(/(?:vous souffrez de|vous avez (?:un|une) (?:cancer|diabete|infection)|\b(?:prenez|arretez|augmentez|diminuez)\b.{0,45}\b(?:mg|comprime|medicament|traitement)|\b(?:posologie|prescription|ordonnance)\s*:\s*\d)/.test(q))
+  throw Error("Conseil clinique personnalisé bloqué.");
+ return v;
+}
 export function researchEndpoint(topic){
  const selected=RESEARCH_TOPICS.find(x=>x.id===topic);
  if(!selected)throw Error("Sujet scientifique inconnu.");
