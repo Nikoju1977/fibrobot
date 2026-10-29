@@ -1,4 +1,20 @@
-# FibroBot — assistant de vie local
+# FibroBot — compagnon IA conversationnel et suivi personnel
+
+## Version actuelle V24 — améliorations vérifiables
+
+Cette version conserve la préférence **Agnes AI puis Mistral** pour les questions générales. Aucun téléchargement de LLM local n'est présenté dans l'interface conversationnelle. Un compte, une clé API et un quota disponible restent nécessaires pour chaque fournisseur.
+
+- **Mémoire contextuelle en session, facultative** : désactivée par défaut, activable via « Mémoriser temporairement le contexte ». Seuls les nouveaux échanges généraux pouvant franchir les filtres de confidentialité sont retenus temporairement en mémoire vive, jamais dans des réglages persistants. La prévisualisation complète du contexte effectivement filtré est affichée avant confirmation de chaque appel distant. Le bouton « Effacer la mémoire de la session » efface ces éléments sans toucher au coffre chiffré.
+- **Recherche factuelle avec références** : autoriser d'abord Internet pour la session, puis cocher « Chercher d'abord des sources ». FibroBot recherche sur des sources publiques reconnues, avec confirmation du libellé exact avant chaque requête. Quand une référence exploitable est trouvée, il affiche les extraits et les liens au lieu d'inventer une réponse. Il n'envoie pas le dossier patient à ces moteurs.
+- **Voix** : bouton « Arrêter la voix », lecture par segments et débit sélectionnable. La synthèse vocale nécessite toujours une voix française locale explicitement disponible ; pas d'écoute vocale permanente ni de commande vocale Android native.
+- **Pannes de clés API** : après un refus HTTP 401, 402 ou 403, le fournisseur est écarté du routeur automatique jusqu'à une nouvelle connexion ; les quotas 429 disposent d'une pause. Aucun quota n'est contourné.
+- **Confidentialité, soins et sécurité** : accès chiffré au dossier de santé, restrictions contre les prescriptions/diagnostics personnalisés non vérifiés, et orientation en cas d'urgence. Les agents, tâches, rendez-vous, fiches médicales et lecteur texte restent présents.
+
+**Limites non résolues :** tests des fournisseurs avec des clés réellement actives, vérification sur les appareils physiques iOS/Android, intégration native d'actions système et de notifications en arrière-plan, supports PDF/EPUB non ajoutés dans cette version. Les API restent soumises aux restrictions CORS du navigateur et à une exposition plus importante des clés dans une PWA purement statique. Ne pas saisir une clé sans limite budgétaire.
+
+Le cache PWA utilise maintenant `fibrobot-shell-v24`. Fermer puis rouvrir la PWA permet normalement son actualisation ; **ne pas effacer les données du site**, qui hébergent le coffre de santé chiffré.
+
+---
 
 ## Première prise en main · Studio Niko Design
 
