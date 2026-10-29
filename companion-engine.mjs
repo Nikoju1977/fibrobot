@@ -27,7 +27,7 @@ export function selectCompanionMode(question,requested="auto"){
 }
 export function companionReply(question,{requested="auto",safety=null}={}){
  const q=norm(question).trim(),kind=safety?.kind;
- if(!q||["urgent","refusal","profile","weather","local"].includes(kind))return null;
+ if(!q||["urgent","profile","weather","local","life"].includes(kind))return null;
  const mode=selectCompanionMode(question,requested);
  if(!mode)return null;
  // Don't replace factual, sourced medical answers with ungrounded conversation.
