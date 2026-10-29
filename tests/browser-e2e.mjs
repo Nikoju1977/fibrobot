@@ -47,6 +47,33 @@ try{
  await page.locator("#prompt").press("Shift+Enter");
  assert.match(await page.locator("#prompt").inputValue(),/Une question\n/);
  await page.locator("#prompt").fill("");
+
+ // Mode Auto (par défaut) : seul un fournisseur connecté peut être essayé ;
+ // une question générale exige l'accord avant une requête distante.
+ assert.equal(await page.locator("#auto-mode").isChecked(),true);
+ await page.locator("#agnes-options summary").click();
+ await page.locator("#agnes-key").fill("une-cle-fictive-agnes-de-test");
+ await page.locator("#agnes-connect").click();
+ assert.equal(await page.locator("#agnes-key").inputValue(),"","Agnes key must leave the input field.");
+ let agnesCalls=0,agnesPost="";
+ await page.route("https://apihub.agnes-ai.com/**",async route=>{
+  if(route.request().method()==="OPTIONS"){
+   await route.fulfill({status:204,headers:{"access-control-allow-origin":"*","access-control-allow-methods":"POST, OPTIONS","access-control-allow-headers":"authorization, content-type"}});return;
+  }
+  agnesCalls++;agnesPost=route.request().postData()||"";
+  await route.fulfill({status:200,contentType:"application/json",
+   headers:{"access-control-allow-origin":"*"},body:JSON.stringify({choices:[{message:{content:"La Tour Eiffel utilise du fer puddlé."}}]})});
+ });
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/Agnes AI/);dialog.accept();});
+ await page.locator("#prompt").fill("Quel matériau a été utilisé pour la Tour Eiffel ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/fer puddlé/).waitFor({timeout:12000});
+ assert.equal(agnesCalls,1,"Agnes must be called with explicit consent");
+ assert.ok(!agnesPost.includes(secret),"No vault secret sent to Agnes");
+ assert.deepEqual(JSON.parse(agnesPost).messages.map(x=>x.role),["system","user"]);
+ await page.locator("#agnes-disconnect").click();
+ assert.equal(await page.locator("#agnes-test").isDisabled(),true);
+ await page.locator("#auto-mode").uncheck();
  // Tous les scénarios de diagnostic utilisent uniquement les moteurs locaux.
  await page.locator("#assistant-diagnostics-panel summary").click();
  await page.locator("#assistant-diagnostics-run").click();
@@ -161,9 +188,9 @@ try{
  page.once("dialog",dialog=>{assert.match(dialog.message(),/histoire courte/);dialog.accept();});
  await page.locator("#prompt").fill("Raconte une histoire courte sur la lune");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Mode secours : Mistral temporairement indisponible/).last().waitFor({timeout:15000});
+ await page.locator("#messages").getByText(/Je ne dispose pas encore d.une réponse vérifiée/).last().waitFor({timeout:15000});
  assert.equal(mistralCalls,4,"One request only on 429");
- assert.match(await page.locator("#mistral-status").textContent(),/429/);
+ assert.match(await page.locator("#mistral-status").textContent(),/pause|quota/i);
  assert.equal(await page.locator("#mistral-use").isChecked(),false,"Disable Mistral automatically when rate-limited");
  assert.equal(await page.locator('#chat-form button[type="submit"]').isDisabled(),false,"Chat form must be re-enabled");
  await page.locator("#prompt").fill("Bonjour");
