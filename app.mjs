@@ -562,6 +562,53 @@ function forms(){
 }
 function breathing(){const out=$("breath-guide"),button=$("breath-start");if(timer){clearInterval(timer);timer=null;out.textContent="Exercice arrêté. Reposez-vous à votre rythme.";button.textContent="Démarrer un exercice doux";return;}let seconds=0;button.textContent="Arrêter l'exercice";out.textContent="Installez-vous confortablement. Respirez naturellement.";timer=setInterval(()=>{seconds++;const phase=seconds%12;out.textContent=phase<4?"Inspirez doucement, sans forcer.":phase<9?"Expirez tranquillement, sans retenir votre souffle.":"Restez à votre rythme. Si cela vous gêne, arrêtez.";if(seconds>=72){clearInterval(timer);timer=null;button.textContent="Démarrer un exercice doux";out.textContent="Exercice terminé. Vous pouvez vous reposer.";}} ,1000);}
 function events(){
+ $("preference-save").addEventListener("click",async()=>{
+  if(!db){notify("Ouvrez le coffre pour mémoriser votre préférence.");return;}
+  try{
+   const value=validateGeneralPreference($("general-preference").value);
+   await put(db,"settings",{id:PREFERENCE_SETTING_ID,value});
+   DATA.settings=await all(db,"settings");
+   $("preference-share").checked=false;renderGeneralPreference();
+   notify("Préférence générale enregistrée dans votre coffre chiffré. Aucun envoi automatique.");
+  }catch(e){$("preference-status").textContent=String(e.message||e);notify("Préférence non enregistrée.");}
+ });
+ $("preference-delete").addEventListener("click",async()=>{
+  if(!db)return;
+  try{
+   await del(db,"settings",PREFERENCE_SETTING_ID);
+   DATA.settings=await all(db,"settings");
+   $("preference-share").checked=false;renderGeneralPreference();
+   notify("Préférence de conversation supprimée du coffre actuel ; les anciennes sauvegardes ne sont pas modifiées.");
+  }catch(e){notify("Suppression de préférence impossible : "+String(e.message).slice(0,100));}
+ });
+ $("preference-share").addEventListener("change",e=>{
+  if(e.target.checked&&!savedGeneralPreference(DATA.settings)){
+   e.target.checked=false;notify("Enregistrez d'abord une préférence générale non sensible.");return;
+  }
+  $("preference-status").textContent=e.target.checked?"Partage activé pour cette session uniquement. La préférence exacte sera présentée avant chaque envoi IA.":"Préférence conservée uniquement dans le coffre ; aucun envoi à l'IA.";
+ });
+ $("api-budget-select").addEventListener("change",e=>{
+  try{configureApiBudget(e.target.value);}
+  catch(err){e.target.value=String(apiBudgetStatus().cap);notify(err.message);}
+  updateApiBudgetUI();
+ });
+ $("trend-metric").addEventListener("change",renderHealthTrends);
+ $("trend-days").addEventListener("change",renderHealthTrends);
+ const applyAccessibility=()=>{
+  document.body.classList.toggle("easy-reading",$("easy-reading").checked);
+  document.body.dataset.readingSize=$("reading-size").value;
+ };
+ $("easy-reading").addEventListener("change",applyAccessibility);
+ $("reading-size").addEventListener("change",applyAccessibility);
+ $("chat-voice-pause").addEventListener("click",()=>{
+  if(!("speechSynthesis" in window)||!speechSynthesis.speaking){notify("Aucune lecture vocale en cours.");return;}
+  speechSynthesis.pause();notify("Lecture vocale en pause.");
+ });
+ $("chat-voice-resume").addEventListener("click",()=>{
+  if(!("speechSynthesis" in window)||!speechSynthesis.paused){notify("Aucune lecture à reprendre.");return;}
+  speechSynthesis.resume();notify("Lecture vocale reprise.");
+ });
+
  $("chat-memory-optin").addEventListener("change",e=>{
   sessionTurns.length=0;
   $("chat-memory-state").textContent=e.target.checked?
@@ -597,18 +644,31 @@ function events(){
  $("book-file").addEventListener("change",async event=>{
   const file=event.currentTarget.files?.[0];
   if(!file)return;
-  stopSpeaking();bookText="";bookIndex=0;refreshBook();
+  stopSpeaking();bookText="";bookIndex=0;pdfDocumentFile=null;$("book-pdf-open").hidden=true;refreshBook();
   try{
-   validateBookFile(file);
-   bookText=normalizeBookText(await file.text());
-   bookIndex=0;refreshBook();
-   notify("Texte chargé localement : "+file.name+". Aucun envoi réseau.");
-  }catch(error){$("book-state").textContent=String(error.message||error);notify("Lecture du fichier impossible.");}
+   const item=await openPrivateDocument(file);
+   if(item.kind==="pdf"){
+    pdfDocumentFile=item.file;
+    $("book-pdf-open").hidden=false;
+    $("book-state").textContent="PDF prêt pour un aperçu dans le navigateur. Aucun texte extrait ou envoyé à un serveur.";
+    notify("PDF chargé sur cet appareil. Touchez « Afficher mon PDF » pour l'ouvrir.");
+   }else{
+    bookText=item.text;bookIndex=0;refreshBook();
+    notify("Document "+item.format+" chargé et extrait localement. Aucun envoi à un serveur.");
+   }
+  }catch(error){$("book-state").textContent=String(error.message||error);notify("Lecture impossible : "+String(error.message||error).slice(0,130));}
+ });
+ $("book-pdf-open").addEventListener("click",()=>{
+  if(!pdfDocumentFile){notify("Aucun fichier PDF sélectionné.");return;}
+  const url=URL.createObjectURL(pdfDocumentFile);
+  const opened=window.open(url,"_blank","noopener,noreferrer");
+  if(!opened)notify("Si le PDF ne s'ouvre pas, autorisez les fenêtres du navigateur pour ce site.");
+  setTimeout(()=>URL.revokeObjectURL(url),120000);
  });
  $("book-prev").addEventListener("click",()=>{if(bookText){stopSpeaking();bookIndex=Math.max(0,bookIndex-1);refreshBook();}});
  $("book-next").addEventListener("click",()=>{if(bookText){stopSpeaking();bookIndex++;refreshBook();}});
  $("book-read").addEventListener("click",()=>{
-  if(!bookText){notify("Ouvrez d'abord un livre .txt ou .md.");return;}
+  if(!bookText){notify("Ouvrez un document TXT, Markdown, EPUB ou DOCX avec du texte lisible.");return;}
   speak(readerPage(bookText,bookIndex).text,{requested:true});
  });
  $("book-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
@@ -885,14 +945,14 @@ function events(){
  });
 }
 async function init(){
- renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();
+ renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
  window.addEventListener("offline",updateConnectionState);
  window.addEventListener("pagehide",()=>{
   try{activeRecognition?.abort();}catch{}activeRecognition=null;
-  disconnectMistral();disconnectAgnes();sessionTurns.length=0;
+  disconnectMistral();disconnectAgnes();sessionTurns.length=0;pdfDocumentFile=null;$("preference-share").checked=false;
   $("agnes-key").value="";
   const field=$("mistral-key");if(field)field.value="";
  });
