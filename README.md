@@ -307,4 +307,4 @@ Les **urgences, conseils médicamenteux, symptômes individuels, résumés de sa
 
 **Contraintes réelles :** le chargement d'un modèle local WebGPU dépend du GPU, de la RAM et du navigateur. Les appels API Agnes/Mistral nécessitent une connexion, une clé valide, des quotas disponibles et le support CORS côté fournisseur. Les tests GitHub Actions simulent les API ; ils ne prouvent ni la disponibilité du service live avec votre compte ni la compatibilité réelle sur tous les téléphones. La PWA reste sans serveur administré par FibroBot.
 
-Pour mettre à jour la PWA sans supprimer vos données, **fermez puis rouvrez-la** ; le service worker utilise `fibrobot-shell-v21`. Ne videz pas les données du site car elles contiennent le coffre local chiffré.
+Pour mettre à jour la PWA sans supprimer vos données, **fermez puis rouvrez-la** ; le service worker utilise `fibrobot-shell-v22`. Ne videz pas les données du site car elles contiennent le coffre local chiffré.
