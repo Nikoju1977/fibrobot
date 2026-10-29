@@ -6,6 +6,20 @@ const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({acceptDownloads:true});
 const page=await context.newPage();
 const URL="http://127.0.0.1:8765";
+function storedArchive(entries){
+ const locals=[],centrals=[];let offset=0;
+ for(const [name,content] of entries){
+  const n=Buffer.from(name,"utf8"),data=Buffer.from(content,"utf8");
+  const local=Buffer.alloc(30);local.writeUInt32LE(0x04034b50,0);local.writeUInt16LE(20,4);
+  local.writeUInt32LE(data.length,18);local.writeUInt32LE(data.length,22);local.writeUInt16LE(n.length,26);
+  const central=Buffer.alloc(46);central.writeUInt32LE(0x02014b50,0);central.writeUInt16LE(20,4);central.writeUInt16LE(20,6);
+  central.writeUInt32LE(data.length,20);central.writeUInt32LE(data.length,24);central.writeUInt16LE(n.length,28);central.writeUInt32LE(offset,42);
+  locals.push(local,n,data);centrals.push(central,n);offset+=local.length+n.length+data.length;
+ }
+ const cd=Buffer.concat(centrals),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50,0);
+ end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);end.writeUInt32LE(cd.length,12);end.writeUInt32LE(offset,16);
+ return Buffer.concat([...locals,cd,end]);
+}
 const secret="phrase de controle longue et unique 2026";
 const value="Observation test chiffrée";
 try{
@@ -112,6 +126,17 @@ try{
  await page.locator("#book-file").setInputFiles({name:"livre.txt",mimeType:"text/plain",buffer:Buffer.from("Mon livre privé de test.")});
  await page.locator("#book-page").getByText(/Mon livre privé de test/).waitFor({timeout:10000});
  assert.equal(await page.locator("#book-pdf-open").isVisible(),false);
+ const docx=storedArchive([["word/document.xml",'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Chapitre DOCX privé</w:t></w:r></w:p></w:body></w:document>']]);
+ await page.locator("#book-file").setInputFiles({name:"page.docx",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",buffer:docx});
+ await page.locator("#book-page").getByText(/Chapitre DOCX privé/).waitFor({timeout:10000});
+ const epub=storedArchive([
+  ["META-INF/container.xml",'<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>'],
+  ["OEBPS/content.opf",'<package><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>'],
+  ["OEBPS/chapter.xhtml",'<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Chapitre EPUB privé.</p></body></html>']
+ ]);
+ await page.locator("#book-file").setInputFiles({name:"page.epub",mimeType:"application/epub+zip",buffer:epub});
+ await page.locator("#book-page").getByText(/Chapitre EPUB privé/).waitFor({timeout:10000});
+
  await page.locator("#prompt").fill("Une question");
  assert.match(await page.locator("#prompt-count").textContent(),/12 \/ 2000/);
  await page.locator("#prompt").press("Shift+Enter");
