@@ -75,5 +75,5 @@ test("V30: simple UI, encrypted Agnes controls and no local inference required",
   assert.ok(app.includes(term),term);
  assert.match(css,/v30-simple:not\(\.v30-advanced\)/);
  assert.match(sw,/agnes-credential-vault\.mjs/);
- assert.match(sw,/fibrobot-shell-v30/);
+ assert.match(sw,/fibrobot-shell-v31/);
 });
