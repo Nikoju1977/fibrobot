@@ -4,6 +4,8 @@ import {openSecureDB,all,put,del,wipeDB,encryptedExport,eraseLegacy} from "./vau
 import {liveIntent,explicitWeatherCity,publicWeather,publicAirQuality,publicFrenchHolidays,LIVE_SOURCES} from "./public-live-services.mjs";
 import {createPublicFeedMonitor,feedState} from "./live-feed-hub.mjs";
 import {createAmbientPlayer,AMBIENT_TYPES} from "./ambient-sound.mjs";
+import {parseQuickHealth,QUICK_HELP} from "./quick-health.mjs";
+import {searchPrivateRecords} from "./private-search.mjs";
 import {SPECIALISTS,routeSpecialist,runSpecialist} from "./agent-hub.mjs";
 import {classifyIntent,summarizeObservations,prepareVisit,planDaily} from "./assistant-engine.mjs";
 import {findScientificArticles,externalResearchLink} from "./research-library.mjs";
@@ -1335,6 +1337,62 @@ function setupV31Controls(){
  window.addEventListener("offline",tick);
  setInterval(tick,300000);status();
 }
+function setupV32Controls(){
+ const chat=$("chat"),agents=chat?.querySelector(".v31-agent-panel");
+ if(!chat||!agents)return;
+ const quick=dom("section",undefined,"card v32-quick-panel");
+ quick.append(dom("h3","Journal express · une seule ligne"),
+  dom("p","Note facultative, uniquement dans votre coffre chiffré. Les facteurs notés ne prouvent aucune cause.","tiny"));
+ const form=dom("form",undefined,"v32-quick-form");form.id="v32-quick-form";
+ const label=dom("label","Douleur, fatigue et énergie (notes sur 10)");label.htmlFor="v32-quick-entry";
+ const input=dom("input");input.id="v32-quick-entry";input.type="text";input.maxLength=240;
+ input.autocomplete="off";input.placeholder=QUICK_HELP;
+ const save=dom("button","Enregistrer dans mon coffre","btn primary");save.type="submit";
+ const info=dom("p","Exemple : douleur 7 fatigue 8 stress · cette observation ne remplace pas un examen médical.","tiny");info.id="v32-quick-help";
+ const state=dom("p","Aucune nouvelle observation saisie.","tiny");state.id="v32-quick-status";state.setAttribute("role","status");
+ input.setAttribute("aria-describedby","v32-quick-help v32-quick-status");
+ form.append(label,input,save,info);quick.append(form,state);
+ form.addEventListener("submit",async event=>{
+  event.preventDefault();
+  if(!db||save.disabled){state.textContent="Déverrouillez le coffre pour enregistrer.";return;}
+  let parsed;
+  try{parsed=parseQuickHealth(input.value,today());}
+  catch(error){state.textContent=String(error?.message||error).slice(0,160);return;}
+  save.disabled=true;
+  try{
+   await put(db,"symptoms",parsed.payload);
+   input.value="";state.textContent="Observation enregistrée et chiffrée : "+parsed.preview;
+   await reload();
+  }catch{state.textContent="Enregistrement impossible : vérifiez votre coffre."; }
+  finally{save.disabled=false;}
+ });
+ agents.after(quick);
+ const search=dom("details");search.className="card v32-search-panel";search.id="v32-private-search";
+ search.append(dom("summary","Rechercher dans mes notes, tâches, rendez-vous et conversations"));
+ const searchLabel=dom("label","Recherche privée, sur cet appareil");searchLabel.htmlFor="v32-search-query";
+ const query=dom("input");query.id="v32-search-query";query.type="search";query.autocomplete="off";query.maxLength=100;
+ query.placeholder="Ex. douleur, kiné, rendez-vous…";
+ const output=dom("div",undefined,"v32-search-results");output.id="v32-search-results";output.setAttribute("role","status");
+ const redraw=()=>{
+  output.replaceChildren();
+  if(!db){output.append(dom("p","Coffre verrouillé."));return;}
+  if(query.value.trim().length<2){output.append(dom("p","Saisissez au moins deux caractères."));return;}
+  const found=searchPrivateRecords(DATA,query.value,{limit:20,agentId:activeAgentId});
+  if(!found.length){output.append(dom("p","Aucun résultat dans cet espace (les autres conversations sont séparées)."));return;}
+  output.append(dom("p",found.length+" résultat(s) affiché(s), dans votre coffre uniquement.","tiny"));
+  for(const item of found){
+   const row=dom("article",undefined,"v32-search-result");
+   row.append(dom("strong",item.label),dom("small",item.store+" · "+item.date));
+   if(item.snippet)row.append(dom("p",item.snippet,"tiny"));
+   const button=dom("button","Voir la section","btn light");button.type="button";
+   button.addEventListener("click",()=>{search.open=false;tab(item.tab);});
+   row.append(button);output.append(row);
+  }
+ };
+ query.addEventListener("input",redraw);
+ search.addEventListener("toggle",()=>{if(search.open){redraw();}});
+ search.append(searchLabel,query,output);quick.after(search);
+}
 function setupV30Controls(){
  document.body.classList.add("v30-simple");
  const chat=$("chat");
@@ -1413,7 +1471,7 @@ function setupV29Controls(){
  }
 }
 async function init(){
- setupV27Controls();setupV28Controls();setupV29Controls();setupV30Controls();setupV31Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
+ setupV27Controls();setupV28Controls();setupV29Controls();setupV30Controls();setupV31Controls();setupV32Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
