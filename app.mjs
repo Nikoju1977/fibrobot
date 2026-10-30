@@ -30,6 +30,11 @@ import {normalizeBookText,validateBookFile,readerPage,splitSpeech} from "./book-
 import {parseLocalNavigation} from "./local-commands.mjs";
 import {medicationCalendarICS} from "./medication-calendar.mjs";
 import {READER_BOOKMARK_ID,readerBookmark,matchingReaderBookmark} from "./reader-bookmark.mjs";
+import {preferredLocalVoice,speechErrorMessage} from "./voice-health.mjs";
+import {descriptiveWellbeingBrief} from "./v28-insights.mjs";
+import {findBookPages} from "./reader-search.mjs";
+import {deviceReadiness} from "./device-readiness.mjs";
+import {createSessionGuard} from "./session-guard.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
@@ -38,6 +43,7 @@ let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSp
 let bookText="",bookIndex=0,bookFile=null,speechToken=0,activeRecognition=null,dictationStarting=false,pendingInstall=null,pdfDocumentFile=null,lastActivityAt=Date.now();
 // Session-only chat context; never persisted and never taken from the health vault.
 const sessionTurns=[];
+const activeSession=createSessionGuard();
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
 const val=id=>$(id).value;
 function notify(message){$("toast").textContent=message;$("toast").hidden=false;clearTimeout(notify.timeout);notify.timeout=setTimeout(()=>$("toast").hidden=true,5500);}
@@ -60,7 +66,7 @@ function lockInactiveVault(){
  const minutes=storedAutoLockMinutes(DATA.settings);
  if(!shouldLockForInactivity(lastActivityAt,Date.now(),minutes))return;
  try{
-  stopSpeaking();try{activeRecognition?.abort();}catch{}
+  activeSession.invalidate();stopSpeaking();try{activeRecognition?.abort();}catch{}
   sessionTurns.length=0;bookText="";pdfDocumentFile=null;
   disconnectMistral();disconnectAgnes();db.close();db=null;
  }finally{location.reload();}
@@ -210,7 +216,7 @@ function renderSpecialists(){
  }
 }
 function renderChat(){const out=$("messages");out.replaceChildren();if(!DATA.conversations.length)out.append(bubble("Bonjour. Je peux vous aider à organiser vos tâches et consulter des informations médicales sourcées. Qu'aimeriez-vous faire aujourd'hui ?","bot"));else DATA.conversations.slice(-100).forEach(m=>out.append(bubble(m.body,m.role,m.sourceId,m.references,m.siteId)));out.scrollTop=out.scrollHeight;}
-function localVoice(){return "speechSynthesis" in window?speechSynthesis.getVoices().find(v=>v.localService===true&&v.lang.toLowerCase().startsWith("fr")):null;}
+function localVoice(){return "speechSynthesis" in window?preferredLocalVoice(speechSynthesis):null;}
 function syncVoiceControls(){
  const global=$("voice-toggle"),local=$("chat-voice-toggle");
  if(global){global.textContent="Voix : "+(voice?"activée":"off");global.setAttribute("aria-pressed",String(voice));}
@@ -226,7 +232,7 @@ function stopSpeaking(){
  if("speechSynthesis" in window)try{speechSynthesis.cancel();}catch{}
  updateVoiceState("Lecture arrêtée.");
 }
-function speak(message,{requested=false}={}){
+function speak(message,{requested=false,onComplete=null}={}){
  if(!voice&&!requested)return false;
  const selected=localVoice();
  if(!selected){notify("Aucune voix française garantie locale sur cet appareil. La lecture audio n'est pas disponible.");voice=false;syncVoiceControls();return false;}
@@ -235,12 +241,12 @@ function speak(message,{requested=false}={}){
  voice=true;syncVoiceControls();stopSpeaking();const token=speechToken;let index=0;
  const next=()=>{
   if(token!==speechToken)return;
-  if(index>=chunks.length){updateVoiceState("Lecture terminée.");return;}
+  if(index>=chunks.length){updateVoiceState("Lecture terminée.");if(typeof onComplete==="function")onComplete();return;}
   const utterance=new SpeechSynthesisUtterance(chunks[index++]);
   utterance.lang="fr-FR";utterance.voice=selected;utterance.rate=Number($("chat-voice-speed")?.value)||1;
   utterance.onstart=()=>{if(token===speechToken)updateVoiceState("FibroBot parle : segment "+index+" sur "+chunks.length+".",true);};
   utterance.onend=next;
-  utterance.onerror=()=>{if(token===speechToken){updateVoiceState("Lecture interrompue.");notify("Lecture audio interrompue sur cet appareil.");}};
+  utterance.onerror=e=>{if(token===speechToken){updateVoiceState("Lecture interrompue.");notify(speechErrorMessage(e));}};
   try{speechSynthesis.speak(utterance);}catch{notify("Lecture vocale indisponible.");}
  };
  next();return true;
@@ -318,7 +324,7 @@ async function ask(q){
   notify("Déverrouillez le coffre avant de poser une question.");
   return;
  }
- busyChat=true;
+ busyChat=true;const sessionTicket=activeSession.start();
  // Le patient voit immédiatement que sa question a été prise en compte.
  // Cette prévisualisation est remplacée par l'historique dès la réponse reçue.
  const out=$("messages");
@@ -498,7 +504,7 @@ async function ask(q){
     if(candidate.provider==="agnes")$("agnes-status").textContent="Agnes disponible · réponse fournie par ce moteur.";
     if(candidate.provider==="mistral")$("mistral-status").textContent="Mistral disponible · réponse fournie par ce moteur.";
    }else if(candidate.errors.length){
-    setEngineNote("Auto : moteurs indisponibles. Les fonctions locales restent accessibles.");
+    setEngineNote("Auto : "+candidate.errors.map(x=>x.provider+" ("+x.category+")").join(", ")+". Aucun diagnostic de santé n'est généré par le fournisseur.");
    }
    updateEngineNote();
   }
@@ -508,7 +514,8 @@ async function ask(q){
   }
   if(mistralProblem&&!mistralAttempted){setEngineNote("Mistral en pause. FibroBot répond localement.");}
   }
-  const purpose=companionMode?"companion-local":intent==="general"?"general-local":intent;
+  if(!activeSession.current(sessionTicket)||!db)return;
+   const purpose=companionMode?"companion-local":intent==="general"?"general-local":intent;
   if($("chat-memory-optin").checked&&engine.startsWith("IA ·")&&intent==="general"){
    appendSessionTurn(sessionTurns,input,answer);
    $("chat-memory-state").textContent="Mémoire de cette session : "+Math.floor(sessionTurns.length/2)+" échange(s) généraux filtrés.";
@@ -531,6 +538,7 @@ async function ask(q){
   if(saved&&engine!=="Assistant documentaire (repli : IA en échec)")setEngineNote("Dernière réponse : "+engine+".");
   if(response.kind==="urgent")notify("Une situation potentiellement urgente a été évoquée.");
  }catch(e){
+  if(!activeSession.current(sessionTicket)||!db)return;
   console.error("FibroBot : traitement impossible",String(e?.message||e).slice(0,160));
   const message="Je n'ai pas réussi à terminer cette réponse. Le mode documentaire et les agents locaux restent disponibles. Vous pouvez reposer la question après avoir vérifié votre coffre.";
   if(pending.isConnected)pending.textContent=message;
@@ -1027,7 +1035,7 @@ function events(){
   speak(lastSpeech);
  });
  $("erase-legacy").addEventListener("click",async()=>{if(!confirm("Supprimer l'ancienne base FibrobotDB non chiffrée de CE navigateur ? Vérifiez d'abord que vos données ont bien été migrées dans le coffre."))return;try{await eraseLegacy();notify("Ancienne base non chiffrée supprimée.");}catch(e){notify(e.message);}});
- $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;try{activeRecognition?.abort();}catch{}activeRecognition=null;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
+ $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;activeSession.invalidate();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
  $("breath-start")?.addEventListener("click",breathing);
  $("relax-script")?.addEventListener("click",()=>{
    const script="Vous pouvez arrêter à tout moment. Installez-vous si possible dans une position confortable. Prenez conscience des points de contact de votre corps avec le support. Laissez votre respiration trouver son rythme naturel, sans la forcer. Observez les sons autour de vous. Si vous ressentez de l'inconfort, ouvrez les yeux et arrêtez. Vous n'avez rien à réussir. Quel petit geste pourrait rendre cet instant plus confortable ?";
@@ -1070,14 +1078,74 @@ function setupV27Controls(){
   }
  }
 }
+function setupV28Controls(){
+ const health=document.querySelector(".health-trends");
+ if(health){
+  const button=dom("button","Lire mon bilan descriptif","btn light");button.type="button";button.id="v28-health-brief";
+  const output=dom("p","Bilan personnel uniquement ; aucune interprétation clinique.","tiny");output.id="v28-health-output";output.setAttribute("role","status");
+  health.append(button,output);
+  button.addEventListener("click",()=>{
+   if(!db){notify("Déverrouillez votre coffre.");return;}
+   output.textContent=descriptiveWellbeingBrief(DATA.symptoms,{days:Number($("trend-days").value)});
+  });
+ }
+ const book=$("book-panel");
+ if(book){
+  const wrapper=dom("div",undefined,"v28-book-search");
+  const label=dom("label","Rechercher dans mon livre ouvert");label.htmlFor="v28-book-query";
+  const field=dom("input");field.id="v28-book-query";field.maxLength=100;field.type="search";field.placeholder="Mot ou expression";
+  const search=dom("button","Trouver une page","btn light");search.type="button";search.id="v28-book-search";
+  const results=dom("div",undefined,"v28-search-results");results.id="v28-search-results";results.setAttribute("role","status");results.setAttribute("aria-live","polite");
+  const multi=dom("button","Écouter jusqu'à 3 pages","btn light");multi.type="button";multi.id="v28-book-read-three";
+  wrapper.append(label,field,search,multi,results);book.append(wrapper);
+  search.addEventListener("click",()=>{
+   results.replaceChildren();
+   if(!bookText){results.append(dom("p","Ouvrez d'abord un document texte."));return;}
+   const hits=findBookPages(bookText,field.value);
+   if(!hits.length){results.append(dom("p","Aucun résultat. Saisissez au moins deux caractères."));return;}
+   for(const hit of hits){
+    const b=dom("button","Page "+(hit.page+1)+" — "+hit.preview,"btn light");b.type="button";
+    b.addEventListener("click",()=>{stopSpeaking();bookIndex=hit.page;refreshBook();$("book-page")?.focus();});
+    results.append(b);
+   }
+  });
+  multi.addEventListener("click",()=>{
+   if(!bookText){notify("Ouvrez d'abord un livre.");return;}
+   const first=bookIndex,parts=[];let last=first;
+   for(let index=first;index<Math.min(first+3,readerPage(bookText,0).count);index++){
+    parts.push(readerPage(bookText,index).text);last=index;
+   }
+   speak(parts.join("\n\n"),{requested:true,onComplete:()=>{if(bookText&&bookIndex===first){bookIndex=last;refreshBook();}}});
+  });
+ }
+ const toolbar=document.querySelector(".chat-header-actions");
+ if(toolbar){
+  const quiet=dom("button","Mode calme","chat-voice-toggle");quiet.id="v28-quiet-toggle";quiet.type="button";quiet.setAttribute("aria-pressed","false");toolbar.append(quiet);
+  quiet.addEventListener("click",()=>{const enabled=document.body.classList.toggle("v28-quiet");quiet.setAttribute("aria-pressed",String(enabled));notify(enabled?"Mode calme activé.":"Mode calme désactivé.");});
+ }
+ const check=$("assistant-diagnostics-result");
+ if(check){
+  const button=dom("button","Vérifier les capacités du téléphone","btn light");button.type="button";button.id="v28-device-check";
+  check.before(button);
+  button.addEventListener("click",()=>{
+   const status=deviceReadiness({secure:window.isSecureContext,storage:Boolean(db),serviceWorker:"serviceWorker" in navigator,
+    notifications:"Notification" in window,notificationPermission:window.Notification?.permission,
+    recognition:Boolean(window.SpeechRecognition||window.webkitSpeechRecognition),
+    localSpeech:Boolean(localVoice()),installed:Boolean(window.matchMedia?.("(display-mode: standalone)")?.matches||navigator.standalone),
+    online:navigator.onLine!==false});
+   check.replaceChildren(...status.map(item=>dom("p",(item.ok?"OK : ":"À vérifier : ")+item.label+" — "+item.detail)));
+   check.append(dom("p","Ce contrôle ne vérifie ni les clés IA, ni les alarmes en arrière-plan, ni le matériel Android/iOS réel."));
+  });
+ }
+}
 async function init(){
- setupV27Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
+ setupV27Controls();setupV28Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
  window.addEventListener("offline",updateConnectionState);
  window.addEventListener("pagehide",()=>{
-  try{activeRecognition?.abort();}catch{}activeRecognition=null;
+  activeSession.invalidate();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;bookText="";bookFile=null;
   disconnectMistral();disconnectAgnes();sessionTurns.length=0;pdfDocumentFile=null;$("preference-share").checked=false;
   $("agnes-key").value="";
   const field=$("mistral-key");if(field)field.value="";

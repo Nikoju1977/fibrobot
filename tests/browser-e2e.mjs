@@ -104,6 +104,10 @@ try{
  assert.equal(await page.locator("#chat-memory-optin").isChecked(),false);
  await page.locator("#chat-voice-speed").selectOption("1.15");
  assert.equal(await page.locator("#chat-voice-speed").inputValue(),"1.15");
+ await page.locator("#v28-quiet-toggle").click();
+ assert.equal(await page.locator("#v28-quiet-toggle").getAttribute("aria-pressed"),"true");
+ assert.equal(await page.locator("body").evaluate(e=>e.classList.contains("v28-quiet")),true);
+ await page.locator("#v28-quiet-toggle").click();
  await page.locator("#chat-voice-stop").click();
  await page.locator("#chat-voice-pause").click();
  await page.locator("#chat-voice-resume").click();
@@ -131,6 +135,11 @@ try{
  await page.locator("#book-file").setInputFiles({name:"livre.txt",mimeType:"text/plain",buffer:Buffer.from("Mon livre privé de test.")});
  await page.locator("#book-page").getByText(/Mon livre privé de test/).waitFor({timeout:10000});
  assert.equal(await page.locator("#book-pdf-open").isVisible(),false);
+ await page.locator("#v28-book-query").fill("livre");
+ await page.locator("#v28-book-search").click();
+ await page.locator("#v28-search-results button").getByText(/Mon livre privé/).waitFor();
+ await page.locator("#v28-search-results button").first().click();
+ assert.match(await page.locator("#book-page").textContent(),/Mon livre privé/);
  const docx=storedArchive([["word/document.xml",'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Chapitre DOCX privé</w:t></w:r></w:p></w:body></w:document>']]);
  await page.locator("#book-file").setInputFiles({name:"page.docx",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",buffer:docx});
  await page.locator("#book-page").getByText(/Chapitre DOCX privé/).waitFor({timeout:10000});
@@ -185,6 +194,9 @@ try{
  assert.match(diagnosis,/4 scénarios locaux réussis/);
  assert.match(diagnosis,/Bibliothèque médicale locale : prêt/);
  assert.match(diagnosis,/Mistral AI : déconnecté/);
+ await page.locator("#v28-device-check").click();
+ assert.match(await page.locator("#assistant-diagnostics-result").textContent(),/Contexte HTTPS/);
+ assert.match(await page.locator("#assistant-diagnostics-result").textContent(),/pas de garantie app fermée|Autorisation absente/);
  assert.equal(await page.locator("#network-mode").isChecked(),false,"Network must be opt-in");
  let wikipediaQueries=0;
  await page.route("https://fr.wikipedia.org/**",async route=>{
@@ -227,6 +239,9 @@ try{
  await page.locator("#trend-metric").selectOption("fatigue");
  assert.match(await page.locator("#trend-summary").textContent(),/Aucune valeur/);
  await page.locator("#trend-metric").selectOption("intensity");
+ await page.locator("#v28-health-brief").click();
+ assert.match(await page.locator("#v28-health-output").textContent(),/Bilan descriptif/);
+ assert.match(await page.locator("#v28-health-output").textContent(),/aucune valeur exploitable/);
  // JARVIS distant : mémoire volatile, double consentement, aucun patient.
  await page.locator('#nav [data-tab="chat"]').click();
  await page.locator("#mistral-options summary").click();
