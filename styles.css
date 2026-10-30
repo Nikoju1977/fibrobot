@@ -120,3 +120,50 @@ body.v30-simple:not(.v30-advanced) #chat #gemma-options{display:none!important}
 .v32-breath-status{text-align:center;font-weight:650;min-height:46px;color:#254758}
 @media(prefers-reduced-motion:reduce){.v32-breath-circle{transition:none!important;transform:none!important}}
 @media(max-width:600px){.v32-breathing-panel{padding:12px}.v32-breathing-controls{display:grid;grid-template-columns:1fr 1fr}.v32-breathing-controls label{grid-column:span 1}.v32-breathing-controls select{width:100%;min-width:0}.v32-breathing-controls button{grid-column:span 1}}
+
+
+/* V33 — the conversation is the entry point; specialist panels remain optional. */
+.v33-start{padding:10px 0 18px;max-width:960px}
+.v33-start h3{font-size:clamp(1.12rem,2.3vw,1.4rem);margin:0 0 5px;line-height:1.35;color:#173b4b}
+.v33-start p{margin:6px 0 9px;line-height:1.55}
+.v33-connection-status{font-size:.93rem;color:#335469}
+.v33-start-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.v33-start-actions button{min-height:48px;white-space:normal;text-align:center}
+.v33-crisis-link{background:none;border:0;color:#8c3333;font-weight:700;text-decoration:underline;text-underline-offset:3px;padding:10px}
+.v33-more{display:block;margin:12px 0;min-height:48px;white-space:normal;text-align:left}
+body.v33-simple #chat .assistant-hero{padding-block:14px;margin-bottom:5px}
+body.v33-simple #chat .assistant-hero-symbol{display:none}
+body.v33-simple #chat .assistant-hero-copy h2{font-size:clamp(1.35rem,3vw,1.85rem);margin-bottom:6px}
+body.v33-simple #chat .assistant-hero-copy p{max-width:780px}
+body.v33-simple #chat .chat-layout{display:block;max-width:940px;margin:0 0 16px}
+body.v33-simple #chat .chat-layout .chat-card{max-width:100%;width:100%;min-width:0}
+body.v33-simple #chat .chat-composer-field textarea{min-height:66px;font-size:16px}
+body.v33-simple #chat .composer-actions button{min-height:48px}
+body.v33-simple:not(.v33-extras) #chat .suggestions,
+body.v33-simple:not(.v33-extras) #chat .companion-tools,
+body.v33-simple:not(.v33-extras) #chat .companion-mode-bar,
+body.v33-simple:not(.v33-extras) #chat .v31-agent-panel,
+body.v33-simple:not(.v33-extras) #chat .v31-feed-panel,
+body.v33-simple:not(.v33-extras) #chat .v31-ambient-panel,
+body.v33-simple:not(.v33-extras) #chat .v32-quick-panel,
+body.v33-simple:not(.v33-extras) #chat .assistant-diagnostics-card,
+body.v33-simple:not(.v33-extras) #chat #medical-knowledge-panel,
+body.v33-simple:not(.v33-extras) #chat .book-panel,
+body.v33-simple:not(.v33-extras) #chat .chat-header-actions #chat-voice-pause,
+body.v33-simple:not(.v33-extras) #chat .chat-header-actions #chat-voice-resume,
+body.v33-simple:not(.v33-extras) #chat .chat-header-actions #chat-voice-stop,
+body.v33-simple:not(.v33-extras) #chat .chat-header-actions #v28-quiet-toggle,
+body.v33-simple #chat #v30-advanced-toggle{display:none!important}
+@media(max-width:650px){
+ .v33-start{padding:4px 0 12px}
+ .v33-start-actions{display:grid;grid-template-columns:1fr;gap:2px}
+ .v33-start-actions button{width:100%}
+ body.v33-simple #chat .assistant-hero{padding:12px}
+ body.v33-simple #chat .chat-card{padding:12px}
+ body.v33-simple #chat .chat-window-heading small{display:none}
+ body.v33-simple #chat #chat-send{font-weight:750}
+ body.v33-simple #chat #prompt-help{font-size:.82rem}
+}
+@media(prefers-reduced-motion:reduce){
+ body.v33-simple #chat .assistant-hero *,body.v33-simple #chat .v33-start *{animation:none!important}
+}

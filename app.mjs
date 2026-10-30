@@ -1,3 +1,4 @@
+import {setupSimpleAssistant} from "./simple-assistant.mjs";
 import {today,text,makeSymptom,makeTask,makeCondition,makeAppointment,makeMedication,energyGuide,rankTasks,reply,dueReminders,reminderLog,medicationReminderTimes} from "./core.mjs";
 import {LIBRARY} from "./medical-library.mjs";
 import {openSecureDB,all,put,del,wipeDB,encryptedExport,eraseLegacy} from "./vault-ui.mjs";
@@ -48,6 +49,7 @@ const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"S
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
 const FORMS={tasks:"task-form",symptoms:"health-form",conditions:"condition-form",medications:"med-form",appointments:"appt-form"};
 let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSpeech="",busyChat=false,networkEnabled=false;
+let refreshSimpleAssistant=()=>{};
 let bookText="",bookIndex=0,bookFile=null,speechToken=0,activeRecognition=null,dictationStarting=false,pendingInstall=null,pdfDocumentFile=null,lastActivityAt=Date.now();
 // Session-only chat context; never persisted and never taken from the health vault.
 const sessionTurns=[];
@@ -831,14 +833,14 @@ function events(){
    $("agnes-test").disabled=false;$("agnes-disconnect").disabled=false;
   }catch(error){
    disconnectAgnes();$("agnes-status").textContent="Clé Agnes non activée : "+String(error?.message||error).slice(0,120);
-  }finally{button.disabled=false;updateEngineNote();}
+  }finally{button.disabled=false;updateEngineNote();refreshSimpleAssistant();}
  });
  $("agnes-forget")?.addEventListener("click",async()=>{
   if(!db||!confirm("Supprimer la clé Agnes de ce coffre et déconnecter ? Les anciennes sauvegardes chiffrées ne changent pas."))return;
   try{
    await deleteAgnesCredential(db);DATA.settings=await all(db,"settings");
    disconnectAgnes();$("agnes-test").disabled=true;$("agnes-disconnect").disabled=true;
-   refreshAgnesVaultControls();$("agnes-status").textContent="Clé Agnes supprimée du coffre actuel.";updateEngineNote();
+   refreshAgnesVaultControls();$("agnes-status").textContent="Clé Agnes supprimée du coffre actuel.";updateEngineNote();refreshSimpleAssistant();
   }catch{notify("La clé Agnes n'a pas pu être supprimée.");}
  });
  $("agnes-test").addEventListener("click",async()=>{
@@ -849,7 +851,7 @@ function events(){
   catch(error){$("agnes-status").textContent=agnesStatus().cooldownSeconds>0?"Agnes en pause (quota). Réessayez lorsque le fournisseur le permet.":"Agnes indisponible. Vérifiez la clé, le crédit, le réseau et les permissions du navigateur (CORS).";}
   finally{button.disabled=!agnesStatus().connected;updateEngineNote();}
  });
- $("agnes-disconnect").addEventListener("click",()=>{disconnectAgnes();$("agnes-key").value="";$("agnes-test").disabled=true;$("agnes-disconnect").disabled=true;$("agnes-status").textContent="Agnes déconnecté ; clé effacée de la session.";updateEngineNote();});
+ $("agnes-disconnect").addEventListener("click",()=>{disconnectAgnes();$("agnes-key").value="";$("agnes-test").disabled=true;$("agnes-disconnect").disabled=true;$("agnes-status").textContent="Agnes déconnecté ; clé effacée de la session.";updateEngineNote();refreshSimpleAssistant();});
  $("companion-mode").addEventListener("change",()=>{
   const label=$("companion-mode").selectedOptions[0]?.textContent||"Automatique";
   notify("Mode d'écoute : "+label+". Les règles de sécurité restent prioritaires.");
@@ -1511,7 +1513,7 @@ function setupV29Controls(){
  }
 }
 async function init(){
- setupV27Controls();setupV28Controls();setupV29Controls();setupV30Controls();setupV31Controls();setupV32Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
+ setupV27Controls();setupV28Controls();setupV29Controls();setupV30Controls();setupV31Controls();setupV32Controls();refreshSimpleAssistant=setupSimpleAssistant({connected:()=>agnesStatus().connected});renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
@@ -1536,13 +1538,14 @@ async function init(){
  forms();events();
   const shortcut=new URLSearchParams(location.search).get("open");
   if(["chat","crisis","tasks","health","appointments","library"].includes(shortcut))tab(shortcut);
+   else tab("chat");
  patientUX=setupPatientUX({navigate:tab,getSettings:()=>DATA.settings,saveSetting:async(id,value)=>{
    if(!db)throw Error("Déverrouillez d'abord le coffre.");
    await put(db,"settings",{id,value});
    const i=DATA.settings.findIndex(s=>s.id===id);
    if(i<0)DATA.settings.push({id,value});else DATA.settings[i]={id,value};
  },notify});
- try{db=await openSecureDB();await reload();await restoreAgnesAfterUnlock();setInterval(()=>{lockInactiveVault();if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){lockInactiveVault();if(db){renderReminders();renderUpcomingAppointments();}}});}
+ try{db=await openSecureDB();await reload();await restoreAgnesAfterUnlock();refreshSimpleAssistant();setInterval(()=>{lockInactiveVault();if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){lockInactiveVault();if(db){renderReminders();renderUpcomingAppointments();}}});}
  catch(e){console.error(e);notify("Stockage local indisponible : l'application ne peut pas enregistrer vos données. Autorisez le stockage pour ce site.");}
  if("serviceWorker" in navigator&&window.isSecureContext){navigator.serviceWorker.register("./sw.js").catch(()=>{/* hors ligne facultatif */});}
 }

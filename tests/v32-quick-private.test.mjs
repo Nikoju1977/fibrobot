@@ -50,7 +50,7 @@ test("V32: service worker and chat wire bounded private features",()=>{
  for(const term of ["parseQuickHealth","searchPrivateRecords","setupV32Controls","v32-quick-entry","v32-private-search","await put(db,\"symptoms\",parsed.payload)"])
   assert.ok(app.includes(term),term);
  for(const path of ["./quick-health.mjs","./private-search.mjs","./ambient-sound.mjs"])assert.ok(sw.includes(path),path);
- assert.match(sw,/fibrobot-shell-v32/);
+ assert.match(sw,/fibrobot-shell-v33/);
  assert.match(css,/v32-quick-form/);
  assert.match(css,/v32-search-results/);
 });

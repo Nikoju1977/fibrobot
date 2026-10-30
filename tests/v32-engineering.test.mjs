@@ -48,6 +48,6 @@ test("V32: no personal city committed, all new features precached and no insecur
  for(const term of ["v32-quick-entry","v32-private-search","v32-breath-start","stopBreathingSession","BREATH_PATTERNS","searchPrivateRecords"])assert.ok(app.includes(term),term);
  assert.ok(!app.includes('city.value="La Meilleraye-de-Bretagne"'),"No patient locality hardcoded in the public app");
  assert.ok(sw.includes("./breathing-guide.mjs"));
- assert.ok(sw.includes("fibrobot-shell-v32-1"));
+ assert.ok(sw.includes("fibrobot-shell-v33-1"));
  assert.match(css,/prefers-reduced-motion:reduce/);
 });
