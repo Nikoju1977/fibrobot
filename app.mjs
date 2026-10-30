@@ -35,6 +35,8 @@ import {descriptiveWellbeingBrief} from "./v28-insights.mjs";
 import {findBookPages} from "./reader-search.mjs";
 import {deviceReadiness} from "./device-readiness.mjs";
 import {createSessionGuard} from "./session-guard.mjs";
+import {FOREGROUND_REMINDER_OPTIN_ID,optInForegroundReminders,eligibleForegroundReminders} from "./foreground-reminders.mjs";
+import {readingPageRange,BOOK_SLEEP_MINUTES,validSleepMinutes} from "./reading-range.mjs";
 const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
@@ -44,6 +46,9 @@ let bookText="",bookIndex=0,bookFile=null,speechToken=0,activeRecognition=null,d
 // Session-only chat context; never persisted and never taken from the health vault.
 const sessionTurns=[];
 const activeSession=createSessionGuard();
+const medAlertSeen=new Set();
+const QUIET_SETTING_ID="quiet-mode-v29";
+let bookSleepTimeout=null;
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
 const val=id=>$(id).value;
 function notify(message){$("toast").textContent=message;$("toast").hidden=false;clearTimeout(notify.timeout);notify.timeout=setTimeout(()=>$("toast").hidden=true,5500);}
@@ -51,7 +56,7 @@ function tab(name){if(!TITLES[name])return;document.querySelectorAll(".page").fo
 function blank(target,message){target.replaceChildren(dom("div",message,"empty"));}
 function action(label,method,store,id){const b=dom("button",label,"mini");b.type="button";b.dataset.action=method;b.dataset.store=store;b.dataset.id=String(id);return b;}
 function record(target,title,subtitle,notes,store,id,extra={}){const row=dom("div",undefined,"record"),copy=dom("div"),buttons=dom("div",undefined,"actions");copy.append(dom("strong",title,extra.done?"done":""));if(subtitle)copy.append(dom("small",subtitle));if(notes)copy.append(dom("p",notes));if(extra.tag)copy.append(dom("span",extra.tag,extra.tag==="À reporter"?"tag later":"tag"));if(store==="tasks")buttons.append(action(extra.done?"Réouvrir":"Terminer","toggle",store,id));if(FORMS[store])buttons.append(action("Modifier","edit",store,id));if(store)buttons.append(action("Supprimer","delete",store,id));row.append(copy,buttons);target.append(row);}
-async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;refreshMistralVaultControls();render();}
+async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;refreshMistralVaultControls();restoreV29Preferences();render();}
 function render(){ $("count-tasks").textContent=DATA.tasks.filter(x=>!x.done).length;$("count-health").textContent=DATA.symptoms.length;$("count-conditions").textContent=DATA.conditions.length;$("daily-energy").value=energy;$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();renderHealth();renderHealthTrends();renderConditions();renderMeds();renderAppointments();renderUpcomingAppointments();renderLibrary();renderChat();renderGeneralPreference();refreshAutoLockSettings();patientUX?.refreshGuide(); }
 function renderTasks(){const tasks=rankTasks(DATA.tasks,energy),out=$("tasks-list"),home=$("today-tasks");out.replaceChildren();home.replaceChildren();if(!tasks.length)blank(home,"Aucune tâche urgente. Vous pouvez vous reposer.");else tasks.slice(0,5).forEach(t=>record(home,t.title,"Effort "+t.effort+"/3",null,null,t.id,{tag:t.adapted?"Effort compatible":"À reporter"}));if(!DATA.tasks.length)blank(out,"Vous pouvez ajouter vos tâches ici.");else [...tasks,...DATA.tasks.filter(x=>x.done)].forEach(t=>record(out,t.title,(t.priority==="important"?"Essentielle":t.priority==="delegable"?"Délégable":"Flexible")+" · effort "+t.effort+"/3"+(t.due?" · "+t.due:""),null,"tasks",t.id,{done:t.done,tag:t.done?"Terminée":t.adapted?"Effort compatible":"À reporter"}));}
 function renderHealth(){const out=$("health-list");out.replaceChildren();if(!DATA.symptoms.length)blank(out,"Aucune observation enregistrée.");else [...DATA.symptoms].sort((a,b)=>String(b.date).localeCompare(String(a.date))).forEach(s=>{const notes=[s.energy!=null?"Énergie "+s.energy+"/10":"",s.fatigue!=null?"Fatigue "+s.fatigue+"/10":"",s.sleep!=null?"Sommeil "+s.sleep+"/10":"",s.notes].filter(Boolean).join(" · ");record(out,s.name,String(s.date).slice(0,10)+" · Intensité "+s.intensity+"/10"+(s.condition?" · "+s.condition:""),notes,"symptoms",s.id);});const select=$("health-condition"),old=select.value;select.replaceChildren();let option=dom("option","Non précisée");option.value="";select.append(option);for(const c of DATA.conditions){option=dom("option",c.name);option.value=c.name;select.append(option);}select.value=old;}
@@ -125,7 +130,8 @@ function renderMeds(){
  const out=$("med-list");out.replaceChildren();
  if(!DATA.medications.length)blank(out,"Aucun médicament ou traitement déclaré.");
  else DATA.medications.forEach(m=>{
-  const times=medicationReminderTimes(m);
+  let times=[],invalidTimes=false;
+  try{times=medicationReminderTimes(m);}catch{invalidTimes=true;}
   record(out,m.name,[m.dose&&"Dose déclarée : "+m.dose,m.schedule&&"Fréquence : "+m.schedule,times.length&&"Rappels déclarés : "+times.join(", "),m.prescriber&&"Prescripteur : "+m.prescriber].filter(Boolean).join(" · "),m.notes,"medications",m.id);
   if(times.length){
    const button=dom("button","Exporter les rappels vers l'agenda (.ics)","mini");
@@ -133,6 +139,7 @@ function renderMeds(){
    button.setAttribute("aria-label","Exporter des rappels anonymes vers l'agenda système");
    out.lastElementChild?.append(button);
   }
+  if(invalidTimes)out.lastElementChild?.append(dom("p","Horaires anciens ou invalides : corrigez cette fiche pour réactiver les rappels.","tiny"));
  });
  renderReminders();
 }
@@ -227,7 +234,14 @@ function refreshComposer(){
  if(count&&field)count.textContent=field.value.length+" / "+field.maxLength;
 }
 function updateVoiceState(message,active=false){const node=$("voice-live-state");if(node)node.textContent=message;document.body.dataset.voiceState=active?"speaking":"idle";}
+function clearBookSleepTimer(){if(bookSleepTimeout!==null){clearTimeout(bookSleepTimeout);bookSleepTimeout=null;}}
+function startBookSleepTimer(){
+ clearBookSleepTimer();
+ const minutes=validSleepMinutes($("v29-book-sleep")?.value??0);
+ if(minutes)bookSleepTimeout=setTimeout(()=>{stopSpeaking();notify("Minuterie : lecture arrêtée après "+minutes+" minutes.");},minutes*60000);
+}
 function stopSpeaking(){
+ clearBookSleepTimer();
  speechToken++;
  if("speechSynthesis" in window)try{speechSynthesis.cancel();}catch{}
  updateVoiceState("Lecture arrêtée.");
@@ -241,7 +255,7 @@ function speak(message,{requested=false,onComplete=null}={}){
  voice=true;syncVoiceControls();stopSpeaking();const token=speechToken;let index=0;
  const next=()=>{
   if(token!==speechToken)return;
-  if(index>=chunks.length){updateVoiceState("Lecture terminée.");if(typeof onComplete==="function")onComplete();return;}
+  if(index>=chunks.length){clearBookSleepTimer();updateVoiceState("Lecture terminée.");if(typeof onComplete==="function")onComplete();return;}
   const utterance=new SpeechSynthesisUtterance(chunks[index++]);
   utterance.lang="fr-FR";utterance.voice=selected;utterance.rate=Number($("chat-voice-speed")?.value)||1;
   utterance.onstart=()=>{if(token===speechToken)updateVoiceState("FibroBot parle : segment "+index+" sur "+chunks.length+".",true);};
@@ -557,7 +571,17 @@ function showLocalAnswer(answer){
  const out=$("messages");out.append(bubble(answer,"bot"));out.scrollTop=out.scrollHeight;
  tab("chat");speak(answer);
 }
-function renderReminders(){const out=$("due-reminders");out.replaceChildren();const due=dueReminders(DATA.medications,DATA.medicationLogs);if(!due.length){blank(out,"Aucune prise à confirmer maintenant.");return;}for(const x of due){const row=dom("div",undefined,"record"),left=dom("div"),buttons=dom("div",undefined,"actions");left.append(dom("strong",x.name),dom("small","Heure prévue : "+x.time+" (déclarée)"));for(const [label,status] of [["Pris","taken"],["Ignoré","skipped"]]){const button=action(label,"reminder",status,x.medicationId);button.dataset.scheduledTime=x.time;buttons.append(button);}row.append(left,buttons);out.append(row);if(!seen.has(x.key)){seen.add(x.key);notify("Un rappel de traitement est à vérifier dans FibroBot.");if("Notification" in window&&Notification.permission==="granted"&&document.visibilityState==="visible"){try{new Notification("FibroBot • rappel",{body:"Consultez votre prise planifiée dans FibroBot.",tag:"fibrobot-"+x.key});}catch(e){/* Indisponible sur certaines PWA */}}}}}
+function notifyForegroundMedicationReminders(due){
+ if(!db||document.visibilityState!=="visible"||!optInForegroundReminders(DATA.settings))return;
+ for(const reminder of eligibleForegroundReminders(due,medAlertSeen,new Date(),10)){
+  medAlertSeen.add(reminder.key);
+  notify("Rappel personnel : consultez vos horaires déclarés dans FibroBot.");
+  if("Notification" in window&&Notification.permission==="granted"){
+   try{new Notification(reminder.title,{body:reminder.body,tag:"fibrobot-personal-reminder"});}catch{/* No native guarantees. */}
+  }
+ }
+}
+function renderReminders(){const out=$("due-reminders");out.replaceChildren();const due=dueReminders(DATA.medications,DATA.medicationLogs);notifyForegroundMedicationReminders(due);if(!due.length){blank(out,"Aucune prise à confirmer maintenant.");return;}for(const x of due){const row=dom("div",undefined,"record"),left=dom("div"),buttons=dom("div",undefined,"actions");left.append(dom("strong",x.name),dom("small","Heure prévue : "+x.time+" (déclarée)"));for(const [label,status] of [["Pris","taken"],["Ignoré","skipped"]]){const button=action(label,"reminder",status,x.medicationId);button.dataset.scheduledTime=x.time;buttons.append(button);}row.append(left,buttons);out.append(row);if(!seen.has(x.key)){seen.add(x.key);notify("Un rappel de traitement est à vérifier dans FibroBot.");if("Notification" in window&&Notification.permission==="granted"&&document.visibilityState==="visible"){try{new Notification("FibroBot • rappel",{body:"Consultez votre prise planifiée dans FibroBot.",tag:"fibrobot-"+x.key});}catch(e){/* Indisponible sur certaines PWA */}}}}}
 function renderUpcomingAppointments(){
  const out=$("upcoming-appointments");if(!out||!db)return;
  const upcoming=upcomingAppointments(DATA.appointments,new Date(),7);
@@ -737,7 +761,7 @@ function events(){
  $("book-next").addEventListener("click",()=>{if(bookText){stopSpeaking();bookIndex++;refreshBook();}});
  $("book-read").addEventListener("click",()=>{
   if(!bookText){notify("Ouvrez un document TXT, Markdown, EPUB ou DOCX avec du texte lisible.");return;}
-  speak(readerPage(bookText,bookIndex).text,{requested:true});
+  if(speak(readerPage(bookText,bookIndex).text,{requested:true}))startBookSleepTimer();
  });
  $("book-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
  $("book-save-mark")?.addEventListener("click",async()=>{
@@ -1111,17 +1135,29 @@ function setupV28Controls(){
   });
   multi.addEventListener("click",()=>{
    if(!bookText){notify("Ouvrez d'abord un livre.");return;}
-   const first=bookIndex,parts=[];let last=first;
-   for(let index=first;index<Math.min(first+3,readerPage(bookText,0).count);index++){
-    parts.push(readerPage(bookText,index).text);last=index;
-   }
-   speak(parts.join("\n\n"),{requested:true,onComplete:()=>{if(bookText&&bookIndex===first){bookIndex=last;refreshBook();}}});
+   const source=bookText,range=readingPageRange(source,bookIndex,3);
+   if(speak(range.spokenText,{requested:true,onComplete:()=>{
+    if(bookText===source&&bookIndex===range.firstPage){bookIndex=range.nextPage;refreshBook();}
+   }}))startBookSleepTimer();
   });
  }
  const toolbar=document.querySelector(".chat-header-actions");
  if(toolbar){
   const quiet=dom("button","Mode calme","chat-voice-toggle");quiet.id="v28-quiet-toggle";quiet.type="button";quiet.setAttribute("aria-pressed","false");toolbar.append(quiet);
-  quiet.addEventListener("click",()=>{const enabled=document.body.classList.toggle("v28-quiet");quiet.setAttribute("aria-pressed",String(enabled));notify(enabled?"Mode calme activé.":"Mode calme désactivé.");});
+  quiet.addEventListener("click",async()=>{
+   if(!db){notify("Déverrouillez le coffre avant de modifier ce réglage.");return;}
+   const enabled=!document.body.classList.contains("v28-quiet");
+   document.body.classList.toggle("v28-quiet",enabled);quiet.setAttribute("aria-pressed",String(enabled));
+   try{
+    await put(db,"settings",{id:QUIET_SETTING_ID,value:enabled});
+    const at=DATA.settings.findIndex(x=>x.id===QUIET_SETTING_ID);
+    if(at<0)DATA.settings.push({id:QUIET_SETTING_ID,value:enabled});else DATA.settings[at]={id:QUIET_SETTING_ID,value:enabled};
+    notify(enabled?"Mode calme activé et conservé dans le coffre.":"Mode calme désactivé et préférence conservée.");
+   }catch{
+    document.body.classList.toggle("v28-quiet",!enabled);quiet.setAttribute("aria-pressed",String(!enabled));
+    notify("Impossible de sauvegarder le mode calme.");
+   }
+  });
  }
  const check=$("assistant-diagnostics-result");
  if(check){
@@ -1138,8 +1174,55 @@ function setupV28Controls(){
   });
  }
 }
+function restoreV29Preferences(){
+ const enabled=DATA.settings.find(x=>x.id===QUIET_SETTING_ID)?.value===true;
+ document.body.classList.toggle("v28-quiet",enabled);
+ $("v28-quiet-toggle")?.setAttribute("aria-pressed",String(enabled));
+ const alerts=$("v29-reminder-opt-in");
+ if(alerts)alerts.checked=optInForegroundReminders(DATA.settings);
+}
+function setupV29Controls(){
+ const reminders=$("medications");
+ if(reminders){
+  const group=dom("div",undefined,"v29-reminder-optin");
+  const label=dom("label",undefined,"consent");label.htmlFor="v29-reminder-opt-in";
+  const choice=dom("input");choice.id="v29-reminder-opt-in";choice.type="checkbox";
+  label.append(choice,document.createTextNode(" Alerte générique pendant que FibroBot est ouvert (facultatif)"));
+  group.append(label,dom("p","Sans nom de médicament dans la notification. Aucune alerte garantie quand l'application est fermée : utilisez une alarme système pour les prises indispensables.","tiny"));
+  reminders.append(group);
+  choice.addEventListener("change",async()=>{
+   const enabled=choice.checked;
+   if(!db){choice.checked=false;notify("Déverrouillez d'abord le coffre.");return;}
+   try{
+    await put(db,"settings",{id:FOREGROUND_REMINDER_OPTIN_ID,value:enabled});
+    const index=DATA.settings.findIndex(x=>x.id===FOREGROUND_REMINDER_OPTIN_ID);
+    if(index<0)DATA.settings.push({id:FOREGROUND_REMINDER_OPTIN_ID,value:enabled});
+    else DATA.settings[index]={id:FOREGROUND_REMINDER_OPTIN_ID,value:enabled};
+    if(enabled)notifyForegroundMedicationReminders(dueReminders(DATA.medications,DATA.medicationLogs));
+    notify(enabled?"Alertes dans l'application activées. Elles ne sont pas garanties en arrière-plan.":"Alertes de traitements désactivées.");
+   }catch{
+    choice.checked=!enabled;notify("La préférence de rappel n'a pas été sauvegardée.");
+   }
+  });
+ }
+ const search=$("v28-book-query")?.closest(".v28-book-search");
+ if(search){
+  const label=dom("label","Arrêter automatiquement la lecture après");label.htmlFor="v29-book-sleep";
+  const select=dom("select");select.id="v29-book-sleep";select.setAttribute("aria-label","Minuterie de sommeil pour la lecture");
+  for(const minutes of BOOK_SLEEP_MINUTES){
+   const option=dom("option",minutes?minutes+" minutes":"Pas de minuterie");option.value=String(minutes);select.append(option);
+  }
+  search.append(label,select,dom("p","La minuterie fonctionne uniquement pendant que cette page reste active.","tiny"));
+ }
+ if("speechSynthesis" in window&&typeof speechSynthesis.addEventListener==="function"){
+  speechSynthesis.addEventListener("voiceschanged",()=>{
+   if(!db)return;
+   updateVoiceState(localVoice()?"Voix française locale détectée.":"Voix locale indisponible : vérifiez les voix installées sur votre téléphone.");
+  });
+ }
+}
 async function init(){
- setupV27Controls();setupV28Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
+ setupV27Controls();setupV28Controls();setupV29Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);

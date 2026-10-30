@@ -140,6 +140,10 @@ try{
  await page.locator("#v28-search-results button").getByText(/Mon livre privé/).waitFor();
  await page.locator("#v28-search-results button").first().click();
  assert.match(await page.locator("#book-page").textContent(),/Mon livre privé/);
+ assert.equal(await page.locator("#v29-book-sleep").inputValue(),"0");
+ await page.locator("#v29-book-sleep").selectOption("10");
+ assert.equal(await page.locator("#v29-book-sleep").inputValue(),"10");
+ await page.locator("#v29-book-sleep").selectOption("0");
  const docx=storedArchive([["word/document.xml",'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Chapitre DOCX privé</w:t></w:r></w:p></w:body></w:document>']]);
  await page.locator("#book-file").setInputFiles({name:"page.docx",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",buffer:docx});
  await page.locator("#book-page").getByText(/Chapitre DOCX privé/).waitFor({timeout:10000});
@@ -242,6 +246,13 @@ try{
  await page.locator("#v28-health-brief").click();
  assert.match(await page.locator("#v28-health-output").textContent(),/Bilan descriptif/);
  assert.match(await page.locator("#v28-health-output").textContent(),/aucune valeur exploitable/);
+ await page.locator('#nav [data-tab="medications"]').click();
+ assert.equal(await page.locator("#v29-reminder-opt-in").isChecked(),false,"No foreground medication alert without opt-in");
+ await page.locator("#v29-reminder-opt-in").check();
+ await page.locator("#toast").getByText(/Alertes dans l'application activées/).waitFor({timeout:12000});
+ assert.equal(await page.locator("#v29-reminder-opt-in").isChecked(),true);
+ await page.locator("#v29-reminder-opt-in").uncheck();
+ await page.locator("#toast").getByText(/Alertes de traitements désactivées/).waitFor({timeout:12000});
  // JARVIS distant : mémoire volatile, double consentement, aucun patient.
  await page.locator('#nav [data-tab="chat"]').click();
  await page.locator("#mistral-options summary").click();
@@ -354,6 +365,9 @@ try{
  assert.equal(envelope?.algorithm,"AES-GCM-256");
  assert.ok(!JSON.stringify(envelope).includes(value),"No plaintext in vault IndexedDB");
  assert.ok(!JSON.stringify(envelope).includes("cle-fictive-de-test-non-utilisable"),"API key must never be stored in IndexedDB plaintext");
+ await page.locator('#nav [data-tab="chat"]').click();
+ await page.locator("#v28-quiet-toggle").click();
+ await page.locator("#toast").getByText(/Mode calme activé et conservé dans le coffre/).waitFor({timeout:12000});
  page.once("dialog",dialog=>dialog.accept());
  await page.locator("#lock-vault").click();
  await page.locator("#vault-gate").waitFor({state:"visible",timeout:15000});
@@ -366,6 +380,10 @@ try{
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:15000});
  await page.locator('#nav [data-tab="privacy"]').click();
  assert.equal(await page.locator("#auto-lock-minutes").inputValue(),"30","Encrypted inactivity setting should survive lock and reopen");
+ assert.equal(await page.locator("#v28-quiet-toggle").getAttribute("aria-pressed"),"true","Calm preference must be restored from vault");
+ await page.locator('#nav [data-tab="chat"]').click();
+ await page.locator("#v28-quiet-toggle").click();
+ await page.locator("#toast").getByText(/préférence conservée/).waitFor({timeout:12000});
  await page.locator('#nav [data-tab="today"]').click();
  await page.locator("#first-steps").waitFor({state:"hidden",timeout:10000});
  await page.locator('#nav [data-tab="chat"]').click();

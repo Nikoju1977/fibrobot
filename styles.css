@@ -35,3 +35,10 @@ body.v28-quiet .assistant-hero-symbol,body.v28-quiet .assistant-hero::before{dis
 body.v28-quiet .bubble-body{line-height:1.8;letter-spacing:.008em}
 body.v28-quiet .chat-card{box-shadow:none!important}
 @media(max-width:650px){.v28-book-search button,#v28-health-brief,#v28-device-check,#v28-quiet-toggle{min-height:46px;max-width:100%}}
+
+/* V29: accessible optional foreground reminders and sleep reader settings */
+.v29-reminder-optin{border:1px solid var(--border,#53616e);border-radius:.85rem;padding:.85rem;margin:1rem 0;max-width:56rem}
+.v29-reminder-optin label{display:flex;align-items:center;gap:.65rem;line-height:1.5}
+.v29-reminder-optin input[type="checkbox"]{width:1.25rem;height:1.25rem;flex:none;accent-color:var(--accent,#159873)}
+.v28-book-search select{min-height:46px;width:100%;font-size:1rem;padding:.5rem;border-radius:.5rem}
+@media(max-width:650px){.v29-reminder-optin{padding:1rem}.v29-reminder-optin label{min-height:48px}}

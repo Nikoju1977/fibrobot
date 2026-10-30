@@ -1,6 +1,6 @@
 /* FibroBot local-first : seulement les fichiers statiques, jamais IndexedDB. */
-const VERSION="fibrobot-shell-v28";
-const ASSETS=["./","./index.html","./styles.css","./ux-pro.css","./ux-pro.mjs","./app.mjs","./gemma-local.mjs","./gemma-worker.mjs","./assistant-engine.mjs","./assistant-diagnostics.mjs","./agent-hub.mjs","./companion-engine.mjs","./conversation-context.mjs","./voice-input.mjs","./appointment-reminders.mjs","./care-briefing.mjs","./safe-preferences.mjs","./health-trends.mjs","./request-budget.mjs","./document-reader.mjs","./session-lock.mjs","./agnes-bridge.mjs","./auto-engine.mjs","./life-actions.mjs","./local-commands.mjs","./medication-calendar.mjs","./reader-bookmark.mjs","./voice-health.mjs","./v28-insights.mjs","./reader-search.mjs","./device-readiness.mjs","./session-guard.mjs","./book-reader.mjs","./research-library.mjs","./network-library.mjs","./knowledge-router.mjs","./medical-rag.mjs","./mistral-bridge.mjs","./mistral-credential-vault.mjs","./mistral-routing.mjs","./mcp-fibro-tools.mjs","./vault.mjs","./vault-ui.mjs","./core.mjs","./medical-library.mjs","./manifest.json","./icon.svg"];
+const VERSION="fibrobot-shell-v29";
+const ASSETS=["./","./index.html","./styles.css","./ux-pro.css","./ux-pro.mjs","./app.mjs","./gemma-local.mjs","./gemma-worker.mjs","./assistant-engine.mjs","./assistant-diagnostics.mjs","./agent-hub.mjs","./companion-engine.mjs","./conversation-context.mjs","./voice-input.mjs","./appointment-reminders.mjs","./care-briefing.mjs","./safe-preferences.mjs","./health-trends.mjs","./request-budget.mjs","./document-reader.mjs","./session-lock.mjs","./agnes-bridge.mjs","./auto-engine.mjs","./life-actions.mjs","./local-commands.mjs","./medication-calendar.mjs","./reader-bookmark.mjs","./voice-health.mjs","./v28-insights.mjs","./reader-search.mjs","./foreground-reminders.mjs","./reading-range.mjs","./device-readiness.mjs","./session-guard.mjs","./book-reader.mjs","./research-library.mjs","./network-library.mjs","./knowledge-router.mjs","./medical-rag.mjs","./mistral-bridge.mjs","./mistral-credential-vault.mjs","./mistral-routing.mjs","./mcp-fibro-tools.mjs","./vault.mjs","./vault-ui.mjs","./core.mjs","./medical-library.mjs","./manifest.json","./icon.svg"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(VERSION).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });
@@ -11,8 +11,10 @@ self.addEventListener("fetch",event=>{
  if(event.request.method!=="GET")return;
  const url=new URL(event.request.url);
  if(url.origin!==self.location.origin)return;
- const allowed=ASSETS.filter(path=>path!=="./").some(path=>url.pathname.endsWith(path.slice(2)))||event.request.mode==="navigate";
- if(!allowed)return;
+ const scopePath=new URL(self.registration.scope).pathname;
+ const scopedNavigation=event.request.mode==="navigate"&&url.pathname.startsWith(scopePath);
+ const assetPath=ASSETS.filter(path=>path!=="./").some(path=>new URL(path,self.registration.scope).pathname===url.pathname);
+ if(!assetPath&&!scopedNavigation)return;
  event.respondWith((async()=>{
   const cache=await caches.open(VERSION);
   try{
