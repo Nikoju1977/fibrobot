@@ -12,19 +12,17 @@ test("diagnostic du cerveau entièrement local : quatre scénarios distincts",()
 
 test("diagnostic transparent sans clé, sans connexion et sans état patient",()=>{
  const status=companionStatus();
- assert.equal(status.length,5);
+ assert.equal(status.length,4);
  assert.equal(status[0].status,"verrouillé");
  assert.equal(status[1].status,"prêt");
- assert.equal(status[2].status,"non chargé");
- assert.equal(status[3].status,"déconnecté");
- assert.equal(status[4].status,"désactivée");
+ assert.equal(status[2].status,"déconnecté");
+ assert.equal(status[3].status,"désactivée");
  const busy=companionStatus({vaultOpen:true,webGPU:{ready:true,modelId:"Qwen-test"},
   mistral:{connected:true,cooldownSeconds:120},internet:true});
  assert.equal(busy[0].status,"prêt");
- assert.equal(busy[2].status,"prêt");
- assert.equal(busy[3].status,"limité (429)");
- assert.match(busy[3].detail,/120/);
- assert.equal(busy[4].status,"autorisée");
+ assert.equal(busy[2].status,"limité (429)");
+ assert.match(busy[2].detail,/120/);
+ assert.equal(busy[3].status,"autorisée");
  assert.doesNotMatch(JSON.stringify(busy),/secret|bearer|api_key/i);
 });
 
