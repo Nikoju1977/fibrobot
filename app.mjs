@@ -751,12 +751,32 @@ function events(){
  });
  $("chat-voice-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
  $("install-app").addEventListener("click",requestPWAInstallation);
- $("auto-mode").addEventListener("change",()=>{updateEngineNote();notify($("auto-mode").checked?"IA activée : Agnes puis Mistral selon disponibilité.":"IA conversationnelle désactivée.");});
- $("agnes-connect").addEventListener("click",()=>{
+ $("auto-mode").addEventListener("change",()=>{updateEngineNote();notify($("auto-mode").checked?"Agnes AI activé pour les questions générales et fiches publiques autorisées.":"IA conversationnelle désactivée.");});
+ $("agnes-connect").addEventListener("click",async()=>{
   const key=$("agnes-key").value.trim();$("agnes-key").value="";
-  try{connectAgnes(key);$("agnes-status").textContent="Agnes connecté pour cette session. Le mode Auto demandera ton accord avant chaque question envoyée.";$("agnes-test").disabled=false;$("agnes-disconnect").disabled=false;}
-  catch(error){disconnectAgnes();$("agnes-status").textContent="Clé Agnes non activée. Vérifie la clé et réessaie.";}
-  updateEngineNote();
+  const button=$("agnes-connect");button.disabled=true;
+  try{
+   if(!db)throw Error("Déverrouillez votre coffre.");
+   connectAgnes(key);
+   if($("agnes-save-key")?.checked){
+    await saveAgnesCredential(db,key);
+    DATA.settings=await all(db,"settings");refreshAgnesVaultControls();
+   }
+   $("agnes-status").textContent=$("agnes-save-key")?.checked?
+    "Clé Agnes chiffrée dans le coffre et activée. Testez la connexion pour vérifier votre accès API.":
+    "Clé Agnes activée dans cette session. Testez la connexion pour vérifier votre accès API.";
+   $("agnes-test").disabled=false;$("agnes-disconnect").disabled=false;
+  }catch(error){
+   disconnectAgnes();$("agnes-status").textContent="Clé Agnes non activée : "+String(error?.message||error).slice(0,120);
+  }finally{button.disabled=false;updateEngineNote();}
+ });
+ $("agnes-forget")?.addEventListener("click",async()=>{
+  if(!db||!confirm("Supprimer la clé Agnes de ce coffre et déconnecter ? Les anciennes sauvegardes chiffrées ne changent pas."))return;
+  try{
+   await deleteAgnesCredential(db);DATA.settings=await all(db,"settings");
+   disconnectAgnes();$("agnes-test").disabled=true;$("agnes-disconnect").disabled=true;
+   refreshAgnesVaultControls();$("agnes-status").textContent="Clé Agnes supprimée du coffre actuel.";updateEngineNote();
+  }catch{notify("La clé Agnes n'a pas pu être supprimée.");}
  });
  $("agnes-test").addEventListener("click",async()=>{
   if(!agnesStatus().connected)return;
@@ -1222,6 +1242,43 @@ function restoreV29Preferences(){
  const alerts=$("v29-reminder-opt-in");
  if(alerts)alerts.checked=optInForegroundReminders(DATA.settings);
 }
+function setupV30Controls(){
+ document.body.classList.add("v30-simple");
+ const chat=$("chat");
+ const hero=chat?.querySelector(".assistant-hero");
+ const agnes=$("agnes-options");
+ if(hero&&agnes){
+  hero.after(agnes);
+  agnes.classList.add("v30-agnes-primary");
+  const summary=agnes.querySelector("summary small");
+  if(summary)summary.textContent="Une seule clé, enregistrable dans le coffre chiffré · spécialiste fibromyalgie";
+  const intro=agnes.querySelector(".ai-details>p");
+  if(intro)intro.textContent="Saisissez votre clé Agnes une fois. FibroBot vous aide pour les questions générales et s'appuie sur ses fiches médicales de référence pour la fibromyalgie. Agnes exige Internet, un compte et un accès API ; les requêtes peuvent être payantes ou bloquées par le navigateur.";
+  const form=agnes.querySelector(".form");
+  const save=dom("label",undefined,"consent");save.htmlFor="agnes-save-key";
+  const checkbox=dom("input");checkbox.id="agnes-save-key";checkbox.type="checkbox";checkbox.checked=true;
+  save.append(checkbox,document.createTextNode(" Enregistrer ma clé dans le coffre chiffré de ce téléphone"));
+  const session=dom("label",undefined,"consent");session.htmlFor="agnes-session-consent";
+  const allow=dom("input");allow.id="agnes-session-consent";allow.type="checkbox";
+  session.append(allow,document.createTextNode(" Autoriser mes questions générales admissibles pendant cette session (confirmation au premier envoi)"));
+  const medical=dom("label",undefined,"consent");medical.htmlFor="agnes-public-fiches";
+  const publicFiche=dom("input");publicFiche.id="agnes-public-fiches";publicFiche.type="checkbox";
+  medical.append(publicFiche,document.createTextNode(" Autoriser l'explication des fiches médicales publiques (sans ma question personnelle)"));
+  const row=agnes.querySelector(".button-row");
+  const forget=dom("button","Supprimer ma clé enregistrée","btn light");forget.id="agnes-forget";forget.type="button";forget.disabled=true;
+  row?.append(forget);
+  const status=$("agnes-status");status?.before(save,session,medical,
+   dom("p","Les questions privées, symptômes, traitements et urgences restent traités dans FibroBot. L'IA distante ne remplace pas un médecin. Le premier accès Internet peut demander une confirmation.","tiny"));
+ }
+ const toggle=dom("button","Afficher les réglages avancés","btn light");toggle.type="button";toggle.id="v30-advanced-toggle";
+ toggle.setAttribute("aria-expanded","false");
+ hero?.after(toggle);
+ toggle.addEventListener("click",()=>{
+  const enabled=document.body.classList.toggle("v30-advanced");
+  toggle.setAttribute("aria-expanded",String(enabled));
+  toggle.textContent=enabled?"Masquer les réglages avancés":"Afficher les réglages avancés";
+ });
+}
 function setupV29Controls(){
  const reminders=$("medications");
  if(reminders){
@@ -1263,7 +1320,7 @@ function setupV29Controls(){
  }
 }
 async function init(){
- setupV27Controls();setupV28Controls();setupV29Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
+ setupV27Controls();setupV28Controls();setupV29Controls();setupV30Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
