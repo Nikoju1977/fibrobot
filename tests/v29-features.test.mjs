@@ -43,7 +43,7 @@ test("V29: reading progress moves forward by pages and never overflows",()=>{
  assert.equal(end.lastPage,5);
  assert.deepEqual(BOOK_SLEEP_MINUTES,[0,5,10,20]);
  assert.equal(validSleepMinutes("10"),10);
- assert.throws(()=>validSleepMinutes(999),/invalide/);
+ assert.throws(()=>validSleepMinutes(999),/non valide/);
 });
 test("V29: invalid legacy medication times are detected without dose advice",()=>{
  assert.throws(()=>medicationReminderTimes({reminderTimes:"99:99"}),/invalides/);
