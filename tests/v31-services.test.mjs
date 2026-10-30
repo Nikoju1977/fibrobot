@@ -79,7 +79,7 @@ test("V31 ambient player is action-triggered, uses bounded volume and never stor
  assert.throws(()=>boundedAmbientVolume("abc"),/Volume/);
  const player=createAmbientPlayer();
  assert.equal(player.currentType(),null);
- assert.throws(()=>player.play("fake"),/Ambiance inconnue/);
+ await assert.rejects(player.play("fake"),/Ambiance inconnue/);
  player.stop();assert.equal(player.currentType(),null);
 });
 test("V31 includes eight informational specialists, not virtual doctors",()=>{
