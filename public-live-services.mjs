@@ -27,7 +27,7 @@ export function weatherHorizon(question){
 }
 export function explicitWeatherCity(question){
  const q=compact(question);
- const m=q.match(/\b(?:à|sur|pour|dans|de|d')\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'-]{1,70})/i);
+ const m=q.match(/\s(?:à|sur|pour|dans|de|d')\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'-]{1,70})/i);
  if(!m)return "";
  const city=m[1].replace(/\s+(?:aujourd'hui|demain|après-demain|cette semaine|ce soir|maintenant|actuellement|sur les? .*)$/i,"").trim().replace(/[?!.,]+$/,"");
  if(/^(?:la|le|ce|cette|quel|quelle|demain|aujourd'hui|temps|meteo|pluie|semaine|matin|soir)$/i.test(city))return "";
