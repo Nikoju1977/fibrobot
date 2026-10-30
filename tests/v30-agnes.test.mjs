@@ -37,7 +37,7 @@ test("V30: distinct Agnes AAD, random nonce and tamper-proof vault",async()=>{
  assert.notEqual(a.iv,b.iv);
  assert.equal(await unsealAgnesCredential(a,s.key),fakeKey);
  await assert.rejects(unsealMistralCredential(a,s.key),/impossible/);
- const damaged={...a,payload:(a.payload[0]==="A"?"B":"A")+a.payload.slice(1)};
+ const damaged={...a,payload:(a.payload[0].toLowerCase()==="a"?"b":"a")+a.payload.slice(1)};
  await assert.rejects(unsealAgnesCredential(damaged,s.key),/impossible/);
  s.closed=true;await assert.rejects(saveAgnesCredential(s,fakeKey),/Déverrouillez/);
 });
