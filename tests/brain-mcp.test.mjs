@@ -59,7 +59,7 @@ test("sources institutionnelles : liens HTTPS strictement approuvés",()=>{
 
 test("huit outils MCP spécialisés, données patient non transmises à distance",()=>{
  assert.equal(FIBRO_MCP_TOOLS.length,8);
- assert.equal(callFibroTool("fibro.list_agents").items.length,7);
+ assert.equal(callFibroTool("fibro.list_agents").items.length,8);
  assert.equal(callFibroTool("fibro.research_topics").items.length,10);
  assert.equal(callFibroTool("fibro.guidance",{topic:"sommeil"}).kind,"reference");
  assert.equal(normalizedFibroTopic("fibromyalgie"),"fibro");
