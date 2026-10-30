@@ -23,3 +23,15 @@
 body[data-voice-state="speaking"] .voice-state{font-weight:700;opacity:1}
 body[data-voice-state="speaking"] .assistant-avatar{outline:3px solid currentColor;outline-offset:3px}
 @media(prefers-reduced-motion:reduce){body[data-voice-state="speaking"] .assistant-avatar{animation:none!important;transition:none!important}}
+
+/* V28 - patient-friendly, reduced-distraction layout. */
+.v28-book-search{display:grid;gap:.55rem;padding:.8rem;margin:.8rem 0;border:1px solid currentColor;border-radius:.8rem}
+.v28-book-search input{min-height:46px;width:100%;font-size:1rem;padding:.55rem;border-radius:.4rem}
+.v28-search-results{display:grid;gap:.35rem;max-height:260px;overflow:auto}
+.v28-search-results button{text-align:left;white-space:normal;overflow-wrap:anywhere}
+#v28-quiet-toggle[aria-pressed="true"]{font-weight:800;text-decoration:underline}
+body.v28-quiet *,body.v28-quiet *::before,body.v28-quiet *::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
+body.v28-quiet .assistant-hero-symbol,body.v28-quiet .assistant-hero::before{display:none!important}
+body.v28-quiet .bubble-body{line-height:1.8;letter-spacing:.008em}
+body.v28-quiet .chat-card{box-shadow:none!important}
+@media(max-width:650px){.v28-book-search button,#v28-health-brief,#v28-device-check,#v28-quiet-toggle{min-height:46px;max-width:100%}}
