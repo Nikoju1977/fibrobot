@@ -10,7 +10,8 @@ import {setupPatientUX} from "./ux-pro.mjs";
 import {checkAssistantCore,companionStatus,documentedAnswer} from "./assistant-diagnostics.mjs";
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
 import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,generateMistralMedicalExplanation,generateMistralPlanningAdvice,testMistralConnection} from "./mistral-bridge.mjs";
-import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgnesChat,testAgnesConnection} from "./agnes-bridge.mjs";
+import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgnesChat,generateAgnesPublicFiche,testAgnesConnection} from "./agnes-bridge.mjs";
+import {AGNES_CREDENTIAL_ID,validStoredAgnesCredential,saveAgnesCredential,loadAgnesCredential,deleteAgnesCredential} from "./agnes-credential-vault.mjs";
 import {autoGeneralAllowed,answerWithAuto,shouldPreferSources} from "./auto-engine.mjs";
 import {sessionPreview,appendSessionTurn} from "./conversation-context.mjs";
 import {PREFERENCE_SETTING_ID,validateGeneralPreference,savedGeneralPreference,preferenceHistory} from "./safe-preferences.mjs";
@@ -56,7 +57,7 @@ function tab(name){if(!TITLES[name])return;document.querySelectorAll(".page").fo
 function blank(target,message){target.replaceChildren(dom("div",message,"empty"));}
 function action(label,method,store,id){const b=dom("button",label,"mini");b.type="button";b.dataset.action=method;b.dataset.store=store;b.dataset.id=String(id);return b;}
 function record(target,title,subtitle,notes,store,id,extra={}){const row=dom("div",undefined,"record"),copy=dom("div"),buttons=dom("div",undefined,"actions");copy.append(dom("strong",title,extra.done?"done":""));if(subtitle)copy.append(dom("small",subtitle));if(notes)copy.append(dom("p",notes));if(extra.tag)copy.append(dom("span",extra.tag,extra.tag==="À reporter"?"tag later":"tag"));if(store==="tasks")buttons.append(action(extra.done?"Réouvrir":"Terminer","toggle",store,id));if(FORMS[store])buttons.append(action("Modifier","edit",store,id));if(store)buttons.append(action("Supprimer","delete",store,id));row.append(copy,buttons);target.append(row);}
-async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;refreshMistralVaultControls();restoreV29Preferences();render();}
+async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;refreshMistralVaultControls();refreshAgnesVaultControls();restoreV29Preferences();render();}
 function render(){ $("count-tasks").textContent=DATA.tasks.filter(x=>!x.done).length;$("count-health").textContent=DATA.symptoms.length;$("count-conditions").textContent=DATA.conditions.length;$("daily-energy").value=energy;$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();renderHealth();renderHealthTrends();renderConditions();renderMeds();renderAppointments();renderUpcomingAppointments();renderLibrary();renderChat();renderGeneralPreference();refreshAutoLockSettings();patientUX?.refreshGuide(); }
 function renderTasks(){const tasks=rankTasks(DATA.tasks,energy),out=$("tasks-list"),home=$("today-tasks");out.replaceChildren();home.replaceChildren();if(!tasks.length)blank(home,"Aucune tâche urgente. Vous pouvez vous reposer.");else tasks.slice(0,5).forEach(t=>record(home,t.title,"Effort "+t.effort+"/3",null,null,t.id,{tag:t.adapted?"Effort compatible":"À reporter"}));if(!DATA.tasks.length)blank(out,"Vous pouvez ajouter vos tâches ici.");else [...tasks,...DATA.tasks.filter(x=>x.done)].forEach(t=>record(out,t.title,(t.priority==="important"?"Essentielle":t.priority==="delegable"?"Délégable":"Flexible")+" · effort "+t.effort+"/3"+(t.due?" · "+t.due:""),null,"tasks",t.id,{done:t.done,tag:t.done?"Terminée":t.adapted?"Effort compatible":"À reporter"}));}
 function renderHealth(){const out=$("health-list");out.replaceChildren();if(!DATA.symptoms.length)blank(out,"Aucune observation enregistrée.");else [...DATA.symptoms].sort((a,b)=>String(b.date).localeCompare(String(a.date))).forEach(s=>{const notes=[s.energy!=null?"Énergie "+s.energy+"/10":"",s.fatigue!=null?"Fatigue "+s.fatigue+"/10":"",s.sleep!=null?"Sommeil "+s.sleep+"/10":"",s.notes].filter(Boolean).join(" · ");record(out,s.name,String(s.date).slice(0,10)+" · Intensité "+s.intensity+"/10"+(s.condition?" · "+s.condition:""),notes,"symptoms",s.id);});const select=$("health-condition"),old=select.value;select.replaceChildren();let option=dom("option","Non précisée");option.value="";select.append(option);for(const c of DATA.conditions){option=dom("option",c.name);option.value=c.name;select.append(option);}select.value=old;}
@@ -172,6 +173,23 @@ function bubble(body,role,source,references=[],siteId=""){
  }
  return b;
 }
+function refreshAgnesVaultControls(){
+ const entry=DATA.settings.find(x=>x?.id===AGNES_CREDENTIAL_ID);
+ const saved=Boolean(entry&&validStoredAgnesCredential(entry.value));
+ if($("agnes-forget"))$("agnes-forget").disabled=!saved;
+ return saved;
+}
+async function restoreAgnesAfterUnlock(){
+ if(!db||!refreshAgnesVaultControls())return;
+ try{
+  connectAgnes(await loadAgnesCredential(db));
+  $("agnes-test").disabled=false;$("agnes-disconnect").disabled=false;
+  $("agnes-status").textContent="Agnes chargé depuis le coffre chiffré. Connexion à tester si nécessaire.";
+ }catch{
+  disconnectAgnes();$("agnes-status").textContent="Clé Agnes sauvegardée mais illisible : veuillez la remplacer.";
+ }
+ updateEngineNote();
+}
 function refreshMistralVaultControls(){
  const entry=DATA.settings.find(x=>x?.id===CREDENTIAL_ID);
  const saved=Boolean(entry&&validStoredMistralCredential(entry.value));
@@ -203,7 +221,7 @@ function updateEngineNote(){
  " · Envoi seulement après votre accord.");
  updateApiBudgetUI();
  const badge=$("assistant-mode-badge");
- if(badge)badge.textContent=$("auto-mode")?.checked?"IA conversationnelle":networkEnabled?"Recherche sur accord":"IA désactivée";
+ if(badge)badge.textContent=ag.connected?"Agnes AI · FibroBot":networkEnabled?"Recherche sur accord":"Agnes à connecter";
  const auto=$("auto-brain-status");
  if(auto){
   const ag=agnesStatus(),mi=mistralStatus();
@@ -452,6 +470,26 @@ async function ask(q){
    const id=routeSpecialist(input);
    if(id){const specialist=runSpecialist(id,{...DATA,energy},input);answer=specialist.answer;sourceId=specialist.sourceId;engine="Agent "+specialist.name;}
   }
+  const publicMedicalRoute=mistralRoute(input,intent,response);
+  if(intent==="medical"&&response.kind==="documented"&&publicMedicalRoute?.mode==="medical-reference"&&
+     $("auto-mode").checked&&agnesStatus().connected){
+   const permitted=$("agnes-public-fiches")?.checked||
+    confirm("Agnes AI peut expliquer la fiche médicale publique « "+publicMedicalRoute.preview+" ».\n\nAucune question personnelle, symptôme ou traitement du coffre ne sera transmis. Cet appel peut être facturé. Autoriser pour cette session ?");
+   if(permitted){
+    $("agnes-public-fiches").checked=true;
+    try{
+     const result=await generateAgnesPublicFiche(publicMedicalRoute.topic,{model:$("agnes-model").value});
+     const fiche=LIBRARY.find(d=>d.id===publicMedicalRoute.topic);
+     answer="Agnes AI — explication pédagogique de la fiche publique :\n"+result.text+"\n\nSource officielle : "+fiche.source+"\n"+fiche.answer+
+      "\n\nInformation générale, sans diagnostic ni prescription.";
+     sourceId=fiche.id;references=[{provider:fiche.source,title:fiche.title,url:fiche.url}];
+     engine="Agnes AI · spécialité fibromyalgie et documentation médicale";
+    }catch{
+     setEngineNote("Agnes indisponible pour cette fiche : réponse médicale sourcée préservée.");
+     notify("La fiche médicale fiable reste accessible sans Agnes.");
+    }
+   }
+  }
   const route=mistralRoute(input,intent,response);
   if(route&&!autoEligible&&!onlineAttempted&&$("mistral-use").checked&&mistralStatus().connected){
    const state=mistralStatus();
@@ -499,16 +537,19 @@ async function ask(q){
    const candidate=await answerWithAuto({
     question:input,intent,response,
     state:{agnesConnected:agnes.connected,agnesCooldown:agnes.cooldownSeconds,agnesBlocked:agnes.authorizationBlocked,
-     mistralConnected:mistral.connected,mistralCooldown:mistral.cooldownSeconds,mistralBlocked:mistral.authorizationBlocked},
+     mistralConnected:false,mistralCooldown:mistral.cooldownSeconds,mistralBlocked:true},
     agnes:async q=>generateAgnesChat(q,{model:$("agnes-model").value,history:preferenceHistory(savedGeneralPreference(DATA.settings),$("chat-memory-optin").checked?sessionTurns:[],$("preference-share").checked)}),
     mistral:async q=>generateMistralChat(q,preferenceHistory(savedGeneralPreference(DATA.settings),$("chat-memory-optin").checked?sessionTurns:[],$("preference-share").checked),{model:$("mistral-model").value}),
     authorize:(provider,q)=>{
      if(apiBudgetStatus().remaining===0){notify("Plafond volontaire d’appels IA de cette session atteint.");return false;}
      const history=preferenceHistory(savedGeneralPreference(DATA.settings),$("chat-memory-optin").checked?sessionTurns:[],$("preference-share").checked);
      const shared=sessionPreview(q,history,history.length>0);
-     return confirm("Envoyer à "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" ?\n\nQuestion : « "+q+" »"+
+     if(provider==="agnes"&&$("agnes-session-consent")?.checked)return true;
+     const accepted=confirm("Envoyer à "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" ?\n\nQuestion : « "+q+" »"+
       (shared?"\n\nContexte de conversation également transmis :\n"+shared:"\n\nAucun historique envoyé.")+
       "\n\nAucune donnée du dossier médical n'est transmise. Cet appel peut être facturé.");
+     if(accepted&&provider==="agnes")$("agnes-session-consent").checked=true;
+     return accepted;
     },
     onAttempt:provider=>setEngineNote("IA : génération "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" après votre accord…")
    });
@@ -1253,7 +1294,7 @@ async function init(){
    const i=DATA.settings.findIndex(s=>s.id===id);
    if(i<0)DATA.settings.push({id,value});else DATA.settings[i]={id,value};
  },notify});
- try{db=await openSecureDB();await reload();setInterval(()=>{lockInactiveVault();if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){lockInactiveVault();if(db){renderReminders();renderUpcomingAppointments();}}});}
+ try{db=await openSecureDB();await reload();await restoreAgnesAfterUnlock();setInterval(()=>{lockInactiveVault();if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){lockInactiveVault();if(db){renderReminders();renderUpcomingAppointments();}}});}
  catch(e){console.error(e);notify("Stockage local indisponible : l'application ne peut pas enregistrer vos données. Autorisez le stockage pour ce site.");}
  if("serviceWorker" in navigator&&window.isSecureContext){navigator.serviceWorker.register("./sw.js").catch(()=>{/* hors ligne facultatif */});}
 }
