@@ -4,7 +4,7 @@
  * Sa récupération demande une action volontaire, coffre ouvert.
  * Ne protège pas contre du JavaScript compromis ou une extension hostile.
  */
-export const CREDENTIAL_ID="agnes-credential-v1";
+export const AGNES_CREDENTIAL_ID="agnes-credential-v1";
 const AAD="FibroBot:AgnesAPIKey:v1";
 const encoder=new TextEncoder(),decoder=new TextDecoder();
 const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
@@ -42,21 +42,21 @@ export async function unsealAgnesCredential(envelope,key){
 export async function hasStoredAgnesCredential(session){
  vaultKey(session);
  const records=await session.all("settings");
- return records.some(x=>x?.id===CREDENTIAL_ID&&validStoredAgnesCredential(x.value));
+ return records.some(x=>x?.id===AGNES_CREDENTIAL_ID&&validStoredAgnesCredential(x.value));
 }
 export async function saveAgnesCredential(session,apiKey){
  const envelope=await sealAgnesCredential(apiKey,vaultKey(session));
- await session.put("settings",{id:CREDENTIAL_ID,value:envelope});
+ await session.put("settings",{id:AGNES_CREDENTIAL_ID,value:envelope});
  return true;
 }
 export async function loadAgnesCredential(session){
  const key=vaultKey(session);
- const stored=(await session.all("settings")).find(x=>x?.id===CREDENTIAL_ID);
+ const stored=(await session.all("settings")).find(x=>x?.id===AGNES_CREDENTIAL_ID);
  if(!stored)throw Error("Aucune clé Agnes dans le coffre.");
  return unsealAgnesCredential(stored.value,key);
 }
 export async function deleteAgnesCredential(session){
  vaultKey(session);
- await session.del("settings",CREDENTIAL_ID);
+ await session.del("settings",AGNES_CREDENTIAL_ID);
  return true;
 }
