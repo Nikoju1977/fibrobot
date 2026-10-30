@@ -48,7 +48,7 @@ const $=id=>document.getElementById(id);
 const TITLES={today:"Aujourd'hui",chat:"Assistant",tasks:"Mes tâches",health:"Suivi santé",conditions:"Mes maladies",medications:"Mes traitements",appointments:"Mes rendez-vous",library:"Bibliothèque médicale",privacy:"Mes données",crisis:"Mode crise"};
 const DATA={symptoms:[],tasks:[],conditions:[],medications:[],appointments:[],medicationLogs:[],conversations:[],settings:[]};
 const FORMS={tasks:"task-form",symptoms:"health-form",conditions:"condition-form",medications:"med-form",appointments:"appt-form"};
-let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSpeech="",busyChat=false;
+let db=null,energy=5,voice=false,seen=new Set(),timer=null,patientUX=null,lastSpeech="",busyChat=false,networkEnabled=false;
 let refreshSimpleAssistant=()=>{};
 let bookText="",bookIndex=0,bookFile=null,speechToken=0,activeRecognition=null,dictationStarting=false,pendingInstall=null,pdfDocumentFile=null,lastActivityAt=Date.now();
 // Session-only chat context; never persisted and never taken from the health vault.
