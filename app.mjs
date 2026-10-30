@@ -56,7 +56,11 @@ const EXPERT_PANEL=Object.freeze([
  {id:"algologue",name:"Douleur / fibromyalgie",specialist:"pain"},
  {id:"pharmacien",name:"Traitements / pharmacien",specialist:"medication"},
  {id:"ergonome",name:"Ergonomie / énergie",specialist:"pacing"},
- {id:"qualite",name:"Qualité / suivi",specialist:"quality"}
+ {id:"qualite",name:"Qualité / suivi",specialist:"quality"},
+ {id:"triage",name:"Orientation médicale",specialist:"triage"},
+ {id:"psycho",name:"Soutien émotionnel",specialist:"psychosocial"},
+ {id:"nutrition",name:"Alimentation",specialist:"nutrition"},
+ {id:"social",name:"Vie sociale / travail",specialist:"social"}
 ]);
 let feedMonitor=null;
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
@@ -413,7 +417,7 @@ async function ask(q){
    }
   }
   // Agents déterministes : aucune donnée du dossier ne part vers Agnes.
-  if(!direct&&requestAgentId!=="general"&&["medical","planning","summary"].includes(intent)&&!liveIntent(input)&&response.kind!=="urgent"){
+  if(!direct&&requestAgentId!=="general"&&!liveIntent(input)&&response.kind!=="urgent"){
    const selected=EXPERT_PANEL.find(a=>a.id===requestAgentId);
    if(selected){
     const result=runSpecialist(selected.specialist,{...DATA,energy},input);
