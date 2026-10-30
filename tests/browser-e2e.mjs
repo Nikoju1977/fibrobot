@@ -285,7 +285,7 @@ try{
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages a[href*='fr.wikipedia.org/wiki/Marie_Curie']").waitFor({timeout:12000});
  assert.equal(wikipediaQueries,1);
- assert.match(await page.locator("#chat-engine-state").textContent(),/Internet publiques/);
+ await page.waitForFunction(()=>/Internet publiques/.test(document.querySelector("#chat-engine-state")?.textContent||""),null,{timeout:15000});
  const onlineText=await page.locator("#messages").textContent();
  assert.match(onlineText,/Physicienne et chimiste/);
  await page.locator("#network-mode").uncheck();
