@@ -85,7 +85,7 @@ try{
  assert.equal(await page.locator("#v31-ambient-controls").count(),0,"Audio controls use class, not a phantom ID");
  assert.equal(await page.locator(".v31-ambient-controls button[data-ambient]").count(),5,"Five browser-only soundscapes");
  assert.equal(await page.locator("#v31-ambient-volume").inputValue(),"25");
- await page.locator("#v31-ambient-volume").fill("30");
+ await page.locator("#v31-ambient-volume").evaluate(el=>{el.value="30";el.dispatchEvent(new Event("input",{bubbles:true}));});
  assert.match(await page.locator(".v31-ambient-panel").textContent(),/Volume sonore : 30 %/);
  assert.equal(await page.locator("#v31-ambient-status").textContent(),"Aucune ambiance en lecture.");
  assert.equal(await page.locator("#v31-watch").isChecked(),false,"No feed monitoring without consent");
