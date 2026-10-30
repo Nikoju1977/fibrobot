@@ -228,13 +228,13 @@ try{
  });
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Aucune IA conversationnelle n.a pu répondre/).waitFor();
+ await page.locator("#messages").getByText(/Agnes AI n.a pas pu répondre/).waitFor();
  assert.equal(wikipediaQueries,0,"Network forbidden until enabled");
  await page.locator("#network-mode").check();
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Qui était Marie Curie/);dialog.dismiss();});
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Aucune IA conversationnelle n.a pu répondre/).last().waitFor();
+ await page.locator("#messages").getByText(/Agnes AI n.a pas pu répondre/).last().waitFor();
  assert.equal(wikipediaQueries,0,"Consent to session is not consent to send each question");
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Wikipédia/);dialog.accept();});
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
@@ -339,7 +339,7 @@ try{
  page.once("dialog",dialog=>{assert.match(dialog.message(),/histoire courte/);dialog.accept();});
  await page.locator("#prompt").fill("Raconte une histoire courte sur la lune");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Aucune IA conversationnelle n.a pu répondre/).last().waitFor({timeout:15000});
+ await page.locator("#messages").getByText(/Agnes AI n.a pas pu répondre/).last().waitFor({timeout:15000});
  assert.equal(mistralCalls,4,"One request only on 429");
  await page.waitForFunction(()=>/pause|quota/i.test(document.getElementById("mistral-status")?.textContent||""),{timeout:12000});
  assert.equal(await page.locator("#mistral-use").isChecked(),false,"Disable Mistral automatically when rate-limited");
