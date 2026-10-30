@@ -87,3 +87,22 @@ body.v30-simple:not(.v30-advanced) #chat #gemma-options{display:none!important}
 .v31-ambient-panel input[type="range"]{display:block;width:min(100%,450px);min-height:40px;accent-color:#39b992}
 .v31-ambient-panel #v31-ambient-status{margin:8px 0;font-size:.88rem}
 @media (prefers-reduced-motion:reduce){.v31-agent-buttons *, .v31-ambient-controls *{animation:none!important;transition:none!important}}
+
+/* V32 — fast private self tracking, on-device search */
+.v32-quick-panel{margin-block:12px;border:1px solid #b7ded5;background:linear-gradient(130deg,#f0fcf7,#fff)}
+.v32-quick-form{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.v32-quick-form label{display:block;flex:0 0 100%;font-weight:650;color:#1b4653}
+.v32-quick-form input{flex:1 1 240px;min-width:0;min-height:50px;padding:12px;border:1px solid #9fbfbc;border-radius:10px;background:#fff;color:#1d3844}
+.v32-quick-form button{min-height:50px}
+.v32-quick-form .tiny{flex:0 0 100%;margin:0;color:#385c65}
+.v32-quick-panel #v32-quick-status{margin:10px 0 0;font-weight:600;color:#20594b}
+.v32-search-panel{margin-block:12px}
+.v32-search-panel summary{cursor:pointer;font-weight:750;min-height:44px;padding:8px 0}
+.v32-search-panel label{display:block;margin:12px 0 6px;font-weight:600}
+.v32-search-panel input[type="search"]{width:100%;min-height:48px;border:1px solid #92b5ba;padding:10px;border-radius:9px}
+.v32-search-results{max-height:400px;overflow-y:auto;margin:12px 0}
+.v32-search-result{border-top:1px solid var(--border);padding:12px 0;overflow-wrap:anywhere}
+.v32-search-result strong,.v32-search-result small{display:block}
+.v32-search-result small{color:#607483;margin:3px 0}
+.v32-search-result .btn{min-height:42px}
+@media(max-width:650px){.v32-quick-panel{padding:14px}.v32-quick-form button{flex:1 1 100%}}
