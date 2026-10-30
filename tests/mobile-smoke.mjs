@@ -18,6 +18,10 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
   await page.locator("#vault-submit").click();
   await page.locator("#vault-gate").waitFor({state:"hidden",timeout:30000});
   assert.equal(requests.length,0,"No external model API should be called before consent: "+requests);
+  assert.equal(await page.locator("#chat").evaluate(el=>el.classList.contains("active")),true,"Mobile opens the conversation");
+  assert.equal(await page.locator("#v33-connect-button").isVisible(),true,"Visible Agnes connection entry point");
+  assert.equal(await page.locator(".v31-agent-panel").isVisible(),false,"Agents hidden in simple mode");
+  await page.locator('.mobile-dock [data-tab="today"]').click();
   // Un patient novice peut terminer la découverte puis rouvrir l'aide à volonté.
   await page.locator("#first-steps").waitFor({state:"visible",timeout:15000});
   await page.locator("#dismiss-guide").click();
@@ -56,7 +60,7 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
 
   assert.equal(await page.locator("#agnes-options").isVisible(),true,"Agnes settings visible");
   assert.equal(await page.locator("#mistral-options").isVisible(),false,"Advanced Mistral settings hidden in simple mode");
-   await page.locator("#v30-advanced-toggle").click();
+   await page.locator("#v33-more").click();
    assert.equal(await page.locator("#mistral-options").isVisible(),true,"Mistral settings available on explicit advanced toggle");
   assert.equal(await page.locator("#chat-local-mode").count(),0,"No local-mode button");
   console.log(label+": UI, coffre, formulaire, XSS, responsive OK (émulation, pas de matériel réel)");
