@@ -81,7 +81,13 @@ try{
   (await page.locator("#chat .chat-card").boundingBox()).y,"Agnes setup shown before chat");
  assert.equal(await page.locator("#mistral-options").isVisible(),false,"Advanced settings hidden in simple mode");
  assert.equal(await page.locator("#v30-advanced-toggle").getAttribute("aria-expanded"),"false");
- assert.equal(await page.locator(".v31-agent-buttons button").count(),5,"General + four specialist agents");
+ assert.equal(await page.locator(".v31-agent-buttons button").count(),9,"General plus eight specialist agents");
+ assert.equal(await page.locator("#v31-ambient-controls").count(),0,"Audio controls use class, not a phantom ID");
+ assert.equal(await page.locator(".v31-ambient-controls button[data-ambient]").count(),5,"Five browser-only soundscapes");
+ assert.equal(await page.locator("#v31-ambient-volume").inputValue(),"25");
+ await page.locator("#v31-ambient-volume").fill("30");
+ assert.match(await page.locator(".v31-ambient-panel").textContent(),/Volume sonore : 30 %/);
+ assert.equal(await page.locator("#v31-ambient-status").textContent(),"Aucune ambiance en lecture.");
  assert.equal(await page.locator("#v31-watch").isChecked(),false,"No feed monitoring without consent");
  assert.equal(await page.locator("#v31-live-consent").isChecked(),false,"No public API without consent");
  await page.locator("#v30-advanced-toggle").click();
