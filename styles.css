@@ -106,3 +106,17 @@ body.v30-simple:not(.v30-advanced) #chat #gemma-options{display:none!important}
 .v32-search-result small{color:#607483;margin:3px 0}
 .v32-search-result .btn{min-height:42px}
 @media(max-width:650px){.v32-quick-panel{padding:14px}.v32-quick-form button{flex:1 1 100%}}
+
+/* V32 expert: low-distraction guided breathing with explicit start/stop. */
+.v32-breathing-panel{margin-block:14px;border:1px solid #c9d3e9;border-radius:14px;padding:18px;background:#f5f7ff}
+.v32-breathing-panel h3{font-weight:750;color:#193e56}
+.v32-breathing-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0}
+.v32-breathing-controls label{font-weight:600;flex:0 0 auto}
+.v32-breathing-controls select{min-height:48px;flex:1 1 120px}
+.v32-breathing-controls button{min-height:48px;flex:1 1 110px}
+.v32-breath-circle{width:150px;height:150px;margin:20px auto 8px;display:grid;place-items:center;text-align:center;border-radius:50%;border:3px solid #6a6ccf;background:linear-gradient(135deg,#d6deff,#bcf4dc);font-weight:700;color:#19354c;transition:transform 4s ease-in-out}
+.v32-breath-circle[data-phase="inhale"]{transform:scale(1.12)}
+.v32-breath-circle[data-phase="exhale"]{transform:scale(.94)}
+.v32-breath-status{text-align:center;font-weight:650;min-height:46px;color:#254758}
+@media(prefers-reduced-motion:reduce){.v32-breath-circle{transition:none!important;transform:none!important}}
+@media(max-width:600px){.v32-breathing-panel{padding:12px}.v32-breathing-controls{display:grid;grid-template-columns:1fr 1fr}.v32-breathing-controls label{grid-column:span 1}.v32-breathing-controls select{width:100%;min-width:0}.v32-breathing-controls button{grid-column:span 1}}

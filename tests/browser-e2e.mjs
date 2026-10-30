@@ -88,6 +88,15 @@ try{
  await page.locator("#v31-ambient-volume").evaluate(el=>{el.value="30";el.dispatchEvent(new Event("input",{bubbles:true}));});
  assert.match(await page.locator(".v31-ambient-panel").textContent(),/Volume sonore : 30 %/);
  assert.equal(await page.locator("#v31-ambient-status").textContent(),"Aucune ambiance en lecture.");
+  assert.equal(await page.locator("#v32-breath-mode").inputValue(),"calm");
+  assert.equal(await page.locator("#v32-breath-duration").inputValue(),"2");
+  await page.locator("#v32-breath-start").click();
+  assert.equal(await page.locator("#v32-breath-start").isDisabled(),true);
+  assert.match(await page.locator("#v32-breath-status").textContent(),/Inspirez doucement/);
+  await page.locator("#v32-breath-stop").click();
+  assert.equal(await page.locator("#v32-breath-start").isDisabled(),false);
+  assert.match(await page.locator("#v32-breath-status").textContent(),/arrêtée/);
+
  assert.equal(await page.locator("#v31-watch").isChecked(),false,"No feed monitoring without consent");
  assert.equal(await page.locator("#v31-live-consent").isChecked(),false,"No public API without consent");
  await page.locator("#v30-advanced-toggle").click();

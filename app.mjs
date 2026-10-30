@@ -6,6 +6,7 @@ import {createPublicFeedMonitor,feedState} from "./live-feed-hub.mjs";
 import {createAmbientPlayer,AMBIENT_TYPES} from "./ambient-sound.mjs";
 import {parseQuickHealth,QUICK_HELP} from "./quick-health.mjs";
 import {searchPrivateRecords} from "./private-search.mjs";
+import {BREATH_PATTERNS,BREATH_DURATIONS,breathingStep,sessionTimeString} from "./breathing-guide.mjs";
 import {SPECIALISTS,routeSpecialist,runSpecialist} from "./agent-hub.mjs";
 import {classifyIntent,summarizeObservations,prepareVisit,planDaily} from "./assistant-engine.mjs";
 import {findScientificArticles,externalResearchLink} from "./research-library.mjs";
@@ -67,6 +68,8 @@ const EXPERT_PANEL=Object.freeze([
 ]);
 let feedMonitor=null;
 const ambientPlayer=createAmbientPlayer();
+let breathingTimer=null;
+function stopBreathingSession(){if(breathingTimer!==null){clearInterval(breathingTimer);breathingTimer=null;}}
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
 const val=id=>$(id).value;
 function notify(message){$("toast").textContent=message;$("toast").hidden=false;clearTimeout(notify.timeout);notify.timeout=setTimeout(()=>$("toast").hidden=true,5500);}
@@ -89,7 +92,7 @@ function lockInactiveVault(){
  const minutes=storedAutoLockMinutes(DATA.settings);
  if(!shouldLockForInactivity(lastActivityAt,Date.now(),minutes))return;
  try{
-  activeSession.invalidate();feedMonitor?.stop();ambientPlayer.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}
+  activeSession.invalidate();feedMonitor?.stop();ambientPlayer.stop();stopBreathingSession();stopSpeaking();try{activeRecognition?.abort();}catch{}
   sessionTurns.length=0;bookText="";pdfDocumentFile=null;
   disconnectMistral();disconnectAgnes();db.close();db=null;
  }finally{location.reload();}
@@ -1105,7 +1108,7 @@ function events(){
   speak(lastSpeech);
  });
  $("erase-legacy").addEventListener("click",async()=>{if(!confirm("Supprimer l'ancienne base FibrobotDB non chiffrée de CE navigateur ? Vérifiez d'abord que vos données ont bien été migrées dans le coffre."))return;try{await eraseLegacy();notify("Ancienne base non chiffrée supprimée.");}catch(e){notify(e.message);}});
- $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;activeSession.invalidate();feedMonitor?.stop();ambientPlayer.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
+ $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;activeSession.invalidate();feedMonitor?.stop();ambientPlayer.stop();stopBreathingSession();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
  $("breath-start")?.addEventListener("click",breathing);
  $("relax-script")?.addEventListener("click",()=>{
    const script="Vous pouvez arrêter à tout moment. Installez-vous si possible dans une position confortable. Prenez conscience des points de contact de votre corps avec le support. Laissez votre respiration trouver son rythme naturel, sans la forcer. Observez les sons autour de vous. Si vous ressentez de l'inconfort, ouvrez les yeux et arrêtez. Vous n'avez rien à réussir. Quel petit geste pourrait rendre cet instant plus confortable ?";
@@ -1269,7 +1272,7 @@ function setupV31Controls(){
  feeds.append(dom("h3","Flux Internet et informations actuelles"));
  feeds.append(dom("p","Routage automatique des questions météo, qualité de l'air et jours fériés. Bibliothèques : Wikipédia, Wikidata, Wiktionnaire, OpenAlex, Crossref, Open Library, GitHub, Europe PMC. Aucun modèle IA local à installer.","tiny"));
  const cityLabel=dom("label","Ville à interroger");cityLabel.htmlFor="v31-city";
- const city=dom("input");city.id="v31-city";city.type="text";city.maxLength=75;city.value="La Meilleraye-de-Bretagne";city.autocomplete="off";
+ const city=dom("input");city.id="v31-city";city.type="text";city.maxLength=75;city.value="";city.placeholder="Ex. Châteaubriant ou Nantes";city.autocomplete="off";
  feeds.append(cityLabel,city);
  const consentLabel=dom("label",undefined,"consent");consentLabel.htmlFor="v31-live-consent";
  const consent=dom("input");consent.type="checkbox";consent.id="v31-live-consent";
@@ -1392,6 +1395,43 @@ function setupV32Controls(){
  query.addEventListener("input",redraw);
  search.addEventListener("toggle",()=>{if(search.open){redraw();}});
  search.append(searchLabel,query,output);quick.after(search);
+ const breath=dom("section",undefined,"card v32-breathing-panel");breath.id="v32-breathing-panel";
+ breath.append(dom("h3","Respiration guidée · pause douce"),
+  dom("p","Exercice facultatif de détente, non médical. Respirez à votre rythme, sans retenir votre souffle. Arrêtez si vous êtes gêné, étourdi ou essoufflé.","tiny"));
+ const row=dom("div",undefined,"v32-breathing-controls");
+ const modeLabel=dom("label","Rythme");modeLabel.htmlFor="v32-breath-mode";
+ const mode=dom("select");mode.id="v32-breath-mode";
+ for(const option of BREATH_PATTERNS){const el=dom("option",option.name);el.value=option.id;mode.append(el);}
+ const durationLabel=dom("label","Durée");durationLabel.htmlFor="v32-breath-duration";
+ const duration=dom("select");duration.id="v32-breath-duration";
+ for(const n of BREATH_DURATIONS){const el=dom("option",n+" minutes");el.value=String(n);duration.append(el);}
+ const start=dom("button","Démarrer","btn primary");start.id="v32-breath-start";start.type="button";
+ const stop=dom("button","Arrêter","btn light");stop.id="v32-breath-stop";stop.type="button";stop.disabled=true;
+ const visual=dom("div","À votre rythme","v32-breath-circle");visual.id="v32-breath-circle";visual.setAttribute("aria-hidden","true");
+ const current=dom("p","Prêt · 02:00","v32-breath-status");current.id="v32-breath-status";current.setAttribute("role","status");
+ const pause=()=>{stopBreathingSession();start.disabled=false;stop.disabled=true;mode.disabled=false;duration.disabled=false;visual.dataset.phase="rest";};
+ start.addEventListener("click",()=>{
+  if(!db){notify("Déverrouillez le coffre pour ouvrir votre séance.");return;}
+  pause();start.disabled=true;stop.disabled=false;mode.disabled=true;duration.disabled=true;
+  const begun=Date.now();
+  const refresh=()=>{
+   if(!db||document.visibilityState!=="visible"){
+    pause();current.textContent="Séance arrêtée : application masquée ou coffre verrouillé.";return;
+   }
+   const step=breathingStep(Math.max(0,Date.now()-begun),{pattern:mode.value,durationMinutes:Number(duration.value)});
+   visual.dataset.phase=step.phase;
+   visual.textContent=step.done?"Terminé":step.phase==="inhale"?"Inspirez":"Expirez";
+   current.textContent=step.label+" · "+sessionTimeString(step.remainingSeconds)+" restantes"+
+     (step.done?"":" · phase "+step.phaseRemainingSeconds+" s");
+   if(step.done)pause();
+  };
+  refresh();breathingTimer=setInterval(refresh,250);
+ });
+ stop.addEventListener("click",()=>{pause();visual.textContent="À votre rythme";current.textContent="Séance arrêtée.";});
+ duration.addEventListener("change",()=>{if(!breathingTimer)current.textContent="Prêt · "+sessionTimeString(Number(duration.value)*60);});
+ document.addEventListener("visibilitychange",()=>{if(document.visibilityState!=="visible"&&breathingTimer){pause();visual.textContent="En pause";current.textContent="Séance arrêtée : application masquée.";}})
+ row.append(modeLabel,mode,durationLabel,duration,start,stop);
+ breath.append(row,visual,current);search.after(breath);
 }
 function setupV30Controls(){
  document.body.classList.add("v30-simple");
@@ -1477,7 +1517,7 @@ async function init(){
  window.addEventListener("online",updateConnectionState);
  window.addEventListener("offline",updateConnectionState);
  window.addEventListener("pagehide",()=>{
-  activeSession.invalidate();feedMonitor?.stop();ambientPlayer.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;bookText="";bookFile=null;
+  activeSession.invalidate();feedMonitor?.stop();ambientPlayer.stop();stopBreathingSession();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;bookText="";bookFile=null;
   disconnectMistral();disconnectAgnes();sessionTurns.length=0;pdfDocumentFile=null;$("preference-share").checked=false;
   $("agnes-key").value="";
   const field=$("mistral-key");if(field)field.value="";

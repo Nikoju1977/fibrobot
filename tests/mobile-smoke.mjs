@@ -51,6 +51,9 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
   assert.equal(await page.locator("#gemma-options").count(),0,"No local LLM configuration installed");
    assert.equal(await page.locator(".v31-agent-buttons button").count(),9,"Eight safe specialists and general chat accessible");
    assert.equal(await page.locator(".v31-ambient-controls button[data-ambient]").count(),5,"Ambient controls accessible on mobile");
+   assert.equal(await page.locator("#v32-breath-start").isVisible(),true,"Guided breathing controls visible on phone");
+   assert.equal(await page.locator("#v32-breath-stop").isDisabled(),true,"No accidental timer before opt-in");
+
   assert.equal(await page.locator("#agnes-options").isVisible(),true,"Agnes settings visible");
   assert.equal(await page.locator("#mistral-options").isVisible(),false,"Advanced Mistral settings hidden in simple mode");
    await page.locator("#v30-advanced-toggle").click();
