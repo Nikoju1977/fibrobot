@@ -27,7 +27,7 @@ export function weatherHorizon(question){
 }
 export function explicitWeatherCity(question){
  const q=compact(question);
- const m=q.match(/\b(?:a|à|sur|pour|dans|de|d')\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'-]{1,70})/i);
+ const m=q.match(/\b(?:à|sur|pour|dans|de|d')\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'-]{1,70})/i);
  if(!m)return "";
  const city=m[1].replace(/\s+(?:aujourd'hui|demain|après-demain|cette semaine|ce soir|maintenant|actuellement|sur les? .*)$/i,"").trim().replace(/[?!.,]+$/,"");
  if(/^(?:la|le|ce|cette|quel|quelle|demain|aujourd'hui|temps|meteo|pluie|semaine|matin|soir)$/i.test(city))return "";
@@ -59,7 +59,7 @@ export async function resolvePublicCity(city,options={}){
  if(!best||!Number.isFinite(Number(best.latitude))||!Number.isFinite(Number(best.longitude)))throw Error("Ville introuvable. Précisez le nom et, si besoin, le département.");
  return {name:compact(best.name),region:compact(best.admin1||""),country:compact(best.country||""),latitude:Number(best.latitude),longitude:Number(best.longitude)};
 }
-const numeric=v=>Number.isFinite(Number(v))?Number(v):null;
+const numeric=v=>v===null||v===undefined||v===""?null:Number.isFinite(Number(v))?Number(v):null;
 const fmt=(n,unit="")=>n===null?"non disponible":Math.round(n*10)/10+unit;
 export async function publicWeather(city,{question="",fetchImpl=globalThis.fetch,signal}={}){
  const location=await resolvePublicCity(city,{fetchImpl,signal});
