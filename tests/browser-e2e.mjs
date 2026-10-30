@@ -36,6 +36,9 @@ try{
  await page.locator("#vault-single-patient").check();
  await page.locator("#vault-submit").click();
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:20000});
+ assert.equal(await page.locator("#chat").evaluate(el=>el.classList.contains("active")),true,"V33 opens the conversation by default");
+ assert.equal(await page.locator("#v33-connect-button").isVisible(),true,"Connection CTA appears in chat");
+ assert.equal(await page.locator(".v31-agent-panel").isVisible(),false,"Specialist controls initially hidden");
  await page.locator('#nav [data-tab="privacy"]').click();
  assert.equal(await page.locator("#auto-lock-minutes").inputValue(),"15","Secure default inactivity timeout");
  await page.locator("#auto-lock-minutes").selectOption("30");
@@ -77,10 +80,13 @@ try{
  await page.locator('#nav [data-tab="chat"]').click();
  // Nouvelle expérience : la discussion est la première section visible.
  assert.equal(await page.locator("#chat-form textarea#prompt").count(),1,"Multiline composer");
- assert.ok((await page.locator("#agnes-options").boundingBox()).y <
-  (await page.locator("#chat .chat-card").boundingBox()).y,"Agnes setup shown before chat");
+ assert.ok((await page.locator("#chat .chat-card").boundingBox()).y <
+  (await page.locator("#agnes-options").boundingBox()).y,"Conversation appears before IA settings");
+ await page.locator("#v33-connect-button").click();
+ assert.equal(await page.locator("#agnes-options").evaluate(el=>el.open),true,"CTA opens Agnes");
+ await page.locator("#agnes-options summary").click();
  assert.equal(await page.locator("#mistral-options").isVisible(),false,"Advanced settings hidden in simple mode");
- assert.equal(await page.locator("#v30-advanced-toggle").getAttribute("aria-expanded"),"false");
+ assert.equal(await page.locator("#v33-more").getAttribute("aria-expanded"),"false");
  assert.equal(await page.locator(".v31-agent-buttons button").count(),9,"General plus eight specialist agents");
  assert.equal(await page.locator("#v31-ambient-controls").count(),0,"Audio controls use class, not a phantom ID");
  assert.equal(await page.locator(".v31-ambient-controls button[data-ambient]").count(),5,"Five browser-only soundscapes");
@@ -99,7 +105,8 @@ try{
 
  assert.equal(await page.locator("#v31-watch").isChecked(),false,"No feed monitoring without consent");
  assert.equal(await page.locator("#v31-live-consent").isChecked(),false,"No public API without consent");
- await page.locator("#v30-advanced-toggle").click();
+ await page.locator("#v33-more").click();
+ assert.equal(await page.locator("#v33-more").getAttribute("aria-expanded"),"true");
  assert.equal(await page.locator("#chat-voice-toggle").getAttribute("aria-pressed"),"false");
  assert.equal(await page.locator("#chat-memory-optin").isChecked(),false,"Session memory must be opt-in");
  assert.equal(await page.locator("#sources-first").isChecked(),false,"Sourced search must be opt-in");
@@ -444,7 +451,7 @@ try{
  assert.equal(await page.locator("#auto-lock-minutes").inputValue(),"30","Encrypted inactivity setting should survive lock and reopen");
  await page.waitForFunction(()=>/Agnes chargé depuis le coffre/.test(document.getElementById("agnes-status")?.textContent||""),{timeout:15000});
  await page.locator('#nav [data-tab="chat"]').click();
- await page.locator("#v30-advanced-toggle").click();
+ assert.equal(await page.locator("#v33-more").getAttribute("aria-expanded"),"true");
  assert.equal(await page.locator("#v28-quiet-toggle").getAttribute("aria-pressed"),"true","Calm preference must be restored from vault");
  await page.locator('#nav [data-tab="chat"]').click();
  await page.locator("#v28-quiet-toggle").click();
