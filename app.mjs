@@ -216,6 +216,14 @@ function setEngineNote(message){
 }
 function updateEngineNote(){
  const ag=agnesStatus(),mi=mistralStatus();
+ if(document.body.classList.contains("v30-simple")&&!document.body.classList.contains("v30-advanced")){
+  setEngineNote(ag.connected?"Agnes AI activé. Questions générales et fiches médicales publiques autorisées, avec consentement.":"Entrez votre clé Agnes AI pour activer les réponses conversationnelles. Les fiches médicales FibroBot restent disponibles.");
+  updateApiBudgetUI();
+  const badge=$("assistant-mode-badge");
+  if(badge)badge.textContent=ag.connected?"Agnes AI · FibroBot":"Agnes à connecter";
+  const auto=$("auto-brain-status");if(auto)auto.textContent=ag.connected?"Agnes connecté : prêt pour les questions admissibles.":"Agnes non connecté.";
+  return;
+ }
  setEngineNote("Conversation IA : Agnes "+(ag.connected?(ag.authorizationBlocked?"clé à vérifier":ag.cooldownSeconds?"en pause":"connecté"):"non connecté")+
  " · Mistral "+(mi.connected?(mi.authorizationBlocked?"clé à vérifier":mi.cooldownSeconds?"en pause":"connecté"):"non connecté")+
  " · Envoi seulement après votre accord.");
@@ -564,7 +572,7 @@ async function ask(q){
    updateEngineNote();
   }
   if(intent==="general"&&!autoAnswered&&!sourceFirstAnswered&&!onlineAttempted&&!mistralAttempted&&response.kind==="refusal"){
-   answer="Aucune IA conversationnelle n’a pu répondre. Connectez Agnes ou Mistral dans les options, puis réessayez. Les informations sourcées et les fonctions de sécurité restent disponibles. Je préfère ne pas inventer de réponse.";
+   answer="Agnes AI n'a pas pu répondre. Vérifiez votre clé et le bouton « Tester Agnes » ; votre connexion et le quota doivent être disponibles. Les fiches sur la fibromyalgie restent accessibles. Je préfère ne pas inventer de réponse.";
    engine="Assistant documentaire de secours";
   }
   if(mistralProblem&&!mistralAttempted){setEngineNote("Mistral en pause. FibroBot répond localement.");}
@@ -783,7 +791,7 @@ function events(){
   if(!confirm("Tester Agnes en envoyant une question d'arithmétique publique ? Cette requête peut être facturée."))return;
   const button=$("agnes-test");button.disabled=true;$("agnes-status").textContent="Vérification de la connexion Agnes…";
   try{const result=await testAgnesConnection({model:$("agnes-model").value});$("agnes-status").textContent="Agnes disponible · test réussi ("+result.model+").";}
-  catch(error){$("agnes-status").textContent=agnesStatus().cooldownSeconds>0?"Agnes en pause (quota). Essayez Mistral ou réessayez plus tard.":"Agnes indisponible. Vérifie la clé, le réseau et l’accès API ; Mistral reste optionnel.";}
+  catch(error){$("agnes-status").textContent=agnesStatus().cooldownSeconds>0?"Agnes en pause (quota). Réessayez lorsque le fournisseur le permet.":"Agnes indisponible. Vérifiez la clé, le crédit, le réseau et les permissions du navigateur (CORS).";}
   finally{button.disabled=!agnesStatus().connected;updateEngineNote();}
  });
  $("agnes-disconnect").addEventListener("click",()=>{disconnectAgnes();$("agnes-key").value="";$("agnes-test").disabled=true;$("agnes-disconnect").disabled=true;$("agnes-status").textContent="Agnes déconnecté ; clé effacée de la session.";updateEngineNote();});
