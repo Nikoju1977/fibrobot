@@ -1,0 +1,22 @@
+name: Nettoyage des branches de PR obsoletes
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/prune-closed-pr-branches.yml'
+      - 'scripts/prune-closed-pr-branches.mjs'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  prune:
+    if: github.repository == 'Nikoju1977/fibrobot' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Supprimer uniquement les branches des PR terminees
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/prune-closed-pr-branches.mjs
