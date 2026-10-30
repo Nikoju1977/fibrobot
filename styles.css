@@ -77,3 +77,13 @@ body.v30-simple:not(.v30-advanced) #chat #gemma-options{display:none!important}
 .v31-directory a{color:#9bd9ff;text-decoration:underline}
 .v31-directory ul{columns:2;list-style:disc inside;padding:0;line-height:1.9}
 @media(max-width:600px){.v31-agent-panel,.v31-feed-panel{padding:12px;border-radius:10px}.v31-agent-buttons{gap:6px}.v31-agent-buttons button{flex:1 1 125px;font-size:.87rem;padding:9px}.v31-directory ul{columns:1}}
+
+/* V31: eight specialist spaces, gentle optional soundscapes, accessible phones */
+.v31-agent-panel,.v31-feed-panel,.v31-ambient-panel{margin-block:12px}
+.v31-ambient-panel .v31-ambient-controls{display:flex;flex-wrap:wrap;gap:9px;margin:13px 0}
+.v31-ambient-controls button{min-height:46px;flex:1 1 120px}
+.v31-ambient-controls button[aria-pressed="true"]{background:#126d50;color:white;border-color:#74d6b4}
+.v31-ambient-panel label{display:block;margin:12px 0 8px}
+.v31-ambient-panel input[type="range"]{display:block;width:min(100%,450px);min-height:40px;accent-color:#39b992}
+.v31-ambient-panel #v31-ambient-status{margin:8px 0;font-size:.88rem}
+@media (prefers-reduced-motion:reduce){.v31-agent-buttons *, .v31-ambient-controls *{animation:none!important;transition:none!important}}
