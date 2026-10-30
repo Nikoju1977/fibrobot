@@ -9,7 +9,7 @@ export function obsoletePrBranches({branches,pullRequests,repository}){
  }
  return branches.filter(b=>b?.name!=="main"&&b?.protected===false&&
    closed.has(b.name)&&!active.has(b.name)&&
-   /^(?:feat|feature|fix|audit|security)\//.test(b.name))
+   /^(?:feat|feature|fix|audit|security|maintenance)\//.test(b.name))
   .map(b=>({name:b.name,sha:b.commit.sha}));
 }
 async function request(path,{method="GET",token}={}){
