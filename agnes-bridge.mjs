@@ -5,6 +5,7 @@
  */
 import {nonMedicalMessages,cleanConversationalReply} from "./assistant-engine.mjs";
 import {reserveApiRequest} from "./request-budget.mjs";
+import {publicMedicalExplanationMessages} from "./medical-rag.mjs";
 const URL="https://apihub.agnes-ai.com/v1/chat/completions";
 const MODELS=Object.freeze(["agnes-2.5-flash","agnes-2.0-flash","agnes-3.0-flash"]);
 const active=new Set();
@@ -28,12 +29,11 @@ export function secondsToRetryAgnes(value,now=Date.now()){
  }
  return Math.max(15,Math.min(900,Math.ceil(seconds)||15));
 }
-export async function generateAgnesChat(question,{model="agnes-2.5-flash",history=[],fetchImpl=globalThis.fetch,signal}={}){
+async function sendAgnesMessages(messages,{model="agnes-2.5-flash",fetchImpl=globalThis.fetch,signal}={}){
  if(!sessionKey)throw Error("Agnes non connecté : ajoutez votre clé dans les réglages.");
  if(authorizationBlocked)throw Error("Clé Agnes refusée : reconnectez une clé valide.");
  if(agnesStatus().cooldownSeconds>0)throw Error("Agnes en pause : quota temporairement atteint.");
  if(!MODELS.includes(model))throw Error("Modèle Agnes non autorisé.");
- const messages=nonMedicalMessages(question,history); // filtered, opt-in session context only
  if(typeof fetchImpl!=="function")throw Error("Fonction réseau indisponible.");
  const controller=new AbortController(),abort=()=>controller.abort();
  active.add(controller);
@@ -67,6 +67,14 @@ export async function generateAgnesChat(question,{model="agnes-2.5-flash",histor
  }finally{
   clearTimeout(timeout);active.delete(controller);signal?.removeEventListener("abort",abort);
  }
+}
+/** Free-form general questions (without private or clinical data). */
+export async function generateAgnesChat(question,{history=[],...options}={}){
+ return sendAgnesMessages(nonMedicalMessages(question,history),options);
+}
+/** A curated public clinical fiche, never the patient's message or vault data. */
+export async function generateAgnesPublicFiche(topic,options={}){
+ return sendAgnesMessages(publicMedicalExplanationMessages(topic),options);
 }
 export async function testAgnesConnection(options={}){
  return generateAgnesChat("Combien font deux plus deux ?",options);
