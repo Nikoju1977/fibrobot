@@ -85,6 +85,6 @@ test("V28: session guard and user-accessible controls are wired in PWA",()=>{
  for(const m of ["voice-health.mjs","v28-insights.mjs","reader-search.mjs","device-readiness.mjs","session-guard.mjs"]){
   assert.ok(sw.includes(m),"offline cache "+m);
  }
- assert.match(sw,/fibrobot-shell-v29/);
+ assert.match(sw,/fibrobot-shell-v30/);
  assert.match(css,/body\.v28-quiet/);
 });
