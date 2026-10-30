@@ -451,6 +451,7 @@ try{
  assert.equal(await page.locator("#auto-lock-minutes").inputValue(),"30","Encrypted inactivity setting should survive lock and reopen");
  await page.waitForFunction(()=>/Agnes chargé depuis le coffre/.test(document.getElementById("agnes-status")?.textContent||""),{timeout:15000});
  await page.locator('#nav [data-tab="chat"]').click();
+ await page.locator("#v33-more").click();
  assert.equal(await page.locator("#v33-more").getAttribute("aria-expanded"),"true");
  assert.equal(await page.locator("#v28-quiet-toggle").getAttribute("aria-pressed"),"true","Calm preference must be restored from vault");
  await page.locator('#nav [data-tab="chat"]').click();
