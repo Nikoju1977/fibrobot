@@ -10,7 +10,8 @@ import {setupPatientUX} from "./ux-pro.mjs";
 import {checkAssistantCore,companionStatus,documentedAnswer} from "./assistant-diagnostics.mjs";
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
 import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,generateMistralMedicalExplanation,generateMistralPlanningAdvice,testMistralConnection} from "./mistral-bridge.mjs";
-import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgnesChat,testAgnesConnection} from "./agnes-bridge.mjs";
+import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgnesChat,generateAgnesPublicFiche,testAgnesConnection} from "./agnes-bridge.mjs";
+import {AGNES_CREDENTIAL_ID,validStoredAgnesCredential,saveAgnesCredential,loadAgnesCredential,deleteAgnesCredential} from "./agnes-credential-vault.mjs";
 import {autoGeneralAllowed,answerWithAuto,shouldPreferSources} from "./auto-engine.mjs";
 import {sessionPreview,appendSessionTurn} from "./conversation-context.mjs";
 import {PREFERENCE_SETTING_ID,validateGeneralPreference,savedGeneralPreference,preferenceHistory} from "./safe-preferences.mjs";
@@ -56,7 +57,7 @@ function tab(name){if(!TITLES[name])return;document.querySelectorAll(".page").fo
 function blank(target,message){target.replaceChildren(dom("div",message,"empty"));}
 function action(label,method,store,id){const b=dom("button",label,"mini");b.type="button";b.dataset.action=method;b.dataset.store=store;b.dataset.id=String(id);return b;}
 function record(target,title,subtitle,notes,store,id,extra={}){const row=dom("div",undefined,"record"),copy=dom("div"),buttons=dom("div",undefined,"actions");copy.append(dom("strong",title,extra.done?"done":""));if(subtitle)copy.append(dom("small",subtitle));if(notes)copy.append(dom("p",notes));if(extra.tag)copy.append(dom("span",extra.tag,extra.tag==="À reporter"?"tag later":"tag"));if(store==="tasks")buttons.append(action(extra.done?"Réouvrir":"Terminer","toggle",store,id));if(FORMS[store])buttons.append(action("Modifier","edit",store,id));if(store)buttons.append(action("Supprimer","delete",store,id));row.append(copy,buttons);target.append(row);}
-async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;refreshMistralVaultControls();restoreV29Preferences();render();}
+async function reload(){for(const name of Object.keys(DATA))DATA[name]=await all(db,name);energy=DATA.settings.find(s=>s.id==="energy")?.value??energy;refreshMistralVaultControls();refreshAgnesVaultControls();restoreV29Preferences();render();}
 function render(){ $("count-tasks").textContent=DATA.tasks.filter(x=>!x.done).length;$("count-health").textContent=DATA.symptoms.length;$("count-conditions").textContent=DATA.conditions.length;$("daily-energy").value=energy;$("energy-out").textContent=energy+"/10";$("energy-guide").textContent=energyGuide(energy).description;renderTasks();renderHealth();renderHealthTrends();renderConditions();renderMeds();renderAppointments();renderUpcomingAppointments();renderLibrary();renderChat();renderGeneralPreference();refreshAutoLockSettings();patientUX?.refreshGuide(); }
 function renderTasks(){const tasks=rankTasks(DATA.tasks,energy),out=$("tasks-list"),home=$("today-tasks");out.replaceChildren();home.replaceChildren();if(!tasks.length)blank(home,"Aucune tâche urgente. Vous pouvez vous reposer.");else tasks.slice(0,5).forEach(t=>record(home,t.title,"Effort "+t.effort+"/3",null,null,t.id,{tag:t.adapted?"Effort compatible":"À reporter"}));if(!DATA.tasks.length)blank(out,"Vous pouvez ajouter vos tâches ici.");else [...tasks,...DATA.tasks.filter(x=>x.done)].forEach(t=>record(out,t.title,(t.priority==="important"?"Essentielle":t.priority==="delegable"?"Délégable":"Flexible")+" · effort "+t.effort+"/3"+(t.due?" · "+t.due:""),null,"tasks",t.id,{done:t.done,tag:t.done?"Terminée":t.adapted?"Effort compatible":"À reporter"}));}
 function renderHealth(){const out=$("health-list");out.replaceChildren();if(!DATA.symptoms.length)blank(out,"Aucune observation enregistrée.");else [...DATA.symptoms].sort((a,b)=>String(b.date).localeCompare(String(a.date))).forEach(s=>{const notes=[s.energy!=null?"Énergie "+s.energy+"/10":"",s.fatigue!=null?"Fatigue "+s.fatigue+"/10":"",s.sleep!=null?"Sommeil "+s.sleep+"/10":"",s.notes].filter(Boolean).join(" · ");record(out,s.name,String(s.date).slice(0,10)+" · Intensité "+s.intensity+"/10"+(s.condition?" · "+s.condition:""),notes,"symptoms",s.id);});const select=$("health-condition"),old=select.value;select.replaceChildren();let option=dom("option","Non précisée");option.value="";select.append(option);for(const c of DATA.conditions){option=dom("option",c.name);option.value=c.name;select.append(option);}select.value=old;}
@@ -172,6 +173,23 @@ function bubble(body,role,source,references=[],siteId=""){
  }
  return b;
 }
+function refreshAgnesVaultControls(){
+ const entry=DATA.settings.find(x=>x?.id===AGNES_CREDENTIAL_ID);
+ const saved=Boolean(entry&&validStoredAgnesCredential(entry.value));
+ if($("agnes-forget"))$("agnes-forget").disabled=!saved;
+ return saved;
+}
+async function restoreAgnesAfterUnlock(){
+ if(!db||!refreshAgnesVaultControls())return;
+ try{
+  connectAgnes(await loadAgnesCredential(db));
+  $("agnes-test").disabled=false;$("agnes-disconnect").disabled=false;
+  $("agnes-status").textContent="Agnes chargé depuis le coffre chiffré. Connexion à tester si nécessaire.";
+ }catch{
+  disconnectAgnes();$("agnes-status").textContent="Clé Agnes sauvegardée mais illisible : veuillez la remplacer.";
+ }
+ updateEngineNote();
+}
 function refreshMistralVaultControls(){
  const entry=DATA.settings.find(x=>x?.id===CREDENTIAL_ID);
  const saved=Boolean(entry&&validStoredMistralCredential(entry.value));
@@ -198,12 +216,20 @@ function setEngineNote(message){
 }
 function updateEngineNote(){
  const ag=agnesStatus(),mi=mistralStatus();
+ if(document.body.classList.contains("v30-simple")&&!document.body.classList.contains("v30-advanced")){
+  setEngineNote(ag.connected?"Agnes AI activé. Questions générales et fiches médicales publiques autorisées, avec consentement.":"Entrez votre clé Agnes AI pour activer les réponses conversationnelles. Les fiches médicales FibroBot restent disponibles.");
+  updateApiBudgetUI();
+  const badge=$("assistant-mode-badge");
+  if(badge)badge.textContent=ag.connected?"Agnes AI · FibroBot":"Agnes à connecter";
+  const auto=$("auto-brain-status");if(auto)auto.textContent=ag.connected?"Agnes connecté : prêt pour les questions admissibles.":"Agnes non connecté.";
+  return;
+ }
  setEngineNote("Conversation IA : Agnes "+(ag.connected?(ag.authorizationBlocked?"clé à vérifier":ag.cooldownSeconds?"en pause":"connecté"):"non connecté")+
  " · Mistral "+(mi.connected?(mi.authorizationBlocked?"clé à vérifier":mi.cooldownSeconds?"en pause":"connecté"):"non connecté")+
  " · Envoi seulement après votre accord.");
  updateApiBudgetUI();
  const badge=$("assistant-mode-badge");
- if(badge)badge.textContent=$("auto-mode")?.checked?"IA conversationnelle":networkEnabled?"Recherche sur accord":"IA désactivée";
+ if(badge)badge.textContent=ag.connected?"Agnes AI · FibroBot":networkEnabled?"Recherche sur accord":"Agnes à connecter";
  const auto=$("auto-brain-status");
  if(auto){
   const ag=agnesStatus(),mi=mistralStatus();
@@ -452,6 +478,26 @@ async function ask(q){
    const id=routeSpecialist(input);
    if(id){const specialist=runSpecialist(id,{...DATA,energy},input);answer=specialist.answer;sourceId=specialist.sourceId;engine="Agent "+specialist.name;}
   }
+  const publicMedicalRoute=mistralRoute(input,intent,response);
+  if(intent==="medical"&&response.kind==="documented"&&publicMedicalRoute?.mode==="medical-reference"&&
+     $("auto-mode").checked&&agnesStatus().connected){
+   const permitted=$("agnes-public-fiches")?.checked||
+    confirm("Agnes AI peut expliquer la fiche médicale publique « "+publicMedicalRoute.preview+" ».\n\nAucune question personnelle, symptôme ou traitement du coffre ne sera transmis. Cet appel peut être facturé. Autoriser pour cette session ?");
+   if(permitted){
+    $("agnes-public-fiches").checked=true;
+    try{
+     const result=await generateAgnesPublicFiche(publicMedicalRoute.topic,{model:$("agnes-model").value});
+     const fiche=LIBRARY.find(d=>d.id===publicMedicalRoute.topic);
+     answer="Agnes AI — explication pédagogique de la fiche publique :\n"+result.text+"\n\nSource officielle : "+fiche.source+"\n"+fiche.answer+
+      "\n\nInformation générale, sans diagnostic ni prescription.";
+     sourceId=fiche.id;references=[{provider:fiche.source,title:fiche.title,url:fiche.url}];
+     engine="Agnes AI · spécialité fibromyalgie et documentation médicale";
+    }catch{
+     setEngineNote("Agnes indisponible pour cette fiche : réponse médicale sourcée préservée.");
+     notify("La fiche médicale fiable reste accessible sans Agnes.");
+    }
+   }
+  }
   const route=mistralRoute(input,intent,response);
   if(route&&!autoEligible&&!onlineAttempted&&$("mistral-use").checked&&mistralStatus().connected){
    const state=mistralStatus();
@@ -499,16 +545,19 @@ async function ask(q){
    const candidate=await answerWithAuto({
     question:input,intent,response,
     state:{agnesConnected:agnes.connected,agnesCooldown:agnes.cooldownSeconds,agnesBlocked:agnes.authorizationBlocked,
-     mistralConnected:mistral.connected,mistralCooldown:mistral.cooldownSeconds,mistralBlocked:mistral.authorizationBlocked},
+     mistralConnected:false,mistralCooldown:mistral.cooldownSeconds,mistralBlocked:true},
     agnes:async q=>generateAgnesChat(q,{model:$("agnes-model").value,history:preferenceHistory(savedGeneralPreference(DATA.settings),$("chat-memory-optin").checked?sessionTurns:[],$("preference-share").checked)}),
     mistral:async q=>generateMistralChat(q,preferenceHistory(savedGeneralPreference(DATA.settings),$("chat-memory-optin").checked?sessionTurns:[],$("preference-share").checked),{model:$("mistral-model").value}),
     authorize:(provider,q)=>{
      if(apiBudgetStatus().remaining===0){notify("Plafond volontaire d’appels IA de cette session atteint.");return false;}
      const history=preferenceHistory(savedGeneralPreference(DATA.settings),$("chat-memory-optin").checked?sessionTurns:[],$("preference-share").checked);
      const shared=sessionPreview(q,history,history.length>0);
-     return confirm("Envoyer à "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" ?\n\nQuestion : « "+q+" »"+
+     if(provider==="agnes"&&$("agnes-session-consent")?.checked)return true;
+     const accepted=confirm("Envoyer à "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" ?\n\nQuestion : « "+q+" »"+
       (shared?"\n\nContexte de conversation également transmis :\n"+shared:"\n\nAucun historique envoyé.")+
       "\n\nAucune donnée du dossier médical n'est transmise. Cet appel peut être facturé.");
+     if(accepted&&provider==="agnes")$("agnes-session-consent").checked=true;
+     return accepted;
     },
     onAttempt:provider=>setEngineNote("IA : génération "+(provider==="agnes"?"Agnes AI":"Mistral AI")+" après votre accord…")
    });
@@ -523,7 +572,7 @@ async function ask(q){
    updateEngineNote();
   }
   if(intent==="general"&&!autoAnswered&&!sourceFirstAnswered&&!onlineAttempted&&!mistralAttempted&&response.kind==="refusal"){
-   answer="Aucune IA conversationnelle n’a pu répondre. Connectez Agnes ou Mistral dans les options, puis réessayez. Les informations sourcées et les fonctions de sécurité restent disponibles. Je préfère ne pas inventer de réponse.";
+   answer="Agnes AI n'a pas pu répondre. Vérifiez votre clé et le bouton « Tester Agnes » ; votre connexion et le quota doivent être disponibles. Les fiches sur la fibromyalgie restent accessibles. Je préfère ne pas inventer de réponse.";
    engine="Assistant documentaire de secours";
   }
   if(mistralProblem&&!mistralAttempted){setEngineNote("Mistral en pause. FibroBot répond localement.");}
@@ -710,19 +759,39 @@ function events(){
  });
  $("chat-voice-stop").addEventListener("click",()=>{stopSpeaking();notify("Lecture vocale arrêtée.");});
  $("install-app").addEventListener("click",requestPWAInstallation);
- $("auto-mode").addEventListener("change",()=>{updateEngineNote();notify($("auto-mode").checked?"IA activée : Agnes puis Mistral selon disponibilité.":"IA conversationnelle désactivée.");});
- $("agnes-connect").addEventListener("click",()=>{
+ $("auto-mode").addEventListener("change",()=>{updateEngineNote();notify($("auto-mode").checked?"Agnes AI activé pour les questions générales et fiches publiques autorisées.":"IA conversationnelle désactivée.");});
+ $("agnes-connect").addEventListener("click",async()=>{
   const key=$("agnes-key").value.trim();$("agnes-key").value="";
-  try{connectAgnes(key);$("agnes-status").textContent="Agnes connecté pour cette session. Le mode Auto demandera ton accord avant chaque question envoyée.";$("agnes-test").disabled=false;$("agnes-disconnect").disabled=false;}
-  catch(error){disconnectAgnes();$("agnes-status").textContent="Clé Agnes non activée. Vérifie la clé et réessaie.";}
-  updateEngineNote();
+  const button=$("agnes-connect");button.disabled=true;
+  try{
+   if(!db)throw Error("Déverrouillez votre coffre.");
+   connectAgnes(key);
+   if($("agnes-save-key")?.checked){
+    await saveAgnesCredential(db,key);
+    DATA.settings=await all(db,"settings");refreshAgnesVaultControls();
+   }
+   $("agnes-status").textContent=$("agnes-save-key")?.checked?
+    "Clé Agnes chiffrée dans le coffre et activée. Testez la connexion pour vérifier votre accès API.":
+    "Clé Agnes activée dans cette session. Testez la connexion pour vérifier votre accès API.";
+   $("agnes-test").disabled=false;$("agnes-disconnect").disabled=false;
+  }catch(error){
+   disconnectAgnes();$("agnes-status").textContent="Clé Agnes non activée : "+String(error?.message||error).slice(0,120);
+  }finally{button.disabled=false;updateEngineNote();}
+ });
+ $("agnes-forget")?.addEventListener("click",async()=>{
+  if(!db||!confirm("Supprimer la clé Agnes de ce coffre et déconnecter ? Les anciennes sauvegardes chiffrées ne changent pas."))return;
+  try{
+   await deleteAgnesCredential(db);DATA.settings=await all(db,"settings");
+   disconnectAgnes();$("agnes-test").disabled=true;$("agnes-disconnect").disabled=true;
+   refreshAgnesVaultControls();$("agnes-status").textContent="Clé Agnes supprimée du coffre actuel.";updateEngineNote();
+  }catch{notify("La clé Agnes n'a pas pu être supprimée.");}
  });
  $("agnes-test").addEventListener("click",async()=>{
   if(!agnesStatus().connected)return;
   if(!confirm("Tester Agnes en envoyant une question d'arithmétique publique ? Cette requête peut être facturée."))return;
   const button=$("agnes-test");button.disabled=true;$("agnes-status").textContent="Vérification de la connexion Agnes…";
   try{const result=await testAgnesConnection({model:$("agnes-model").value});$("agnes-status").textContent="Agnes disponible · test réussi ("+result.model+").";}
-  catch(error){$("agnes-status").textContent=agnesStatus().cooldownSeconds>0?"Agnes en pause (quota). Essayez Mistral ou réessayez plus tard.":"Agnes indisponible. Vérifie la clé, le réseau et l’accès API ; Mistral reste optionnel.";}
+  catch(error){$("agnes-status").textContent=agnesStatus().cooldownSeconds>0?"Agnes en pause (quota). Réessayez lorsque le fournisseur le permet.":"Agnes indisponible. Vérifiez la clé, le crédit, le réseau et les permissions du navigateur (CORS).";}
   finally{button.disabled=!agnesStatus().connected;updateEngineNote();}
  });
  $("agnes-disconnect").addEventListener("click",()=>{disconnectAgnes();$("agnes-key").value="";$("agnes-test").disabled=true;$("agnes-disconnect").disabled=true;$("agnes-status").textContent="Agnes déconnecté ; clé effacée de la session.";updateEngineNote();});
@@ -1181,6 +1250,43 @@ function restoreV29Preferences(){
  const alerts=$("v29-reminder-opt-in");
  if(alerts)alerts.checked=optInForegroundReminders(DATA.settings);
 }
+function setupV30Controls(){
+ document.body.classList.add("v30-simple");
+ const chat=$("chat");
+ const hero=chat?.querySelector(".assistant-hero");
+ const agnes=$("agnes-options");
+ if(hero&&agnes){
+  hero.after(agnes);
+  agnes.classList.add("v30-agnes-primary");
+  const summary=agnes.querySelector("summary small");
+  if(summary)summary.textContent="Une seule clé, enregistrable dans le coffre chiffré · spécialiste fibromyalgie";
+  const intro=agnes.querySelector(".ai-details>p");
+  if(intro)intro.textContent="Saisissez votre clé Agnes une fois. FibroBot vous aide pour les questions générales et s'appuie sur ses fiches médicales de référence pour la fibromyalgie. Agnes exige Internet, un compte et un accès API ; les requêtes peuvent être payantes ou bloquées par le navigateur.";
+  const form=agnes.querySelector(".form");
+  const save=dom("label",undefined,"consent");save.htmlFor="agnes-save-key";
+  const checkbox=dom("input");checkbox.id="agnes-save-key";checkbox.type="checkbox";checkbox.checked=true;
+  save.append(checkbox,document.createTextNode(" Enregistrer ma clé dans le coffre chiffré de ce téléphone"));
+  const session=dom("label",undefined,"consent");session.htmlFor="agnes-session-consent";
+  const allow=dom("input");allow.id="agnes-session-consent";allow.type="checkbox";
+  session.append(allow,document.createTextNode(" Autoriser mes questions générales admissibles pendant cette session (confirmation au premier envoi)"));
+  const medical=dom("label",undefined,"consent");medical.htmlFor="agnes-public-fiches";
+  const publicFiche=dom("input");publicFiche.id="agnes-public-fiches";publicFiche.type="checkbox";
+  medical.append(publicFiche,document.createTextNode(" Autoriser l'explication des fiches médicales publiques (sans ma question personnelle)"));
+  const row=agnes.querySelector(".button-row");
+  const forget=dom("button","Supprimer ma clé enregistrée","btn light");forget.id="agnes-forget";forget.type="button";forget.disabled=true;
+  row?.append(forget);
+  const status=$("agnes-status");status?.before(save,session,medical,
+   dom("p","Les questions privées, symptômes, traitements et urgences restent traités dans FibroBot. L'IA distante ne remplace pas un médecin. Le premier accès Internet peut demander une confirmation.","tiny"));
+ }
+ const toggle=dom("button","Afficher les réglages avancés","btn light");toggle.type="button";toggle.id="v30-advanced-toggle";
+ toggle.setAttribute("aria-expanded","false");
+ hero?.after(toggle);
+ toggle.addEventListener("click",()=>{
+  const enabled=document.body.classList.toggle("v30-advanced");
+  toggle.setAttribute("aria-expanded",String(enabled));
+  toggle.textContent=enabled?"Masquer les réglages avancés":"Afficher les réglages avancés";
+ });
+}
 function setupV29Controls(){
  const reminders=$("medications");
  if(reminders){
@@ -1222,7 +1328,7 @@ function setupV29Controls(){
  }
 }
 async function init(){
- setupV27Controls();setupV28Controls();setupV29Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
+ setupV27Controls();setupV28Controls();setupV29Controls();setupV30Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
@@ -1253,7 +1359,7 @@ async function init(){
    const i=DATA.settings.findIndex(s=>s.id===id);
    if(i<0)DATA.settings.push({id,value});else DATA.settings[i]={id,value};
  },notify});
- try{db=await openSecureDB();await reload();setInterval(()=>{lockInactiveVault();if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){lockInactiveVault();if(db){renderReminders();renderUpcomingAppointments();}}});}
+ try{db=await openSecureDB();await reload();await restoreAgnesAfterUnlock();setInterval(()=>{lockInactiveVault();if(document.visibilityState==="visible"&&db){renderReminders();renderUpcomingAppointments();}},30000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){lockInactiveVault();if(db){renderReminders();renderUpcomingAppointments();}}});}
  catch(e){console.error(e);notify("Stockage local indisponible : l'application ne peut pas enregistrer vos données. Autorisez le stockage pour ce site.");}
  if("serviceWorker" in navigator&&window.isSecureContext){navigator.serviceWorker.register("./sw.js").catch(()=>{/* hors ligne facultatif */});}
 }

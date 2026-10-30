@@ -42,3 +42,20 @@ body.v28-quiet .chat-card{box-shadow:none!important}
 .v29-reminder-optin input[type="checkbox"]{width:1.25rem;height:1.25rem;flex:none;accent-color:var(--accent,#159873)}
 .v28-book-search select{min-height:46px;width:100%;font-size:1rem;padding:.5rem;border-radius:.5rem}
 @media(max-width:650px){.v29-reminder-optin{padding:1rem}.v29-reminder-optin label{min-height:48px}}
+
+/* V30: one-input Agnes-first assistant, with optional advanced settings. */
+.v30-agnes-primary{margin:0 0 18px;border:2px solid #159773;box-shadow:0 8px 24px rgba(0,0,0,.055)}
+.v30-agnes-primary>summary{min-height:58px;font-size:1.02rem}
+.v30-agnes-primary .ai-details .form{gap:12px}
+#v30-advanced-toggle{display:block;margin:0 0 18px;min-height:48px}
+.v30-agnes-primary #agnes-connect{background:#136d50;color:white;border-color:#136d50}
+body.v30-simple:not(.v30-advanced) #chat .auto-brain-card,
+body.v30-simple:not(.v30-advanced) #chat .conversation-controls,
+body.v30-simple:not(.v30-advanced) #chat .specialists,
+body.v30-simple:not(.v30-advanced) #chat .network-card,
+body.v30-simple:not(.v30-advanced) #chat .assistant-advanced-heading,
+body.v30-simple:not(.v30-advanced) #chat #mistral-options,
+body.v30-simple:not(.v30-advanced) #chat #gemma-options{display:none!important}
+.v30-agnes-primary .consent{display:flex;gap:.6rem;align-items:flex-start;max-width:720px}
+.v30-agnes-primary .consent input{flex:none;margin-top:.3rem}
+@media(max-width:650px){.v30-agnes-primary{padding:14px}.v30-agnes-primary .button-row{display:flex;flex-wrap:wrap;gap:8px}.v30-agnes-primary .button-row button{min-height:48px;flex:1 1 145px}}

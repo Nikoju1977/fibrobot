@@ -77,8 +77,11 @@ try{
  await page.locator('#nav [data-tab="chat"]').click();
  // Nouvelle expérience : la discussion est la première section visible.
  assert.equal(await page.locator("#chat-form textarea#prompt").count(),1,"Multiline composer");
- assert.ok((await page.locator("#chat .chat-card").boundingBox()).y <
-  (await page.locator("#agnes-options").boundingBox()).y,"Conversation visible before IA settings");
+ assert.ok((await page.locator("#agnes-options").boundingBox()).y <
+  (await page.locator("#chat .chat-card").boundingBox()).y,"Agnes setup shown before chat");
+ assert.equal(await page.locator("#mistral-options").isVisible(),false,"Advanced settings hidden in simple mode");
+ assert.equal(await page.locator("#v30-advanced-toggle").getAttribute("aria-expanded"),"false");
+ await page.locator("#v30-advanced-toggle").click();
  assert.equal(await page.locator("#chat-voice-toggle").getAttribute("aria-pressed"),"false");
  assert.equal(await page.locator("#chat-memory-optin").isChecked(),false,"Session memory must be opt-in");
  assert.equal(await page.locator("#sources-first").isChecked(),false,"Sourced search must be opt-in");
@@ -165,28 +168,42 @@ try{
  // une question générale exige l'accord avant une requête distante.
  assert.equal(await page.locator("#auto-mode").isChecked(),true);
  await page.locator("#agnes-options summary").click();
+ assert.equal(await page.locator("#agnes-save-key").isChecked(),true);
+ assert.equal(await page.locator("#agnes-session-consent").isChecked(),false);
  await page.locator("#agnes-key").fill("une-cle-fictive-agnes-de-test");
  await page.locator("#agnes-connect").click();
  assert.equal(await page.locator("#agnes-key").inputValue(),"","Agnes key must leave the input field.");
+ await page.locator("#agnes-status").getByText(/chiffrée dans le coffre/).waitFor({timeout:15000});
  let agnesCalls=0,agnesPost="";
  await page.route("https://apihub.agnes-ai.com/**",async route=>{
   if(route.request().method()==="OPTIONS"){
    await route.fulfill({status:204,headers:{"access-control-allow-origin":"*","access-control-allow-methods":"POST, OPTIONS","access-control-allow-headers":"authorization, content-type"}});return;
   }
   agnesCalls++;agnesPost=route.request().postData()||"";
+  const isFiche=agnesPost.includes("Explique cette fiche documentaire publique");
+  const responseText=isFiche?"La fibromyalgie peut s'accompagner de douleurs chroniques et de fatigue.":"La Tour Eiffel utilise du fer puddlé.";
   await route.fulfill({status:200,contentType:"application/json",
-   headers:{"access-control-allow-origin":"*"},body:JSON.stringify({choices:[{message:{content:"La Tour Eiffel utilise du fer puddlé."}}]})});
+   headers:{"access-control-allow-origin":"*"},body:JSON.stringify({choices:[{message:{content:responseText}}]})});
  });
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Agnes AI/);dialog.accept();});
  await page.locator("#prompt").fill("Quel matériau a été utilisé pour la Tour Eiffel ?");
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages").getByText(/fer puddlé/).waitFor({timeout:12000});
  assert.equal(agnesCalls,1,"Agnes must be called with explicit consent");
+ assert.equal(await page.locator("#agnes-session-consent").isChecked(),true,"Session consent recorded");
  assert.ok(!agnesPost.includes(secret),"No vault secret sent to Agnes");
  assert.deepEqual(JSON.parse(agnesPost).messages.map(x=>x.role),["system","user","assistant","user"],"Explicitly shared style preference should be visible in AI request");
  assert.ok(agnesPost.includes("Je préfère des réponses claires"),"Opted-in encrypted preference transmitted only with consent");
  assert.match(await page.locator("#api-budget-status").textContent(),/1 appel/);
  await page.locator("#preference-share").uncheck();
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/fiche médicale publique/);dialog.accept();});
+ await page.locator("#prompt").fill("Quels sont les symptômes de la fibromyalgie ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Agnes AI — explication pédagogique/).last().waitFor({timeout:12000});
+ assert.equal(agnesCalls,2,"Only a source-backed medical explanation may call Agnes");
+ assert.ok(agnesPost.includes("Explique cette fiche documentaire publique"));
+ assert.ok(!agnesPost.includes("Quels sont les symptômes de la fibromyalgie"),"Never send personal medical question");
+ assert.ok(!agnesPost.includes(secret),"Never send the vault secret");
  await page.locator("#agnes-disconnect").click();
  assert.equal(await page.locator("#agnes-test").isDisabled(),true);
  await page.locator("#auto-mode").uncheck();
@@ -211,13 +228,13 @@ try{
  });
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Aucune IA conversationnelle n.a pu répondre/).waitFor();
+ await page.locator("#messages").getByText(/Agnes AI n.a pas pu répondre/).waitFor();
  assert.equal(wikipediaQueries,0,"Network forbidden until enabled");
  await page.locator("#network-mode").check();
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Qui était Marie Curie/);dialog.dismiss();});
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Aucune IA conversationnelle n.a pu répondre/).last().waitFor();
+ await page.locator("#messages").getByText(/Agnes AI n.a pas pu répondre/).last().waitFor();
  assert.equal(wikipediaQueries,0,"Consent to session is not consent to send each question");
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Wikipédia/);dialog.accept();});
  await page.locator("#prompt").fill("Qui était Marie Curie ?");
@@ -322,7 +339,7 @@ try{
  page.once("dialog",dialog=>{assert.match(dialog.message(),/histoire courte/);dialog.accept();});
  await page.locator("#prompt").fill("Raconte une histoire courte sur la lune");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/Aucune IA conversationnelle n.a pu répondre/).last().waitFor({timeout:15000});
+ await page.locator("#messages").getByText(/Agnes AI n.a pas pu répondre/).last().waitFor({timeout:15000});
  assert.equal(mistralCalls,4,"One request only on 429");
  await page.waitForFunction(()=>/pause|quota/i.test(document.getElementById("mistral-status")?.textContent||""),{timeout:12000});
  assert.equal(await page.locator("#mistral-use").isChecked(),false,"Disable Mistral automatically when rate-limited");
@@ -365,6 +382,7 @@ try{
  assert.equal(envelope?.algorithm,"AES-GCM-256");
  assert.ok(!JSON.stringify(envelope).includes(value),"No plaintext in vault IndexedDB");
  assert.ok(!JSON.stringify(envelope).includes("cle-fictive-de-test-non-utilisable"),"API key must never be stored in IndexedDB plaintext");
+ assert.ok(!JSON.stringify(envelope).includes("une-cle-fictive-agnes-de-test"),"Agnes key must never be stored in IndexedDB plaintext");
  await page.locator('#nav [data-tab="chat"]').click();
  await page.locator("#v28-quiet-toggle").click();
  await page.locator("#toast").getByText(/Mode calme activé et conservé dans le coffre/).waitFor({timeout:12000});
@@ -380,6 +398,9 @@ try{
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:15000});
  await page.locator('#nav [data-tab="privacy"]').click();
  assert.equal(await page.locator("#auto-lock-minutes").inputValue(),"30","Encrypted inactivity setting should survive lock and reopen");
+ await page.waitForFunction(()=>/Agnes chargé depuis le coffre/.test(document.getElementById("agnes-status")?.textContent||""),{timeout:15000});
+ await page.locator('#nav [data-tab="chat"]').click();
+ await page.locator("#v30-advanced-toggle").click();
  assert.equal(await page.locator("#v28-quiet-toggle").getAttribute("aria-pressed"),"true","Calm preference must be restored from vault");
  await page.locator('#nav [data-tab="chat"]').click();
  await page.locator("#v28-quiet-toggle").click();
