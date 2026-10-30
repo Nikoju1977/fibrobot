@@ -91,6 +91,6 @@ test("V31: no local model remains in PWA code, new controls are wired",()=>{
  assert.doesNotMatch(app,/gemma-local|loadGemma|llmStatus/);
  assert.doesNotMatch(html,/id="gemma-options"/);
  assert.doesNotMatch(sw,/gemma-local\.mjs/);
- assert.match(sw,/fibrobot-shell-v31/);
+ assert.match(sw,/fibrobot-shell-v32/);
  for(const id of ["public-live-services.mjs","live-feed-hub.mjs"])assert.ok(sw.includes(id));
 });
