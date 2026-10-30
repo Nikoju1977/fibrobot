@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import {SPECIALISTS,routeSpecialist,runSpecialist} from "../agent-hub.mjs";
 import {status,testLocalModel} from "../gemma-local.mjs";
 
-test("catalogue explicite de huit agents avec identifiants distincts",()=>{
- assert.equal(SPECIALISTS.length,8);
- assert.equal(new Set(SPECIALISTS.map(x=>x.id)).size,8);
+test("catalogue explicite de douze agents documentaires avec identifiants distincts",()=>{
+ assert.equal(SPECIALISTS.length,12);
+ assert.equal(new Set(SPECIALISTS.map(x=>x.id)).size,12);
  for(const x of SPECIALISTS){assert.ok(x.name&&x.role&&x.sourceId);}
 });
 

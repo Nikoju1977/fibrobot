@@ -1,6 +1,10 @@
 # FibroBot — compagnon IA conversationnel et suivi personnel
 
-## Version actuelle V30 — Agnes AI principal et fibromyalgie sourcée
+## Version en développement V32 — assistant Agnes + sources publiques + outils du quotidien
+
+La V32 améliore la simplicité et la fiabilité de FibroBot sans supprimer les données du coffre. Voir [V32.md](V32.md) pour le journal express, la recherche chiffrée, les agents spécialisés, les flux publics, la respiration guidée, les tests et les limites.
+
+## Historique V30 — Agnes AI principal et fibromyalgie sourcée
 
 **Démarrage :** déverrouillez votre coffre, ouvrez l'Assistant, saisissez votre clé Agnes AI puis appuyez sur « Connecter Agnes ». La clé peut être enregistrée dans le coffre chiffré de ce téléphone, sans la publier. Les questions publiques admissibles utilisent Agnes ; les questions sur la fibromyalgie restent prioritaires dans la bibliothèque médicale et peuvent obtenir une explication pédagogique par Agnes à partir de **fiches publiques**, sans transmettre le dossier du patient. Les réglages techniques sont masqués par défaut, mais accessibles via « Afficher les réglages avancés ».
 

@@ -14,7 +14,11 @@ export const SPECIALISTS=Object.freeze([
  Object.freeze({id:"visit",name:"Coordination des soins",role:"Préparer une consultation et organiser les informations",sourceId:"care"}),
  Object.freeze({id:"medication",name:"Traitements déclarés",role:"Relire la liste saisie, préparer la revue pharmaceutique",sourceId:"care"}),
  Object.freeze({id:"research",name:"Bibliothèque scientifique",role:"Orienter vers les sources institutionnelles et Europe PMC",sourceId:"fibro"}),
- Object.freeze({id:"quality",name:"Qualité et suivi",role:"Synthèses statistiques descriptives, sans prédire les crises ni en inférer des causes",sourceId:"daily"})
+ Object.freeze({id:"quality",name:"Qualité et suivi",role:"Synthèses statistiques descriptives, sans prédire les crises ni en inférer des causes",sourceId:"daily"}),
+ Object.freeze({id:"triage",name:"Orientation médicale",role:"Préparer les questions à discuter avec un professionnel, sans diagnostic différentiel automatisé",sourceId:"care"}),
+ Object.freeze({id:"psychosocial",name:"Soutien émotionnel",role:"Écoute et stratégies générales de détente, sans simuler un psychologue",sourceId:"sleep"}),
+ Object.freeze({id:"nutrition",name:"Alimentation et quotidien",role:"Information générale et nutrition, sans régime prétendument curatif",sourceId:"daily"}),
+ Object.freeze({id:"social",name:"Vie sociale et travail",role:"Préparer les démarches et l'aménagement des activités sans affirmer des droits individuels",sourceId:"daily"})
 ]);
 const normalized=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const hasClinicalAction=q=>/\b(dosage|dose|posolog|prescri|diagnos|comprime|arreter|arret.*traitement|surdo|interaction|contre.indication|quel medicament|puis.je prendre|peux.je prendre)\b/.test(normalized(q));
@@ -74,6 +78,24 @@ export function runSpecialist(id,context={},question=""){
   case "quality":{
    answer=intro+"Suivi descriptif des observations déclarées. Aucune méthode statistique appliquée ici ne peut prédire une crise ni identifier un déclencheur médical.\n"+
     summarizeObservations(context)+"\nPréparez avec votre soignant un relevé des situations, changements et questions à discuter.";
+   sourceId="daily";break;
+  }
+  case "triage":{
+   answer=intro+"Je peux vous aider à préparer une consultation pour des symptômes nouveaux ou des questions sur la fibromyalgie. Je ne peux pas confirmer ni exclure une maladie à partir d'un questionnaire.\n"+
+    prepareVisit(context)+"\nSignalez rapidement à un professionnel tout symptôme soudain, nouveau ou fortement aggravé.";
+   sourceId="care";break;
+  }
+  case "psychosocial":{
+   answer=intro+"Vivre avec une douleur persistante peut être éprouvant. Si vous le souhaitez, vous pouvez décrire ce qui vous pèse aujourd'hui, à votre rythme. Une pause, une respiration confortable ou une discussion avec un proche peuvent aider certaines personnes, sans garantir un effet clinique.\n"+
+    (documented("sleep")?.answer||"")+"\nPour une souffrance importante, adressez-vous à un professionnel de santé.";
+   sourceId="sleep";break;
+  }
+  case "nutrition":{
+   answer=intro+"Aucun aliment ni supplément ne guérit la fibromyalgie. Pour les questions alimentaires, privilégiez des informations de nutrition générale et une discussion individualisée avec un diététicien ou médecin, notamment en cas d'allergies, de diabète ou de traitement. Évitez les restrictions non prescrites.";
+   sourceId="daily";break;
+  }
+  case "social":{
+   answer=intro+"Pour faciliter la vie quotidienne ou le travail, vous pouvez préparer une liste d'aménagements utiles (pauses, horaires, alternance d'activités, ergonomie) avec le médecin du travail ou votre équipe de soins. En France, les démarches MDPH et la reconnaissance RQTH dépendent des critères individuels en vigueur ; vérifiez les conditions auprès des services officiels.";
    sourceId="daily";break;
   }
   case "research":{

@@ -81,7 +81,22 @@ try{
   (await page.locator("#chat .chat-card").boundingBox()).y,"Agnes setup shown before chat");
  assert.equal(await page.locator("#mistral-options").isVisible(),false,"Advanced settings hidden in simple mode");
  assert.equal(await page.locator("#v30-advanced-toggle").getAttribute("aria-expanded"),"false");
- assert.equal(await page.locator(".v31-agent-buttons button").count(),5,"General + four specialist agents");
+ assert.equal(await page.locator(".v31-agent-buttons button").count(),9,"General plus eight specialist agents");
+ assert.equal(await page.locator("#v31-ambient-controls").count(),0,"Audio controls use class, not a phantom ID");
+ assert.equal(await page.locator(".v31-ambient-controls button[data-ambient]").count(),5,"Five browser-only soundscapes");
+ assert.equal(await page.locator("#v31-ambient-volume").inputValue(),"25");
+ await page.locator("#v31-ambient-volume").evaluate(el=>{el.value="30";el.dispatchEvent(new Event("input",{bubbles:true}));});
+ assert.match(await page.locator(".v31-ambient-panel").textContent(),/Volume sonore : 30 %/);
+ assert.equal(await page.locator("#v31-ambient-status").textContent(),"Aucune ambiance en lecture.");
+  assert.equal(await page.locator("#v32-breath-mode").inputValue(),"calm");
+  assert.equal(await page.locator("#v32-breath-duration").inputValue(),"2");
+  await page.locator("#v32-breath-start").click();
+  assert.equal(await page.locator("#v32-breath-start").isDisabled(),true);
+  assert.match(await page.locator("#v32-breath-status").textContent(),/Inspirez doucement/);
+  await page.locator("#v32-breath-stop").click();
+  assert.equal(await page.locator("#v32-breath-start").isDisabled(),false);
+  assert.match(await page.locator("#v32-breath-status").textContent(),/arrêtée/);
+
  assert.equal(await page.locator("#v31-watch").isChecked(),false,"No feed monitoring without consent");
  assert.equal(await page.locator("#v31-live-consent").isChecked(),false,"No public API without consent");
  await page.locator("#v30-advanced-toggle").click();
@@ -270,7 +285,7 @@ try{
  await page.locator('#chat-form button[type="submit"]').click();
  await page.locator("#messages a[href*='fr.wikipedia.org/wiki/Marie_Curie']").waitFor({timeout:12000});
  assert.equal(wikipediaQueries,1);
- assert.match(await page.locator("#chat-engine-state").textContent(),/Internet publiques/);
+ await page.waitForFunction(()=>/Internet publiques/.test(document.querySelector("#chat-engine-state")?.textContent||""),null,{timeout:15000});
  const onlineText=await page.locator("#messages").textContent();
  assert.match(onlineText,/Physicienne et chimiste/);
  await page.locator("#network-mode").uncheck();

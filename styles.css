@@ -77,3 +77,46 @@ body.v30-simple:not(.v30-advanced) #chat #gemma-options{display:none!important}
 .v31-directory a{color:#9bd9ff;text-decoration:underline}
 .v31-directory ul{columns:2;list-style:disc inside;padding:0;line-height:1.9}
 @media(max-width:600px){.v31-agent-panel,.v31-feed-panel{padding:12px;border-radius:10px}.v31-agent-buttons{gap:6px}.v31-agent-buttons button{flex:1 1 125px;font-size:.87rem;padding:9px}.v31-directory ul{columns:1}}
+
+/* V31: eight specialist spaces, gentle optional soundscapes, accessible phones */
+.v31-agent-panel,.v31-feed-panel,.v31-ambient-panel{margin-block:12px}
+.v31-ambient-panel .v31-ambient-controls{display:flex;flex-wrap:wrap;gap:9px;margin:13px 0}
+.v31-ambient-controls button{min-height:46px;flex:1 1 120px}
+.v31-ambient-controls button[aria-pressed="true"]{background:#126d50;color:white;border-color:#74d6b4}
+.v31-ambient-panel label{display:block;margin:12px 0 8px}
+.v31-ambient-panel input[type="range"]{display:block;width:min(100%,450px);min-height:40px;accent-color:#39b992}
+.v31-ambient-panel #v31-ambient-status{margin:8px 0;font-size:.88rem}
+@media (prefers-reduced-motion:reduce){.v31-agent-buttons *, .v31-ambient-controls *{animation:none!important;transition:none!important}}
+
+/* V32 — fast private self tracking, on-device search */
+.v32-quick-panel{margin-block:12px;border:1px solid #b7ded5;background:linear-gradient(130deg,#f0fcf7,#fff)}
+.v32-quick-form{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.v32-quick-form label{display:block;flex:0 0 100%;font-weight:650;color:#1b4653}
+.v32-quick-form input{flex:1 1 240px;min-width:0;min-height:50px;padding:12px;border:1px solid #9fbfbc;border-radius:10px;background:#fff;color:#1d3844}
+.v32-quick-form button{min-height:50px}
+.v32-quick-form .tiny{flex:0 0 100%;margin:0;color:#385c65}
+.v32-quick-panel #v32-quick-status{margin:10px 0 0;font-weight:600;color:#20594b}
+.v32-search-panel{margin-block:12px}
+.v32-search-panel summary{cursor:pointer;font-weight:750;min-height:44px;padding:8px 0}
+.v32-search-panel label{display:block;margin:12px 0 6px;font-weight:600}
+.v32-search-panel input[type="search"]{width:100%;min-height:48px;border:1px solid #92b5ba;padding:10px;border-radius:9px}
+.v32-search-results{max-height:400px;overflow-y:auto;margin:12px 0}
+.v32-search-result{border-top:1px solid var(--border);padding:12px 0;overflow-wrap:anywhere}
+.v32-search-result strong,.v32-search-result small{display:block}
+.v32-search-result small{color:#607483;margin:3px 0}
+.v32-search-result .btn{min-height:42px}
+@media(max-width:650px){.v32-quick-panel{padding:14px}.v32-quick-form button{flex:1 1 100%}}
+
+/* V32 expert: low-distraction guided breathing with explicit start/stop. */
+.v32-breathing-panel{margin-block:14px;border:1px solid #c9d3e9;border-radius:14px;padding:18px;background:#f5f7ff}
+.v32-breathing-panel h3{font-weight:750;color:#193e56}
+.v32-breathing-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0}
+.v32-breathing-controls label{font-weight:600;flex:0 0 auto}
+.v32-breathing-controls select{min-height:48px;flex:1 1 120px}
+.v32-breathing-controls button{min-height:48px;flex:1 1 110px}
+.v32-breath-circle{width:150px;height:150px;margin:20px auto 8px;display:grid;place-items:center;text-align:center;border-radius:50%;border:3px solid #6a6ccf;background:linear-gradient(135deg,#d6deff,#bcf4dc);font-weight:700;color:#19354c;transition:transform 4s ease-in-out}
+.v32-breath-circle[data-phase="inhale"]{transform:scale(1.12)}
+.v32-breath-circle[data-phase="exhale"]{transform:scale(.94)}
+.v32-breath-status{text-align:center;font-weight:650;min-height:46px;color:#254758}
+@media(prefers-reduced-motion:reduce){.v32-breath-circle{transition:none!important;transform:none!important}}
+@media(max-width:600px){.v32-breathing-panel{padding:12px}.v32-breathing-controls{display:grid;grid-template-columns:1fr 1fr}.v32-breathing-controls label{grid-column:span 1}.v32-breathing-controls select{width:100%;min-width:0}.v32-breathing-controls button{grid-column:span 1}}

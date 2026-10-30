@@ -37,7 +37,7 @@ test("V30: distinct Agnes AAD, random nonce and tamper-proof vault",async()=>{
  assert.notEqual(a.iv,b.iv);
  assert.equal(await unsealAgnesCredential(a,s.key),fakeKey);
  await assert.rejects(unsealMistralCredential(a,s.key),/impossible/);
- const damaged={...a,payload:a.payload.slice(0,-2)+"ff"};
+ const damaged={...a,payload:(a.payload[0].toLowerCase()==="a"?"b":"a")+a.payload.slice(1)};
  await assert.rejects(unsealAgnesCredential(damaged,s.key),/impossible/);
  s.closed=true;await assert.rejects(saveAgnesCredential(s,fakeKey),/Déverrouillez/);
 });
@@ -75,5 +75,5 @@ test("V30: simple UI, encrypted Agnes controls and no local inference required",
   assert.ok(app.includes(term),term);
  assert.match(css,/v30-simple:not\(\.v30-advanced\)/);
  assert.match(sw,/agnes-credential-vault\.mjs/);
- assert.match(sw,/fibrobot-shell-v31/);
+ assert.match(sw,/fibrobot-shell-v32/);
 });

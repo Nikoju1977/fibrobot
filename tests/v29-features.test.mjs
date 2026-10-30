@@ -60,7 +60,7 @@ test("V29: foreground alerts, sleep timer, calm mode and page advance wired",()=
   assert.ok(app.includes(key),key);
  }
  for(const key of ["./foreground-reminders.mjs","./reading-range.mjs"])assert.ok(sw.includes(key),"PWA offline "+key);
- assert.match(sw,/fibrobot-shell-v31/);
+ assert.match(sw,/fibrobot-shell-v32/);
  assert.match(sw,/scopePath=new URL\(self.registration.scope\).pathname/);
  assert.match(sw,/new URL\(path,self.registration.scope\).pathname===url.pathname/);
  assert.doesNotMatch(sw,/url.pathname.endsWith\(path.slice\(2\)\)/);
