@@ -213,7 +213,20 @@ try{
  page.once("dialog",dialog=>{assert.match(dialog.message(),/Agnes AI/);dialog.accept();});
  await page.locator("#prompt").fill("Quel matériau a été utilisé pour la Tour Eiffel ?");
  await page.locator('#chat-form button[type="submit"]').click();
- await page.locator("#messages").getByText(/fer puddlé/).waitFor({timeout:12000});
+ try{
+  await page.locator("#messages").getByText(/fer puddlé/).waitFor({timeout:12000});
+ }catch(error){
+  console.log("TEST-DIAGNOSTIC",JSON.stringify({
+   agnesCalls,agnesPostLength:agnesPost.length,
+   status:await page.locator("#agnes-status").textContent(),
+   engine:await page.locator("#chat-engine-state").textContent(),
+   lastMessages:(await page.locator("#messages").allTextContents()).slice(-8),
+   auto:await page.locator("#auto-mode").isChecked(),
+   agnesConsent:await page.locator("#agnes-session-consent").isChecked(),
+   mode:await page.locator("#companion-mode").inputValue()
+  }));
+  throw error;
+ }
  assert.equal(agnesCalls,1,"Agnes must be called with explicit consent");
  assert.equal(await page.locator("#agnes-session-consent").isChecked(),true,"Session consent recorded");
  assert.ok(!agnesPost.includes(secret),"No vault secret sent to Agnes");
