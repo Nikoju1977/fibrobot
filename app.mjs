@@ -3,6 +3,7 @@ import {LIBRARY} from "./medical-library.mjs";
 import {openSecureDB,all,put,del,wipeDB,encryptedExport,eraseLegacy} from "./vault-ui.mjs";
 import {liveIntent,explicitWeatherCity,publicWeather,publicAirQuality,publicFrenchHolidays,LIVE_SOURCES} from "./public-live-services.mjs";
 import {createPublicFeedMonitor,feedState} from "./live-feed-hub.mjs";
+import {createAmbientPlayer,AMBIENT_TYPES} from "./ambient-sound.mjs";
 import {SPECIALISTS,routeSpecialist,runSpecialist} from "./agent-hub.mjs";
 import {classifyIntent,summarizeObservations,prepareVisit,planDaily} from "./assistant-engine.mjs";
 import {findScientificArticles,externalResearchLink} from "./research-library.mjs";
@@ -56,9 +57,14 @@ const EXPERT_PANEL=Object.freeze([
  {id:"algologue",name:"Douleur / fibromyalgie",specialist:"pain"},
  {id:"pharmacien",name:"Traitements / pharmacien",specialist:"medication"},
  {id:"ergonome",name:"Ergonomie / énergie",specialist:"pacing"},
- {id:"qualite",name:"Qualité / suivi",specialist:"quality"}
+ {id:"qualite",name:"Qualité / suivi",specialist:"quality"},
+ {id:"triage",name:"Orientation médicale",specialist:"triage"},
+ {id:"psycho",name:"Soutien émotionnel",specialist:"psychosocial"},
+ {id:"nutrition",name:"Alimentation",specialist:"nutrition"},
+ {id:"social",name:"Vie sociale / travail",specialist:"social"}
 ]);
 let feedMonitor=null;
+const ambientPlayer=createAmbientPlayer();
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
 const val=id=>$(id).value;
 function notify(message){$("toast").textContent=message;$("toast").hidden=false;clearTimeout(notify.timeout);notify.timeout=setTimeout(()=>$("toast").hidden=true,5500);}
@@ -81,7 +87,7 @@ function lockInactiveVault(){
  const minutes=storedAutoLockMinutes(DATA.settings);
  if(!shouldLockForInactivity(lastActivityAt,Date.now(),minutes))return;
  try{
-  activeSession.invalidate();feedMonitor?.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}
+  activeSession.invalidate();feedMonitor?.stop();ambientPlayer.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}
   sessionTurns.length=0;bookText="";pdfDocumentFile=null;
   disconnectMistral();disconnectAgnes();db.close();db=null;
  }finally{location.reload();}
@@ -413,7 +419,7 @@ async function ask(q){
    }
   }
   // Agents déterministes : aucune donnée du dossier ne part vers Agnes.
-  if(!direct&&requestAgentId!=="general"&&["medical","planning","summary"].includes(intent)&&!liveIntent(input)&&response.kind!=="urgent"){
+  if(!direct&&requestAgentId!=="general"&&!liveIntent(input)&&response.kind!=="urgent"){
    const selected=EXPERT_PANEL.find(a=>a.id===requestAgentId);
    if(selected){
     const result=runSpecialist(selected.specialist,{...DATA,energy},input);
@@ -1097,7 +1103,7 @@ function events(){
   speak(lastSpeech);
  });
  $("erase-legacy").addEventListener("click",async()=>{if(!confirm("Supprimer l'ancienne base FibrobotDB non chiffrée de CE navigateur ? Vérifiez d'abord que vos données ont bien été migrées dans le coffre."))return;try{await eraseLegacy();notify("Ancienne base non chiffrée supprimée.");}catch(e){notify(e.message);}});
- $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;activeSession.invalidate();feedMonitor?.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
+ $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;activeSession.invalidate();feedMonitor?.stop();ambientPlayer.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
  $("breath-start")?.addEventListener("click",breathing);
  $("relax-script")?.addEventListener("click",()=>{
    const script="Vous pouvez arrêter à tout moment. Installez-vous si possible dans une position confortable. Prenez conscience des points de contact de votre corps avec le support. Laissez votre respiration trouver son rythme naturel, sans la forcer. Observez les sons autour de vous. Si vous ressentez de l'inconfort, ouvrez les yeux et arrêtez. Vous n'avez rien à réussir. Quel petit geste pourrait rendre cet instant plus confortable ?";
@@ -1224,7 +1230,7 @@ function setupV31Controls(){
  if(!chat||!hero)return;
  const panel=dom("section",undefined,"card v31-agent-panel");panel.setAttribute("aria-label","Espaces des agents FibroBot");
  panel.append(dom("h3","Votre équipe FibroBot"));
- panel.append(dom("p","Quatre espaces de suivi avec des conversations distinctes. Agents documentaires supervisés, et non professionnels de santé réels.","tiny"));
+ panel.append(dom("p","Huit espaces spécialisés et un dialogue général. Conversations distinctes dans le coffre. Agents d'information, non professionnels de santé réels.","tiny"));
  const toolbar=dom("div",undefined,"v31-agent-buttons");toolbar.setAttribute("role","group");toolbar.setAttribute("aria-label","Choisir un espace");
  const all=[{id:"general",name:"Agnes · général"},...EXPERT_PANEL];
  const title=dom("p","Conversation générale","tiny");title.id="v31-thread-title";title.setAttribute("role","status");
@@ -1284,6 +1290,27 @@ function setupV31Controls(){
  }
  directory.append(list,dom("p","Les résultats sont obtenus à la demande. Seuls météo et air sont rafraîchis pendant l'ouverture de la page. Les fournisseurs peuvent imposer des limitations et bloquer les appels navigateur.","tiny"));feeds.append(directory);
  panel.after(feeds);
+ const ambient=dom("section",undefined,"card v31-ambient-panel");ambient.setAttribute("aria-label","Ambiances sonores facultatives");
+ ambient.append(dom("h3","Ambiance douce et lecture"));
+ ambient.append(dom("p","Sons générés par votre navigateur : pluie, vagues et bruits colorés. Ce n'est pas un traitement de la douleur, ni un service de musique.","tiny"));
+ const controls=dom("div",undefined,"v31-ambient-controls");
+ const audioLabel=dom("p","Aucune ambiance en lecture.","tiny");audioLabel.id="v31-ambient-status";audioLabel.setAttribute("role","status");
+ const updateAudio=()=>{const active=ambientPlayer.currentType();for(const button of controls.querySelectorAll("button[data-ambient]"))button.setAttribute("aria-pressed",String(button.dataset.ambient===active));audioLabel.textContent=active?"Ambiance en lecture : "+(AMBIENT_TYPES.find(x=>x.id===active)?.name||active):"Aucune ambiance en lecture.";};
+ const volLabel=dom("label","Volume sonore : 25 %");volLabel.htmlFor="v31-ambient-volume";
+ const vol=dom("input");vol.id="v31-ambient-volume";vol.type="range";vol.min="0";vol.max="70";vol.step="5";vol.value="25";
+ vol.addEventListener("input",()=>{volLabel.textContent="Volume sonore : "+ambientPlayer.setVolume(vol.value)+" %";});
+ for(const option of AMBIENT_TYPES){
+  const button=dom("button",option.name,"btn light");button.type="button";button.dataset.ambient=option.id;button.setAttribute("aria-pressed","false");
+  button.addEventListener("click",async()=>{button.disabled=true;
+   try{if(ambientPlayer.currentType()===option.id)ambientPlayer.stop();else await ambientPlayer.play(option.id,vol.value);updateAudio();}
+   catch(error){ambientPlayer.stop();updateAudio();notify("Audio indisponible : "+String(error?.message||error).slice(0,110));}
+   finally{button.disabled=false;}
+  });controls.append(button);
+ }
+ const stop=dom("button","Arrêter les sons","btn light");stop.type="button";stop.id="v31-ambient-stop";
+ stop.addEventListener("click",()=>{ambientPlayer.stop();updateAudio();});
+ controls.append(stop);ambient.append(controls,volLabel,vol,audioLabel);
+ feeds.after(ambient);
  const status=()=>{state.textContent=feedState({running:feedMonitor?.isActive(),visible:document.visibilityState==="visible",online:navigator.onLine!==false,city:city.value});};
  const refresh=async()=>{
   if(!db||!consent.checked||!city.value.trim())return;
@@ -1392,7 +1419,7 @@ async function init(){
  window.addEventListener("online",updateConnectionState);
  window.addEventListener("offline",updateConnectionState);
  window.addEventListener("pagehide",()=>{
-  activeSession.invalidate();feedMonitor?.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;bookText="";bookFile=null;
+  activeSession.invalidate();feedMonitor?.stop();ambientPlayer.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;bookText="";bookFile=null;
   disconnectMistral();disconnectAgnes();sessionTurns.length=0;pdfDocumentFile=null;$("preference-share").checked=false;
   $("agnes-key").value="";
   const field=$("mistral-key");if(field)field.value="";
