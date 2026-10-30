@@ -398,7 +398,7 @@ try{
  await page.locator("#vault-gate").waitFor({state:"hidden",timeout:15000});
  await page.locator('#nav [data-tab="privacy"]').click();
  assert.equal(await page.locator("#auto-lock-minutes").inputValue(),"30","Encrypted inactivity setting should survive lock and reopen");
- await page.locator("#agnes-status").getByText(/Agnes chargé depuis le coffre/).waitFor({timeout:15000});
+ await page.waitForFunction(()=>/Agnes chargé depuis le coffre/.test(document.getElementById("agnes-status")?.textContent||""),{timeout:15000});
  await page.locator('#nav [data-tab="chat"]').click();
  await page.locator("#v30-advanced-toggle").click();
  assert.equal(await page.locator("#v28-quiet-toggle").getAttribute("aria-pressed"),"true","Calm preference must be restored from vault");
