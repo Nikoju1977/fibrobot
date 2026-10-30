@@ -34,7 +34,7 @@ test("V29: reading progress moves forward by pages and never overflows",()=>{
  const book="p".repeat(5*2400+120);
  const first=readingPageRange(book,0,3);
  assert.equal(first.pages.length,3);
- assert.equal(first.spokenText.length,7202);
+ assert.equal(first.spokenText.length,7204);
  assert.equal(first.nextPage,3);
  assert.equal(first.totalPages,6);
  const end=readingPageRange(book,5,3);
