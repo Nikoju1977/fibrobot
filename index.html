@@ -8,7 +8,7 @@
 <meta name="description" content="FibroBot, espace privé pour un seul patient, conçu par Studio Niko Design. Suivi, tâches et informations sourcées.">
 <meta name="author" content="Studio Niko Design">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.run https://cdn.jsdelivr.net https://esm.sh 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://www.ebi.ac.uk https://api.mistral.ai https://apihub.agnes-ai.com https://fr.wikipedia.org https://en.wikipedia.org https://www.wikidata.org https://fr.wiktionary.org https://api.openalex.org https://api.crossref.org https://openlibrary.org https://api.github.com https://esm.run https://esm.sh https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co https://github.com https://*.githubusercontent.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.run https://cdn.jsdelivr.net https://esm.sh 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://www.ebi.ac.uk https://api.mistral.ai https://apihub.agnes-ai.com https://api.open-meteo.com https://geocoding-api.open-meteo.com https://air-quality-api.open-meteo.com https://date.nager.at https://fr.wikipedia.org https://en.wikipedia.org https://www.wikidata.org https://fr.wiktionary.org https://api.openalex.org https://api.crossref.org https://openlibrary.org https://api.github.com https://esm.run https://esm.sh https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co https://github.com https://*.githubusercontent.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'">
 <link rel="icon" href="./icon.svg">
 <link rel="manifest" href="./manifest.json">
 <link rel="stylesheet" href="./styles.css">
@@ -156,42 +156,14 @@
   <select id="chat-voice-speed"><option value="0.85">Douce (0,85×)</option><option value="1" selected>Normale (1×)</option><option value="1.15">Rapide (1,15×)</option></select>
 </section>
       <section class="card auto-brain-card" aria-labelledby="auto-brain-title">
-  <div class="auto-brain-header"><div><span class="section-kicker">MOTEUR CONVERSATIONNEL</span><h3 id="auto-brain-title">Assistant IA</h3><p>Agnes AI → Mistral : questions générales, histoires, création et discussion. Les informations de santé personnelles restent protégées.</p></div><label class="auto-switch"><input type="checkbox" id="auto-mode" checked aria-describedby="auto-brain-desc"><span>IA activée</span></label></div>
-  <p id="auto-brain-desc" class="tiny">Connecte au moins une IA. Une clé valide, des quotas disponibles et ton accord pour chaque question sont nécessaires. Aucun envoi du dossier patient.</p>
-  <p id="auto-brain-status" class="auto-brain-status" role="status">IA conversationnelle : connecte Agnes ou Mistral pour commencer.</p><div class="ai-budget-controls"><label for="api-budget-select">Limite volontaire d'appels IA pour cette session</label>
+  <div class="auto-brain-header"><div><span class="section-kicker">MOTEUR CONVERSATIONNEL</span><h3 id="auto-brain-title">Assistant IA</h3><p>Agnes AI pour les conversations, avec des services publics fiables pour les données en direct. Les données de santé restent protégées.</p></div><label class="auto-switch"><input type="checkbox" id="auto-mode" checked aria-describedby="auto-brain-desc"><span>IA activée</span></label></div>
+  <p id="auto-brain-desc" class="tiny">Connectez Agnes avec votre clé. La météo et les sources publiques ont un consentement distinct ; aucun dossier patient ne leur est envoyé.</p>
+  <p id="auto-brain-status" class="auto-brain-status" role="status">Agnes AI : connectez votre clé pour discuter. Les sources publiques se consultent séparément.</p><div class="ai-budget-controls"><label for="api-budget-select">Limite volontaire d'appels IA pour cette session</label>
 <select id="api-budget-select"><option value="5">5 appels maximum</option><option value="10" selected>10 appels maximum</option><option value="20">20 appels maximum</option></select>
 <p id="api-budget-status" class="tiny" role="status">0 appel distant · 10 restants.</p>
 <p class="tiny">Cette limite de requêtes ne garantit pas un plafond de dépenses. Le tarif et le quota sont déterminés par Agnes/Mistral. Les clés dans le navigateur nécessitent de la prudence.</p></div>
 </section>
 <div class="assistant-advanced-heading"><div><span class="section-kicker">POUR ALLER PLUS LOIN</span><h3>Options et moteurs de l’assistant</h3><p>Choisis ton fournisseur et vérifie sa connexion. Les données médicales sourcées et les règles de sécurité demeurent disponibles.</p></div></div>
-      <details class="card ai-card" id="gemma-options" hidden aria-hidden="true">
-  <summary><span class="ai-summary-icon" aria-hidden="true">✳</span><span><strong>Modèles IA locaux (option facultative)</strong><small>Gemma 4, Qwen, SmolLM et autres modèles réellement compatibles · sans compte</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
-  <div class="ai-details">
- <h3>Installer mon assistant IA sur cet appareil</h3>
- <p>Le mode de base fonctionne sans téléchargement. Avec votre accord, un modèle compatible s'installe depuis son hébergeur et calcule ensuite localement dans ce navigateur. Le téléchargement peut être très volumineux ; certains téléphones ne disposent pas d'assez de mémoire GPU. Aucun modèle n'est installé automatiquement.</p>
- <p class="callout">Gemma 4 E2B peut ne pas fonctionner sur les téléphones peu puissants. Le choix « Léger automatique » évite les très gros modèles, mais ne garantit pas la compatibilité. En cas d'échec, vos notes et le mode documentaire restent disponibles.</p>
- <div class="form model-form">
-  <button type="button" class="btn light" id="llm-check">1. Vérifier mon appareil et les modèles</button>
-  <label for="local-model-select">Modèle à utiliser</label>
-  <select id="local-model-select">
-   <option value="auto">Léger automatique (conseillé sur téléphone)</option>
-   <option value="gemma">Gemma 4 E2B si disponible — plus exigeant</option>
-  </select>
-  <label for="gemma-variant">Précision WebGPU</label>
-  <select id="gemma-variant"><option value="auto">Automatique selon le GPU</option><option value="f32">Sans shader-f16, si compatible</option><option value="f16">Avec shader-f16</option></select>
-  <div class="button-row">
-   <button type="button" id="gemma-load" class="btn primary">2. Télécharger et charger le modèle choisi</button>
-   <button type="button" id="gemma-cancel" class="btn light" hidden disabled>Annuler le chargement</button>
-   <button type="button" id="gemma-unload" class="btn light" disabled>Décharger le modèle</button><button type="button" id="llm-test" class="btn light" disabled>3. Tester la réponse IA</button>
-  </div>
-  <p id="llm-device" class="tiny" role="status">Aucune vérification de compatibilité effectuée.</p>
-  <p id="gemma-status" class="tiny" role="status">Modèle non chargé : toutes les fonctions documentaires restent utilisables.</p>
-  <p class="tiny">Quand le modèle termine son chargement, il est activé pour vos conversations générales. Après chaque fermeture de l’application, il faut le recharger en mémoire, même si les fichiers restent dans le cache. Le bouton « Tester » vérifie une vraie génération. Aucune question ni note médicale n’est envoyée au modèle. Le modèle peut se tromper.</p>
-  <progress id="gemma-progress" max="1" value="0" hidden aria-label="Progression du modèle"></progress>
-  <label class="consent"><input type="checkbox" id="gemma-use" disabled>Utiliser l’IA locale pour les questions générales et tâches (automatiquement activé après chargement ; jamais pour la prescription)</label>
- </div>
-</div>
-</details>
       <details class="card ai-card" id="agnes-options">
  <summary><span class="ai-summary-icon" aria-hidden="true">◈</span><span><strong>Agnes AI · moteur principal de discussion</strong><small>Questions générales uniquement, avec confirmation avant l'envoi</small></span><span class="ai-chevron" aria-hidden="true">⌄</span></summary>
  <div class="ai-details">
@@ -256,7 +228,7 @@
        <label class="network-consent" for="network-mode"><input type="checkbox" id="network-mode">
          <span><strong>Autoriser la recherche Internet pour cette session</strong><small>Par défaut, aucun accès Internet pour vos questions. Avant chaque recherche, FibroBot affiche la question exacte et vous demande de confirmer son envoi aux sites indiqués. Le dossier médical, les traitements et les symptômes ne sont jamais utilisés pour ces recherches.</small></span>
        </label>
-       <p class="tiny" id="network-state" role="status">Mode privé local : aucune recherche Internet libre ne sera lancée.</p><label class="consent"><input type="checkbox" id="source-synthesis">Synthèse facultative des sources (si un moteur IA compatible est réellement chargé)</label>
+       <p class="tiny" id="network-state" role="status">Mode privé local : aucune recherche Internet libre ne sera lancée.</p>
        <div class="network-examples">
         <button type="button" class="chip" data-ask="Qui était Marie Curie ?">Encyclopédie</button>
         <button type="button" class="chip" data-ask="Cherche un livre sur l'astronomie">Livres</button>
