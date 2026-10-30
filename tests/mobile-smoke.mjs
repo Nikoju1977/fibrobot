@@ -50,7 +50,9 @@ for(const [label,engine,mobile] of [["WebKit format iPhone",webkit,true],["Chrom
   assert.match(await page.locator("#chat-engine-state").textContent(),/Dernière réponse/);
   assert.equal(await page.locator("#gemma-options").isVisible(),false,"Local LLM panel hidden");
   assert.equal(await page.locator("#agnes-options").isVisible(),true,"Agnes settings visible");
-  assert.equal(await page.locator("#mistral-options").isVisible(),true,"Mistral settings visible");
+  assert.equal(await page.locator("#mistral-options").isVisible(),false,"Advanced Mistral settings hidden in simple mode");
+   await page.locator("#v30-advanced-toggle").click();
+   assert.equal(await page.locator("#mistral-options").isVisible(),true,"Mistral settings available on explicit advanced toggle");
   assert.equal(await page.locator("#chat-local-mode").count(),0,"No local-mode button");
   console.log(label+": UI, coffre, formulaire, XSS, responsive OK (émulation, pas de matériel réel)");
  }finally{await browser.close();}
