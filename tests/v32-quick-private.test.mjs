@@ -15,9 +15,13 @@ test("V32: one-line symptom note supports values and factors without causal clai
  assert.equal(d.payload.date,"2026-10-30");
  assert.equal(d.payload.name,"Auto-suivi rapide");
  assert.equal(parseQuickHealth("douleur 0 sommeil 10","2026-10-30").payload.intensity,0);
+ const narrated=parseQuickHealth("douleur 7/10 fatigue 8 stress après le ménage","2026-10-30");
+ assert.match(narrated.payload.notes,/Contexte libre déclaré : apres le menage/);
+ assert.match(narrated.payload.notes,/association non démontrée/);
+ assert.match(narrated.preview,/note libre conservée/);
 });
 test("V32: malformed and out-of-bounds values never become silently stored measurements",()=>{
- for(const text of ["","fatigue 8 stress","douleur 11","douleur -1","douleur 8 fatigue 12","douleur", "douleur 5 douleur 8","douleur 5 fatigue non renseignée"]){
+ for(const text of ["","fatigue 8 stress","douleur 11","douleur -1","douleur 8 fatigue 12","douleur", "douleur 5 douleur 8","douleur 5 fatigue non renseignée","douleur 7.5","douleur 7,5","fatigue 8 douleur 9.9"]){
   assert.throws(()=>parseQuickHealth(text,"2026-10-30"),Error,text);
  }
  assert.throws(()=>parseQuickHealth("douleur 5","2026-10-32"),/invalide/);
