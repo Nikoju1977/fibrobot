@@ -81,6 +81,9 @@ try{
   (await page.locator("#chat .chat-card").boundingBox()).y,"Agnes setup shown before chat");
  assert.equal(await page.locator("#mistral-options").isVisible(),false,"Advanced settings hidden in simple mode");
  assert.equal(await page.locator("#v30-advanced-toggle").getAttribute("aria-expanded"),"false");
+ assert.equal(await page.locator(".v31-agent-buttons button").count(),5,"General + four specialist agents");
+ assert.equal(await page.locator("#v31-watch").isChecked(),false,"No feed monitoring without consent");
+ assert.equal(await page.locator("#v31-live-consent").isChecked(),false,"No public API without consent");
  await page.locator("#v30-advanced-toggle").click();
  assert.equal(await page.locator("#chat-voice-toggle").getAttribute("aria-pressed"),"false");
  assert.equal(await page.locator("#chat-memory-optin").isChecked(),false,"Session memory must be opt-in");
@@ -204,6 +207,32 @@ try{
  assert.ok(agnesPost.includes("Explique cette fiche documentaire publique"));
  assert.ok(!agnesPost.includes("Quels sont les symptômes de la fibromyalgie"),"Never send personal medical question");
  assert.ok(!agnesPost.includes(secret),"Never send the vault secret");
+ // V31: weather routes directly to a public API, then optionally Agnes.
+ let geoCalls=0,weatherCalls=0;
+ await page.route("https://geocoding-api.open-meteo.com/**",async route=>{
+  geoCalls++;
+  await route.fulfill({status:200,contentType:"application/json",headers:{"access-control-allow-origin":"*"},
+   body:JSON.stringify({results:[{name:"Nantes",latitude:47.2,longitude:-1.5,country:"France"}]})});
+ });
+ await page.route("https://api.open-meteo.com/**",async route=>{
+  weatherCalls++;
+  await route.fulfill({status:200,contentType:"application/json",headers:{"access-control-allow-origin":"*"},
+   body:JSON.stringify({current:{time:"2026-10-30T14:00",temperature_2m:17,apparent_temperature:16,relative_humidity_2m:60,weather_code:2,wind_speed_10m:9},
+   daily:{time:["2026-10-30","2026-10-31","2026-11-01","2026-11-02","2026-11-03","2026-11-04","2026-11-05"],temperature_2m_min:[8,7],temperature_2m_max:[20,18],precipitation_probability_max:[10,70],weather_code:[2,61]}})});
+ });
+ page.once("dialog",dialog=>{assert.match(dialog.message(),/données publiques actuelles/);dialog.accept();});
+ await page.locator("#prompt").fill("Quelle météo à Nantes ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Météo actuelle pour Nantes/).last().waitFor({timeout:15000});
+ assert.equal(geoCalls,1);
+ assert.equal(weatherCalls,1);
+ assert.equal(await page.locator("#v31-live-consent").isChecked(),true,"Weather session consent is opt-in");
+ assert.equal(agnesCalls,2,"Weather does not call Agnes without separate grounded-rephrasing consent");
+ await page.locator("#v31-agnes-grounded").check();
+ await page.locator("#prompt").fill("Quelle météo à Nantes ?");
+ await page.locator('#chat-form button[type="submit"]').click();
+ await page.locator("#messages").getByText(/Données originales de la source/).last().waitFor({timeout:15000});
+ assert.equal(agnesCalls,3,"Agnes can summarize opt-in source data");
  await page.locator("#agnes-disconnect").click();
  assert.equal(await page.locator("#agnes-test").isDisabled(),true);
  await page.locator("#auto-mode").uncheck();
@@ -415,7 +444,7 @@ try{
  await page.locator('#nav [data-tab="chat"]').click();
  await page.locator('#specialist-list [data-specialist="sleep"]').click();
  await page.locator("#messages").getByText(/Sommeil — assistant d'information/).waitFor({timeout:10000});
- assert.equal(await page.locator("#llm-test").isDisabled(),true,"An uninitialized model must never pretend to have passed inference tests");
+ assert.equal(await page.locator("#llm-test").count(),0,"No on-device inference controls remain");
  assert.match(await page.locator("#chat-engine-state").textContent(),/agent Sommeil/);
  await page.locator("#prompt").fill("Bonjour");
  await page.locator('#chat-form button[type="submit"]').click();

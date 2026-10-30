@@ -6,10 +6,12 @@ const css=readFileSync(new URL("../ux-pro.css",import.meta.url),"utf8");
 const app=readFileSync(new URL("../app.mjs",import.meta.url),"utf8");
 const voice=readFileSync(new URL("../voice-input.mjs",import.meta.url),"utf8");
 
-test("assistant : la discussion apparaît avant les options de modèles",()=>{
+test("assistant : conversation principale et configuration Agnes présentes sans modèle local",()=>{
  const section=html.slice(html.indexOf('id="chat"'),html.indexOf('id="tasks"'));
- assert.ok(section.indexOf('id="messages"')<section.indexOf('id="gemma-options"'));
- assert.ok(section.indexOf('id="chat-form"')<section.indexOf('id="gemma-options"'));
+ assert.ok(section.indexOf('id="messages"')>=0);
+ assert.ok(section.indexOf('id="chat-form"')>=0);
+ assert.ok(section.indexOf('id="agnes-options"')>=0);
+ assert.equal(section.includes('id="gemma-options"'),false);
  assert.match(section,/id="assistant-diagnostics-panel"/);
  assert.match(section,/id="specialist-list"/);
 });

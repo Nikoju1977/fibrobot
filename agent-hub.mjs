@@ -13,7 +13,8 @@ export const SPECIALISTS=Object.freeze([
  Object.freeze({id:"pacing",name:"Activités et énergie",role:"Fractionner les tâches, proposer des pauses et priorités",sourceId:"daily"}),
  Object.freeze({id:"visit",name:"Coordination des soins",role:"Préparer une consultation et organiser les informations",sourceId:"care"}),
  Object.freeze({id:"medication",name:"Traitements déclarés",role:"Relire la liste saisie, préparer la revue pharmaceutique",sourceId:"care"}),
- Object.freeze({id:"research",name:"Bibliothèque scientifique",role:"Orienter vers les sources institutionnelles et Europe PMC",sourceId:"fibro"})
+ Object.freeze({id:"research",name:"Bibliothèque scientifique",role:"Orienter vers les sources institutionnelles et Europe PMC",sourceId:"fibro"}),
+ Object.freeze({id:"quality",name:"Qualité et suivi",role:"Synthèses statistiques descriptives, sans prédire les crises ni en inférer des causes",sourceId:"daily"})
 ]);
 const normalized=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const hasClinicalAction=q=>/\b(dosage|dose|posolog|prescri|diagnos|comprime|arreter|arret.*traitement|surdo|interaction|contre.indication|quel medicament|puis.je prendre|peux.je prendre)\b/.test(normalized(q));
@@ -69,6 +70,11 @@ export function runSpecialist(id,context={},question=""){
      ".\nLeur liste, leurs doses et leurs horaires ne sont pas vérifiés par FibroBot. Un pharmacien ou médecin doit confirmer les interactions, contre-indications et modifications éventuelles.\n"+
      "Utilisez « Préparer mon rendez-vous » pour partager vos informations avec un professionnel.";
    sourceId="care";break;
+  }
+  case "quality":{
+   answer=intro+"Suivi descriptif des observations déclarées. Aucune méthode statistique appliquée ici ne peut prédire une crise ni identifier un déclencheur médical.\n"+
+    summarizeObservations(context)+"\nPréparez avec votre soignant un relevé des situations, changements et questions à discuter.";
+   sourceId="daily";break;
   }
   case "research":{
    answer=intro+"Les fiches intégrées présentent les sources HAS et NCCIH. Dans Bibliothèque médicale, la recherche Europe PMC utilise uniquement des thèmes prédéfinis et votre accord. Une publication ne vaut pas une recommandation de traitement.";

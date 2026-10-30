@@ -1,7 +1,8 @@
 import {today,text,makeSymptom,makeTask,makeCondition,makeAppointment,makeMedication,energyGuide,rankTasks,reply,dueReminders,reminderLog,medicationReminderTimes} from "./core.mjs";
 import {LIBRARY} from "./medical-library.mjs";
 import {openSecureDB,all,put,del,wipeDB,encryptedExport,eraseLegacy} from "./vault-ui.mjs";
-import {loadGemma,unloadGemma,cancelGemmaLoad,canPlanWithGemma,generateLifePlan,generateGeneralChat,summarizePublicSources,testLocalModel,cancelLocalGeneration,detectWebGPU,listLocalModels,status as llmStatus} from "./gemma-local.mjs";
+import {liveIntent,explicitWeatherCity,publicWeather,publicAirQuality,publicFrenchHolidays,LIVE_SOURCES} from "./public-live-services.mjs";
+import {createPublicFeedMonitor,feedState} from "./live-feed-hub.mjs";
 import {SPECIALISTS,routeSpecialist,runSpecialist} from "./agent-hub.mjs";
 import {classifyIntent,summarizeObservations,prepareVisit,planDaily} from "./assistant-engine.mjs";
 import {findScientificArticles,externalResearchLink} from "./research-library.mjs";
@@ -10,7 +11,7 @@ import {setupPatientUX} from "./ux-pro.mjs";
 import {checkAssistantCore,companionStatus,documentedAnswer} from "./assistant-diagnostics.mjs";
 import {HEALTH_CATALOG,retrieveMedicalEvidence,approvedMedicalURL} from "./medical-rag.mjs";
 import {connectMistral,disconnectMistral,cancelMistralRequests,mistralStatus,generateMistralChat,generateMistralMedicalExplanation,generateMistralPlanningAdvice,testMistralConnection} from "./mistral-bridge.mjs";
-import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgnesChat,generateAgnesPublicFiche,testAgnesConnection} from "./agnes-bridge.mjs";
+import {agnesStatus,connectAgnes,disconnectAgnes,cancelAgnesRequests,generateAgnesChat,generateAgnesPublicFiche,generateAgnesGroundedPublic,testAgnesConnection} from "./agnes-bridge.mjs";
 import {AGNES_CREDENTIAL_ID,validStoredAgnesCredential,saveAgnesCredential,loadAgnesCredential,deleteAgnesCredential} from "./agnes-credential-vault.mjs";
 import {autoGeneralAllowed,answerWithAuto,shouldPreferSources} from "./auto-engine.mjs";
 import {sessionPreview,appendSessionTurn} from "./conversation-context.mjs";
@@ -50,6 +51,14 @@ const activeSession=createSessionGuard();
 const medAlertSeen=new Set();
 const QUIET_SETTING_ID="quiet-mode-v29";
 let bookSleepTimeout=null;
+let activeAgentId="general";
+const EXPERT_PANEL=Object.freeze([
+ {id:"algologue",name:"Douleur / fibromyalgie",specialist:"pain"},
+ {id:"pharmacien",name:"Traitements / pharmacien",specialist:"medication"},
+ {id:"ergonome",name:"Ergonomie / énergie",specialist:"pacing"},
+ {id:"qualite",name:"Qualité / suivi",specialist:"quality"}
+]);
+let feedMonitor=null;
 const dom=(tag,string,cls)=>{let n=document.createElement(tag);if(string!==undefined)n.textContent=String(string);if(cls)n.className=cls;return n;};
 const val=id=>$(id).value;
 function notify(message){$("toast").textContent=message;$("toast").hidden=false;clearTimeout(notify.timeout);notify.timeout=setTimeout(()=>$("toast").hidden=true,5500);}
@@ -72,7 +81,7 @@ function lockInactiveVault(){
  const minutes=storedAutoLockMinutes(DATA.settings);
  if(!shouldLockForInactivity(lastActivityAt,Date.now(),minutes))return;
  try{
-  activeSession.invalidate();stopSpeaking();try{activeRecognition?.abort();}catch{}
+  activeSession.invalidate();feedMonitor?.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}
   sessionTurns.length=0;bookText="";pdfDocumentFile=null;
   disconnectMistral();disconnectAgnes();db.close();db=null;
  }finally{location.reload();}
@@ -248,7 +257,13 @@ function renderSpecialists(){
   out.append(b);
  }
 }
-function renderChat(){const out=$("messages");out.replaceChildren();if(!DATA.conversations.length)out.append(bubble("Bonjour. Je peux vous aider à organiser vos tâches et consulter des informations médicales sourcées. Qu'aimeriez-vous faire aujourd'hui ?","bot"));else DATA.conversations.slice(-100).forEach(m=>out.append(bubble(m.body,m.role,m.sourceId,m.references,m.siteId)));out.scrollTop=out.scrollHeight;}
+function renderChat(){
+ const out=$("messages");out.replaceChildren();
+ const entries=DATA.conversations.filter(m=>(m.agentId||"general")===activeAgentId).slice(-100);
+ if(!entries.length)out.append(bubble(activeAgentId==="general"?"Bonjour. Connectez Agnes pour discuter. Pour une réponse actuelle, activez les sources publiques dans le panneau Flux.":"Vous êtes dans l'espace "+(EXPERT_PANEL.find(a=>a.id===activeAgentId)?.name||"spécialisé")+". Les réponses médicales reposent sur les fiches et règles de sécurité, jamais sur une simulation d'expert.","bot"));
+ else entries.forEach(m=>out.append(bubble(m.body,m.role,m.sourceId,m.references,m.siteId)));
+ out.scrollTop=out.scrollHeight;
+}
 function localVoice(){return "speechSynthesis" in window?preferredLocalVoice(speechSynthesis):null;}
 function syncVoiceControls(){
  const global=$("voice-toggle"),local=$("chat-voice-toggle");
@@ -364,7 +379,7 @@ async function ask(q){
   notify("Déverrouillez le coffre avant de poser une question.");
   return;
  }
- busyChat=true;const sessionTicket=activeSession.start();
+ busyChat=true;const sessionTicket=activeSession.start(),requestAgentId=activeAgentId;
  // Le patient voit immédiatement que sa question a été prise en compte.
  // Cette prévisualisation est remplacée par l'historique dès la réponse reçue.
  const out=$("messages");
@@ -378,7 +393,7 @@ async function ask(q){
  try{
   const intent=classifyIntent(input),response=reply(input,LIBRARY,{...DATA,energy});
   let answer=response.message+(response.followup?"\n\n"+response.followup:""),sourceId=response.sources?.[0]?.id||"";
-  let engine="Assistant documentaire local",references=[],onlineAttempted=false,mistralAttempted=false,mistralProblem="";
+  let engine="FibroBot · documentation médicale et sources publiques",references=[],onlineAttempted=false,mistralAttempted=false,mistralProblem="";
   // Les actions locales et l'écoute passent après les règles d'urgence du moteur médical.
   let siteId="",direct=false,companionMode="",navigationTarget="";
   if(response.kind!=="urgent"){
@@ -395,6 +410,47 @@ async function ask(q){
    }else{
     const companion=companionReply(input,{requested:$("companion-mode").value,safety:response,history:DATA.conversations});
     if(companion&&!(classifyIntent(input)==="general"&&$("auto-mode").checked&&(agnesStatus().connected||mistralStatus().connected))){answer=companion.message;engine=companion.label+" (soutien, non médical)";companionMode=companion.mode;direct=true;}
+   }
+  }
+  // Agents déterministes : aucune donnée du dossier ne part vers Agnes.
+  if(!direct&&requestAgentId!=="general"&&["medical","planning","summary"].includes(intent)&&!liveIntent(input)&&response.kind!=="urgent"){
+   const selected=EXPERT_PANEL.find(a=>a.id===requestAgentId);
+   if(selected){
+    const result=runSpecialist(selected.specialist,{...DATA,energy},input);
+    answer=result.answer;sourceId=result.sourceId;engine="Espace "+selected.name+" · fiche médicale et sécurité";direct=true;
+   }
+  }
+  // Services publics actualisés, jamais une météo devinée par le modèle.
+  if(!direct&&intent==="general"&&response.kind!=="urgent"){
+   const kind=liveIntent(input);
+   if(kind){
+    direct=true;
+    const city=(explicitWeatherCity(input)||$("v31-city")?.value.trim()||"").slice(0,75);
+    const permitted=$("v31-live-consent")?.checked||
+      confirm("Consulter les données publiques actuelles ?\n\nSeule la ville « "+city+" » sera envoyée à Open-Meteo, ou la requête de calendrier à Nager.Date. Aucun dossier médical n'est transmis. Autoriser pour cette session ?");
+    if(!permitted){
+     answer="Sources Internet non autorisées. Activez les sources publiques dans le panneau « Flux en direct » pour les prévisions actualisées.";
+     engine="Sources publiques : consentement nécessaire";
+    }else{
+     $("v31-live-consent").checked=true;
+     try{
+      setEngineNote("Consultation des données publiques actualisées…");
+      const found=kind==="weather"?await publicWeather(city,{question:input}):
+         kind==="air"?await publicAirQuality(city):await publicFrenchHolidays(input);
+      answer=found.answer;references=found.references;sourceId="";
+      engine="Source publique datée · "+kind;
+      if(agnesStatus().connected&&$("v31-agnes-grounded")?.checked&&$("auto-mode").checked){
+       try{
+        const phrased=await generateAgnesGroundedPublic(input,found.answer,{model:$("agnes-model").value});
+        answer=phrased.text+"\n\nDonnées originales de la source :\n"+found.answer;
+        engine="Agnes AI + "+kind+" · données publiques";
+       }catch{notify("Agnes indisponible : les chiffres de la source sont conservés.");}
+      }
+     }catch(err){
+      answer="Le service public n'a pas livré de données vérifiables. Vérifiez Internet et le nom de ville. Détail : "+String(err?.message||"Indisponible").slice(0,140);
+      engine="Service public indisponible";
+     }
+    }
    }
   }
   if(!direct){
@@ -428,13 +484,6 @@ async function ask(q){
      const responseOnline=await searchPublicQuestion(input);
      answer=formatPublicAnswer(responseOnline);
      references=responseOnline.results.map(r=>({provider:r.provider,title:r.title,url:r.url,date:r.date}));
-     if(references.length&&$("source-synthesis").checked&&$("gemma-use").checked&&llmStatus().ready){
-      setEngineNote("Rédaction de la synthèse depuis les extraits publics (IA locale)…");
-      try{
-       const synthesis=await summarizePublicSources(input,responseOnline.results);
-       answer="Synthèse IA locale à vérifier dans les sources ci-dessous :\n"+synthesis+"\n\n"+answer;
-      }catch(error){notify("Synthèse locale impossible : extraits documentaires conservés.");}
-     }
      sourceId="";engine=references.length?"Sources Internet publiques vérifiables":"Recherche en ligne sans résultat";
     }catch(error){
      onlineAttempted=false;
@@ -446,12 +495,7 @@ async function ask(q){
    engine="Sécurité médicale : réponse encadrée";
   }else if(intent==="planning"&&response.kind!=="refusal"){
    answer=planDaily({...DATA,energy});engine="Agent activités et énergie";
-   if($("gemma-use").checked&&llmStatus().ready&&canPlanWithGemma(input)){
-    setEngineNote("IA locale : classement des tâches en cours…");
-    try{answer=await generateLifePlan(input,{energy,tasks:DATA.tasks})+"\n\n[Suggestion de classement générée localement.]";engine="IA locale : "+llmStatus().modelId;}
-    catch(error){engine="Agent activités et énergie (repli local)";notify("Le classement IA a échoué : plan local conservé.");}
-   }
-  }else if(intent==="summary"&&response.kind!=="refusal"){
+   }else if(intent==="summary"&&response.kind!=="refusal"){
    answer=summarizeObservations(DATA);engine="Agent journal et observations";
   }else if(intent==="visit"&&response.kind!=="refusal"){
    answer=prepareVisit(DATA);engine="Agent coordination des soins";
@@ -583,8 +627,8 @@ async function ask(q){
    appendSessionTurn(sessionTurns,input,answer);
    $("chat-memory-state").textContent="Mémoire de cette session : "+Math.floor(sessionTurns.length/2)+" échange(s) généraux filtrés.";
   }
-  const userRecord={role:"user",body:input,time:Date.now(),purpose};
-  const b={role:"bot",body:answer,time:Date.now(),sourceId,references,purpose,siteId,companionMode};
+  const userRecord={role:"user",body:input,time:Date.now(),purpose,agentId:requestAgentId};
+  const b={role:"bot",body:answer,time:Date.now(),sourceId,references,purpose,siteId,companionMode,agentId:requestAgentId};
   // L'écran ne dépend jamais de la réussite d'une requête réseau ou d'IndexedDB.
   DATA.conversations.push(userRecord,b);
   pending.remove();
@@ -603,7 +647,7 @@ async function ask(q){
  }catch(e){
   if(!activeSession.current(sessionTicket)||!db)return;
   console.error("FibroBot : traitement impossible",String(e?.message||e).slice(0,160));
-  const message="Je n'ai pas réussi à terminer cette réponse. Le mode documentaire et les agents locaux restent disponibles. Vous pouvez reposer la question après avoir vérifié votre coffre.";
+  const message="Je n'ai pas réussi à terminer cette réponse. Vos fiches médicales et le coffre restent disponibles. Vérifiez la connexion Agnes et les sources publiques.";
   if(pending.isConnected)pending.textContent=message;
   else $("messages").append(bubble(message,"bot"));
   setEngineNote("Erreur récupérable : "+String(e?.message||e).slice(0,145));
@@ -853,28 +897,13 @@ function events(){
   const core=checkAssistantCore();
   const checks=dom("p",core.ok?"Moteur documentaire : 4 scénarios locaux réussis.":"Moteur documentaire : au moins un scénario local a échoué.");
   out.append(checks);
-  for(const detail of companionStatus({vaultOpen:Boolean(db),webGPU:llmStatus(),mistral:mistralStatus(),internet:networkEnabled})){
+  for(const detail of companionStatus({vaultOpen:Boolean(db),mistral:mistralStatus(),internet:networkEnabled})){
    out.append(dom("p",detail.name+" : "+detail.status+" — "+detail.detail));
   }
   out.append(dom("p","Dictée : "+((window.SpeechRecognition||window.webkitSpeechRecognition)?"API exposée, fonctionnement réel à tester.":"API indisponible.")+" Voix française locale : "+(localVoice()?"détectée, à tester.":"non détectée.")));
   out.append(dom("p","Rappels hors application : non garantis en PWA. Commandes natives Android/iOS : non disponibles. Audit clinique et tests matériels toujours nécessaires."));
   out.append(dom("p","Ce diagnostic n'appelle aucune API et ne teste pas la disponibilité réelle de Mistral ou WebGPU. Aucune donnée patient n'est envoyée."));
   $("assistant-diagnostics-state").textContent=core.ok?"Diagnostic local terminé. Vérifiez les états des moteurs ci-dessous.":"Diagnostic local incomplet : la bibliothèque pourrait être indisponible.";
- });
- $("chat-local-mode")?.addEventListener("click",()=>{
-  // Aucune intervention sur les données patient ni sur les clés enregistrées.
-  $("mistral-use").checked=false;
-  $("gemma-use").checked=false;
-  networkEnabled=false;$("network-mode").checked=false;
-  $("network-state").textContent="Mode local : aucune recherche Internet libre ne sera lancée.";
-  cancelMistralRequests();cancelAgnesRequests();$("auto-mode").checked=false;
-  const cancelled=cancelLocalGeneration();
-  if(cancelled){
-   $("gemma-use").disabled=true;$("gemma-unload").disabled=true;$("llm-test").disabled=true;
-   $("gemma-status").textContent="Inférence interrompue : rechargez le modèle local depuis son cache quand vous le souhaitez.";
-  }
-  setEngineNote("Mode secours local activé : réponses documentaires et agents disponibles sans Mistral.");
-  notify("Mode local activé. Vous pouvez poser votre question, même sans Mistral.");
  });
  $("mistral-connect").addEventListener("click",async()=>{
   const source=$("mistral-key"),secret=source.value.trim(),save=$("mistral-save-key").checked;
@@ -1041,66 +1070,6 @@ function events(){
  $("print-report").addEventListener("click",()=>{if(confirm("Le rapport imprimable contient vos données de santé EN CLAIR. Évitez un ordinateur partagé, une imprimante publique ou un PDF non protégé. Continuer ?"))printReport();});
  $("erase").addEventListener("click",async()=>{if(!confirm("Supprimer définitivement toutes les données FibroBot de ce navigateur ?"))return;try{disableMistralSession();db.close();await wipeDB();location.reload();}catch(e){notify("Effacement bloqué : "+e.message);}});
  $("notification-permission").addEventListener("click",async()=>{if(!("Notification" in window)||typeof Notification.requestPermission!=="function"){notify("Notifications non disponibles ici. Gardez une alarme système pour les prises essentielles.");return;}try{const state=await Notification.requestPermission();notify(state==="granted"?"Notifications autorisées tant que le navigateur le permet.":"Notifications non autorisées. Les rappels restent visibles dans FibroBot.");}catch(e){notify("Notifications non prises en charge.");}});
- $("llm-check").addEventListener("click",async()=>{
-  const button=$("llm-check");button.disabled=true;
-  $("llm-device").textContent="Vérification du GPU et consultation du catalogue WebLLM…";
-  try{
-   const cap=await detectWebGPU();if(!cap.supported)throw Error(cap.reason);
-   if(!confirm("Vérifier le catalogue des modèles locaux ? Cette action télécharge seulement le moteur WebLLM depuis son hébergeur. Elle ne télécharge aucun poids de modèle et n'envoie aucune donnée patient."))return;
-   const models=await listLocalModels();
-   const select=$("local-model-select");
-   select.querySelectorAll("option[data-dynamic]").forEach(x=>x.remove());
-   for(const entry of models.filter(x=>x.estimatedMB===null||x.estimatedMB<5000).sort((a,b)=>(a.estimatedMB||99999)-(b.estimatedMB||99999)).slice(0,35)){
-    const option=document.createElement("option");option.dataset.dynamic="1";option.value=entry.id;
-    option.textContent=entry.id+(entry.estimatedMB?" · VRAM ~"+Math.round(entry.estimatedMB)+" Mo":" · VRAM inconnue");
-    select.append(option);
-   }
-   $("llm-device").textContent=models.length+" modèles répertoriés · WebGPU disponible · shader-f16 "+(cap.f16?"oui":"non")+". Sélectionnez un modèle adapté à la mémoire de votre appareil.";
-  }catch(error){$("llm-device").textContent="Modèles non vérifiés : "+error.message;}
-  finally{button.disabled=false;}
- });
- $("gemma-load").addEventListener("click",async()=>{
-   const button=$("gemma-load"),cancel=$("gemma-cancel"),progress=$("gemma-progress"),status=$("gemma-status");
-   button.disabled=true;status.textContent="Vérification WebGPU…";
-   try{
-    const cap=await detectWebGPU();if(!cap.supported)throw Error(cap.reason);
-    const desired=$("local-model-select").value;
-    if(!confirm("Télécharger un modèle IA local"+(desired==="auto"?" léger":desired==="gemma"?" Gemma 4":" sélectionné")+" ? Les poids peuvent faire plusieurs Go et saturer la mémoire GPU. Le calcul a lieu sur cet appareil ; le modèle ne reçoit aucun dossier médical."))return;
-    progress.hidden=false;progress.value=0;cancel.hidden=false;cancel.disabled=false;
-    const result=await loadGemma({variant:$("gemma-variant").value,model:desired,onProgress:p=>{
-     status.textContent=p.text||"Chargement du modèle local…";
-     if(Number.isFinite(p.progress))progress.value=Math.max(0,Math.min(1,p.progress));
-    }});
-    $("gemma-use").disabled=false;$("gemma-use").checked=true;
-    $("gemma-unload").disabled=false;$("llm-test").disabled=false;
-    status.textContent="Modèle chargé et activé : "+result.modelId+". Testez maintenant la génération pour vérifier qu'il répond.";
-    updateEngineNote();
-    notify("Modèle local activé. Appuyez sur « Tester la réponse IA » pour vérifier l'inférence.");
-   }catch(error){
-    $("gemma-use").checked=false;$("gemma-use").disabled=true;
-    $("gemma-unload").disabled=true;$("llm-test").disabled=true;updateEngineNote();
-    status.textContent="Le modèle n'a pas été chargé : "+error.message+" Le mode sans IA reste disponible. Essayez « Léger automatique » ou un autre navigateur.";
-    notify("Échec du modèle : FibroBot reste utilisable.");
-   }finally{button.disabled=false;progress.hidden=true;cancel.hidden=true;cancel.disabled=true;}
- });
- $("gemma-cancel").addEventListener("click",()=>{if(cancelGemmaLoad())$("gemma-status").textContent="Chargement annulé ; vous pouvez garder le mode sans IA ou choisir un modèle léger.";});
- $("gemma-use").addEventListener("change",updateEngineNote);
- $("llm-test").addEventListener("click",async()=>{
-  const button=$("llm-test");button.disabled=true;
-  $("gemma-status").textContent="Test de génération réelle en cours (sans aucune donnée patient)…";
-  try{
-   const check=await testLocalModel();
-   $("gemma-status").textContent="Test réussi : "+check.modelId+" a généré une réponse en "+(check.durationMs/1000).toFixed(1)+" s. L'IA est active pour les questions générales.";
-   setEngineNote("Test de génération IA réussi : modèle opérationnel dans cette session.");
-  }catch(error){
-   $("gemma-status").textContent="Test de génération échoué : "+error.message+". Réessayez avec le modèle léger ou un navigateur compatible.";
-   setEngineNote("Modèle chargé, mais inférence en échec : "+String(error.message).slice(0,130));
-  }finally{button.disabled=!llmStatus().ready;}
- });
- $("gemma-unload").addEventListener("click",async()=>{
-  try{await unloadGemma();$("gemma-use").checked=false;$("gemma-use").disabled=true;$("gemma-unload").disabled=true;$("llm-test").disabled=true;updateEngineNote();$("gemma-status").textContent="Modèle déchargé ; assistant local documentaire toujours disponible.";}
-  catch(error){notify("Déchargement impossible : "+error.message);}
- });
  $("research-search").addEventListener("click",async()=>{
   const button=$("research-search"),out=$("research-results"),label=$("research-status");
   if(!db)return;
@@ -1128,7 +1097,7 @@ function events(){
   speak(lastSpeech);
  });
  $("erase-legacy").addEventListener("click",async()=>{if(!confirm("Supprimer l'ancienne base FibrobotDB non chiffrée de CE navigateur ? Vérifiez d'abord que vos données ont bien été migrées dans le coffre."))return;try{await eraseLegacy();notify("Ancienne base non chiffrée supprimée.");}catch(e){notify(e.message);}});
- $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;activeSession.invalidate();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
+ $("lock-vault").addEventListener("click",()=>{if(!confirm("Verrouiller le coffre et quitter cette session ?"))return;activeSession.invalidate();feedMonitor?.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;sessionTurns.length=0;disconnectAgnes();disableMistralSession();db?.close();location.reload();});
  $("breath-start")?.addEventListener("click",breathing);
  $("relax-script")?.addEventListener("click",()=>{
    const script="Vous pouvez arrêter à tout moment. Installez-vous si possible dans une position confortable. Prenez conscience des points de contact de votre corps avec le support. Laissez votre respiration trouver son rythme naturel, sans la forcer. Observez les sons autour de vous. Si vous ressentez de l'inconfort, ouvrez les yeux et arrêtez. Vous n'avez rien à réussir. Quel petit geste pourrait rendre cet instant plus confortable ?";
@@ -1250,6 +1219,95 @@ function restoreV29Preferences(){
  const alerts=$("v29-reminder-opt-in");
  if(alerts)alerts.checked=optInForegroundReminders(DATA.settings);
 }
+function setupV31Controls(){
+ const chat=$("chat"),hero=chat?.querySelector(".assistant-hero");
+ if(!chat||!hero)return;
+ const panel=dom("section",undefined,"card v31-agent-panel");panel.setAttribute("aria-label","Espaces des agents FibroBot");
+ panel.append(dom("h3","Votre équipe FibroBot"));
+ panel.append(dom("p","Quatre espaces de suivi avec des conversations distinctes. Agents documentaires supervisés, et non professionnels de santé réels.","tiny"));
+ const toolbar=dom("div",undefined,"v31-agent-buttons");toolbar.setAttribute("role","group");toolbar.setAttribute("aria-label","Choisir un espace");
+ const all=[{id:"general",name:"Agnes · général"},...EXPERT_PANEL];
+ const title=dom("p","Conversation générale","tiny");title.id="v31-thread-title";title.setAttribute("role","status");
+ for(const entry of all){
+  const button=dom("button",entry.name,"btn light");button.type="button";button.dataset.v31Agent=entry.id;
+  button.setAttribute("aria-pressed",String(entry.id===activeAgentId));
+  button.addEventListener("click",()=>{
+   if(busyChat){notify("Terminez la réponse précédente avant de changer d'agent.");return;}
+   activeAgentId=entry.id;sessionTurns.length=0;
+   for(const b of toolbar.querySelectorAll("button"))b.setAttribute("aria-pressed",String(b.dataset.v31Agent===entry.id));
+   title.textContent="Espace : "+entry.name;
+   renderChat();updateEngineNote();
+  });
+  toolbar.append(button);
+ }
+ panel.append(toolbar,title);
+ const clear=dom("button","Effacer uniquement cette conversation","btn light");clear.type="button";clear.id="v31-clear-thread";
+ clear.addEventListener("click",async()=>{
+  if(!db||busyChat)return;
+  if(!confirm("Effacer définitivement la conversation de cet espace dans le coffre chiffré ? Les autres espaces restent conservés."))return;
+  clear.disabled=true;
+  try{
+   const records=await all(db,"conversations");
+   const mine=records.filter(r=>(r.agentId||"general")===activeAgentId);
+   for(const record of mine)await del(db,"conversations",record.id);
+   DATA.conversations=await all(db,"conversations");sessionTurns.length=0;
+   renderChat();notify("Conversation sélectionnée supprimée du coffre chiffré.");
+  }catch{notify("Effacement incomplet : vérifiez le coffre et réessayez.");}
+  finally{clear.disabled=false;}
+ });
+ panel.append(clear);
+ hero.after(panel);
+ const feeds=dom("section",undefined,"card v31-feed-panel");
+ feeds.append(dom("h3","Flux Internet et informations actuelles"));
+ feeds.append(dom("p","Routage automatique des questions météo, qualité de l'air et jours fériés. Bibliothèques : Wikipédia, Wikidata, Wiktionnaire, OpenAlex, Crossref, Open Library, GitHub, Europe PMC. Aucun modèle IA local à installer.","tiny"));
+ const cityLabel=dom("label","Ville à interroger");cityLabel.htmlFor="v31-city";
+ const city=dom("input");city.id="v31-city";city.type="text";city.maxLength=75;city.value="La Meilleraye-de-Bretagne";city.autocomplete="off";
+ feeds.append(cityLabel,city);
+ const consentLabel=dom("label",undefined,"consent");consentLabel.htmlFor="v31-live-consent";
+ const consent=dom("input");consent.type="checkbox";consent.id="v31-live-consent";
+ consentLabel.append(consent,document.createTextNode(" Autoriser les services publics pour cette session (ville uniquement, pas de dossier médical)."));
+ feeds.append(consentLabel);
+ const agnesLabel=dom("label",undefined,"consent");agnesLabel.htmlFor="v31-agnes-grounded";
+ const agnes=dom("input");agnes.type="checkbox";agnes.id="v31-agnes-grounded";
+ agnesLabel.append(agnes,document.createTextNode(" Agnes peut reformuler mes résultats publics datés (appel API potentiellement payant)."));
+ feeds.append(agnesLabel);
+ const watchLabel=dom("label",undefined,"consent");watchLabel.htmlFor="v31-watch";
+ const watch=dom("input");watch.id="v31-watch";watch.type="checkbox";
+ watchLabel.append(watch,document.createTextNode(" Suivre météo et qualité de l'air toutes les 5 min lorsque la page est visible"));
+ feeds.append(watchLabel);
+ const state=dom("p","Veille désactivée.","tiny");state.id="v31-watch-status";state.setAttribute("role","status");feeds.append(state);
+ const results=dom("pre","Aucune donnée consultée.","v31-live-output");results.id="v31-live-output";results.setAttribute("aria-live","polite");feeds.append(results);
+ const directory=dom("details");directory.className="v31-directory";
+ directory.append(dom("summary","Sources disponibles et limites"));
+ const list=dom("ul");for(const source of [...PUBLIC_PROVIDERS,...LIVE_SOURCES]){
+  const li=dom("li"),link=dom("a",source.name);link.href=source.origin||source.url;link.target="_blank";link.rel="noopener noreferrer";li.append(link);list.append(li);
+ }
+ directory.append(list,dom("p","Les résultats sont obtenus à la demande. Seuls météo et air sont rafraîchis pendant l'ouverture de la page. Les fournisseurs peuvent imposer des limitations et bloquer les appels navigateur.","tiny"));feeds.append(directory);
+ panel.after(feeds);
+ const status=()=>{state.textContent=feedState({running:feedMonitor?.isActive(),visible:document.visibilityState==="visible",online:navigator.onLine!==false,city:city.value});};
+ const refresh=async()=>{
+  if(!db||!consent.checked||!city.value.trim())return;
+  const chosen=city.value.trim();
+  const settle=await Promise.allSettled([publicWeather(chosen,{question:"Quel temps fait-il aujourd'hui ?"}),publicAirQuality(chosen)]);
+  if(!db||!watch.checked)return;
+  const details=settle.map((r,i)=>r.status==="fulfilled"?r.value.answer:("Service "+(i?"air":"météo")+" indisponible : "+String(r.reason?.message||"erreur").slice(0,130)));
+  results.textContent="Consultation à "+new Date().toLocaleTimeString("fr-FR")+" ; chiffres et prévisions susceptibles d'évoluer.\n\n"+details.join("\n\n");
+ };
+ feedMonitor=createPublicFeedMonitor({refresh});
+ const tick=()=>{feedMonitor?.tick({visible:document.visibilityState==="visible",online:navigator.onLine!==false}).catch(()=>{});status();};
+ watch.addEventListener("change",()=>{
+  if(watch.checked&&!consent.checked){watch.checked=false;notify("Autorisez d'abord les sources publiques.");return;}
+  if(watch.checked&&!city.value.trim()){watch.checked=false;notify("Saisissez la ville à suivre.");return;}
+  if(watch.checked)feedMonitor.start();else feedMonitor.stop();
+  status();tick();
+ });
+ consent.addEventListener("change",()=>{if(!consent.checked){watch.checked=false;feedMonitor.stop();}status();});
+ city.addEventListener("change",()=>{results.textContent="Ville modifiée. Activez ou réactivez le suivi pour rafraîchir.";status();});
+ document.addEventListener("visibilitychange",tick);
+ window.addEventListener("online",tick);
+ window.addEventListener("offline",tick);
+ setInterval(tick,300000);status();
+}
 function setupV30Controls(){
  document.body.classList.add("v30-simple");
  const chat=$("chat");
@@ -1328,13 +1386,13 @@ function setupV29Controls(){
  }
 }
 async function init(){
- setupV27Controls();setupV28Controls();setupV29Controls();setupV30Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
+ setupV27Controls();setupV28Controls();setupV29Controls();setupV30Controls();setupV31Controls();renderSpecialists();updateEngineNote();syncVoiceControls();refreshComposer();updateDictationButton();updateConnectionState();installGuidance();updateApiBudgetUI();
  window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();pendingInstall=event;installGuidance();});
  window.addEventListener("appinstalled",()=>{pendingInstall=null;installGuidance();});
  window.addEventListener("online",updateConnectionState);
  window.addEventListener("offline",updateConnectionState);
  window.addEventListener("pagehide",()=>{
-  activeSession.invalidate();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;bookText="";bookFile=null;
+  activeSession.invalidate();feedMonitor?.stop();stopSpeaking();try{activeRecognition?.abort();}catch{}activeRecognition=null;bookText="";bookFile=null;
   disconnectMistral();disconnectAgnes();sessionTurns.length=0;pdfDocumentFile=null;$("preference-share").checked=false;
   $("agnes-key").value="";
   const field=$("mistral-key");if(field)field.value="";

@@ -59,3 +59,21 @@ body.v30-simple:not(.v30-advanced) #chat #gemma-options{display:none!important}
 .v30-agnes-primary .consent{display:flex;gap:.6rem;align-items:flex-start;max-width:720px}
 .v30-agnes-primary .consent input{flex:none;margin-top:.3rem}
 @media(max-width:650px){.v30-agnes-primary{padding:14px}.v30-agnes-primary .button-row{display:flex;flex-wrap:wrap;gap:8px}.v30-agnes-primary .button-row button{min-height:48px;flex:1 1 145px}}
+
+/* V31 — panneau agents inspiré de l'interface multi-agents proposée. */
+.v31-agent-panel,.v31-feed-panel{background:#17212c;color:#edf4fa;border:1px solid #35465a;border-radius:13px;padding:18px;margin:0 0 16px}
+.v31-agent-panel h3,.v31-feed-panel h3{color:#fff;margin:0 0 8px}
+.v31-agent-panel .tiny,.v31-feed-panel .tiny{color:#b9c9d8;line-height:1.55}
+.v31-agent-buttons{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.v31-agent-buttons button{background:#243549;color:#f3f8fb;border:1px solid #4b6178;min-height:46px;flex:1 1 155px;font-weight:650;white-space:normal;text-align:center}
+.v31-agent-buttons button[aria-pressed="true"]{background:#0869ad;color:white;border-color:#58a8e4;box-shadow:0 0 0 1px #58a8e4}
+.v31-agent-panel #v31-clear-thread{min-height:44px;margin-top:8px;background:#293746;color:#d5e4ef;border:1px solid #62788b}
+.v31-feed-panel label{display:block;margin:9px 0;font-weight:600;color:#ebf5fc}
+.v31-feed-panel input[type="text"]{width:100%;min-height:48px;padding:10px;background:#101922;color:#fff;border:1px solid #6d869c;border-radius:8px;font-size:1rem}
+.v31-feed-panel .consent{display:flex;align-items:flex-start;gap:10px;line-height:1.45;font-weight:500}
+.v31-feed-panel .consent input{flex:none;margin-top:5px;width:18px;height:18px}
+.v31-live-output{background:#101a25;color:#d5edfa;padding:14px;border-radius:8px;border:1px solid #314b61;white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow-y:auto;font-size:.9rem;line-height:1.55}
+.v31-directory summary{cursor:pointer;min-height:42px;padding-top:9px;color:#c9e9ff;font-weight:700}
+.v31-directory a{color:#9bd9ff;text-decoration:underline}
+.v31-directory ul{columns:2;list-style:disc inside;padding:0;line-height:1.9}
+@media(max-width:600px){.v31-agent-panel,.v31-feed-panel{padding:12px;border-radius:10px}.v31-agent-buttons{gap:6px}.v31-agent-buttons button{flex:1 1 125px;font-size:.87rem;padding:9px}.v31-directory ul{columns:1}}

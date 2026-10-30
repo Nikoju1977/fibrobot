@@ -29,14 +29,12 @@ export function checkAssistantCore(){
  return {ok:checks.every(x=>x.ok),checks};
 }
 
-export function companionStatus({vaultOpen=false,webGPU={},mistral={},internet=false}={}){
- const local=webGPU&&typeof webGPU==="object"?webGPU:{};
+export function companionStatus({vaultOpen=false,mistral={},internet=false}={}){
  const remote=mistral&&typeof mistral==="object"?mistral:{};
  const cooldown=Math.max(0,Math.ceil(Number(remote.cooldownSeconds)||0));
  return [
   {id:"coffre",name:"Coffre patient",status:vaultOpen?"prêt":"verrouillé",detail:vaultOpen?"Conversation enregistrable dans le coffre chiffré.":"Le coffre doit être déverrouillé pour enregistrer les échanges."},
   {id:"documentation",name:"Bibliothèque médicale locale",status:"prêt",detail:"Fiches de fibromyalgie et aide déterministe disponibles sans Mistral."},
-  {id:"local",name:"LLM sur appareil",status:local.ready?"prêt":"non chargé",detail:local.ready?"Modèle actif : "+String(local.modelId||"local").slice(0,90):"Chargez un modèle WebGPU facultatif dans les options."},
   {id:"mistral",name:"Mistral AI",status:!remote.connected?"déconnecté":cooldown?"limité (429)":"configuré",detail:cooldown?"Quota atteint : nouvelle tentative possible dans environ "+cooldown+" secondes. Aucun appel automatique.":remote.connected?"Clé disponible ; le vrai test nécessite un appel API consenti.":"Utilisation facultative avec votre clé API."},
   {id:"internet",name:"Recherche Internet",status:internet?"autorisée":"désactivée",detail:"Les recherches libres nécessitent une confirmation distincte pour chaque question."}
  ];

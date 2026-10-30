@@ -27,7 +27,7 @@ const PROVIDERS=Object.freeze([
  {id:"wikipedia-en",name:"Wikipédia anglophone",kind:"encyclopédie de secours",origin:"https://en.wikipedia.org"}
 ]);
 export const PUBLIC_PROVIDERS=PROVIDERS.map(x=>Object.freeze({...x}));
-export const SAFE_LINK_HOSTS=Object.freeze(["fr.wikipedia.org","en.wikipedia.org","www.wikidata.org","fr.wiktionary.org","openalex.org","doi.org","openlibrary.org","github.com","europepmc.org","www.ebi.ac.uk","api.openalex.org","www.ameli.fr","www.has-sante.fr","www.nccih.nih.gov","medlineplus.gov","www.medlineplus.gov"]);
+export const SAFE_LINK_HOSTS=Object.freeze(["fr.wikipedia.org","en.wikipedia.org","www.wikidata.org","fr.wiktionary.org","openalex.org","doi.org","openlibrary.org","github.com","europepmc.org","www.ebi.ac.uk","api.openalex.org","www.ameli.fr","www.has-sante.fr","www.nccih.nih.gov","medlineplus.gov","www.medlineplus.gov","open-meteo.com","date.nager.at"]);
 export function safeReferenceUrl(url){
  try{const u=new URL(String(url));return u.protocol==="https:"&&!u.username&&!u.password&&SAFE_LINK_HOSTS.includes(u.hostname)&&!u.port&&u.href.length<800?u.href:null;}
  catch{return null;}
