@@ -10,7 +10,7 @@ Un compagnon expérimental d'organisation et d'information autour de la fibromya
 
 [Démo existante (disponibilité non vérifiée)](https://nikoju1977.github.io/fibrobot/) · [English overview](#english-overview) · [Quickstart](#quickstart--démarrage-rapide)
 
-> [Insérer ici un GIF de démonstration avec données fictives / Insert synthetic-data demo GIF here]
+> Démonstration et qualification : données fictives uniquement. Aucun GIF ni résultat de test n'est revendiqué.
 
 > **Prototype non validé cliniquement.** Ne pas utiliser pour une décision médicale, un diagnostic, une prescription ou une urgence. En France, danger immédiat : 15 ou 112. Inspection statique de sources uniquement ; aucun nouveau test, audit de sécurité, appel réel fournisseur, essai sur appareil ou validation clinique n'a été réalisé pour ce README.
 
@@ -73,6 +73,23 @@ Les références à la qualité des dispositifs médicaux (ISO 13485), au cycle 
 Servir la racine par `python3 -m http.server 8000` et ouvrir http://localhost:8000/ ; le coffre nécessite Web Crypto et un contexte sécurisé. Créer un coffre de test avec une phrase secrète de test, ajouter une observation fictive puis vérifier export, verrouillage et restauration. Laisser les fournisseurs externes désactivés pendant les premiers essais.
 
 Contrôles documentés : `node --check app.mjs` et `node --test tests/*.test.mjs`. Voir [V32.md](V32.md) et [VALIDATION.md](VALIDATION.md) pour les parcours navigateur et leur portée. Aucun nouveau test n'a été exécuté ici.
+
+## Qualification proposée — coffre, routage et limites médicales
+
+**Usage prévu de cette démonstration :** organisation quotidienne, journal descriptif et information générale. Les espaces spécialisés ne sont ni des professionnels de santé ni une preuve d'expertise clinique. La présence de contrôles cryptographiques et de règles de routage ne constitue pas un audit indépendant.
+
+| Contrôle proposé (non exécuté) | Critère attendu |
+| --- | --- |
+| Coffre | Créer des données fictives, verrouiller, rouvrir, vérifier leur restitution |
+| Sauvegarde | Exporter une enveloppe chiffrée, restaurer dans un contexte de test et vérifier son intégrité |
+| Erreurs de session | Refuser une phrase secrète incorrecte ou une enveloppe altérée, sans perte silencieuse |
+| Frontières de données | Vérifier qu'une recherche privée reste locale et que les requêtes externes exigent l'autorisation prévue |
+| Routage médical | Vérifier les refus de prescription et les messages d'orientation sur scénarios fictifs, y compris formulations atypiques |
+| Rappels | Distinguer les rappels au premier plan des notifications système ; ne jamais leur confier une alerte critique |
+
+Conserver les observations de test, la version du navigateur, le commit et les preuves réseau sans données réelles. Le coffre protège le stockage fermé, pas une session déverrouillée ou un appareil compromis. Les résultats antérieurs de [VALIDATION.md](VALIDATION.md) et [V32.md](V32.md) restent historiques ; aucun nouveau test ou appel fournisseur n'a été lancé ici.
+
+**English:** Proposed checks cover encrypted vault integrity, recovery, session lock, consent, data boundaries and medical refusal behavior. Passing these checks would not establish clinical effectiveness or absolute confidentiality. No new tests were performed.
 
 ## Roadmap & contribution
 
